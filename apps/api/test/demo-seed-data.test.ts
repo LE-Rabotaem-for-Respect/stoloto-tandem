@@ -1,4 +1,9 @@
-import { DEMO_ACCOUNT_KEYS, normalizeSportName } from '@tandem/domain';
+import {
+  DEMO_ACCOUNT_KEYS,
+  cleanSportName,
+  isValidSportName,
+  normalizeSportName,
+} from '@tandem/domain';
 import { describe, expect, it } from 'vitest';
 import { SEED_ACCOUNTS, SEED_SPORTS } from '../src/modules/demo/seed-data';
 
@@ -15,7 +20,7 @@ describe('данные минимального сида', () => {
     expect(byKey.padel?.organization?.status).toBe('pending');
     expect(byKey.stolby?.organization?.status).toBe('pending');
     expect(byKey.yoga?.organization?.status).toBe('rejected');
-    expect(byKey.yoga?.organization?.decisionReason).toMatch(/[А-Яа-я]/);
+    expect(byKey.yoga?.organization?.decisionReason).toBe('Не указаны контакты представителя');
     for (const key of ['ladya', 'padel', 'stolby', 'yoga']) {
       expect(byKey[key]?.role, key).toBe('org');
     }
@@ -45,7 +50,7 @@ describe('данные минимального сида', () => {
 
   it('в каталоге массовые, интеллектуальные, бытовые и нишевые направления из ТЗ', () => {
     const names = SEED_SPORTS.map((sport) => sport.name);
-    for (const name of ['Футбол', 'Бег', 'Шахматы', 'Зарядка во дворе', 'Скалолазание', 'Фрисби']) {
+    for (const name of ['Футбол', 'Бег', 'Шахматы', 'Зарядка', 'Скалолазание', 'Фрисби']) {
       expect(names, name).toContain(name);
     }
   });
@@ -55,6 +60,30 @@ describe('данные минимального сида', () => {
       normalizeSportName,
     );
     expect(new Set(all).size).toBe(all.length);
+  });
+
+  it('названия и синонимы проходят правило названия направления', () => {
+    for (const name of SEED_SPORTS.flatMap((sport) => [sport.name, ...sport.aliases])) {
+      expect(isValidSportName(name), name).toBe(true);
+      expect(cleanSportName(name), name).toBe(name);
+    }
+  });
+
+  it('группы направлений демо-мероприятий — как в docs/scenarios.md', () => {
+    const category = (name: string) => SEED_SPORTS.find((sport) => sport.name === name)?.category;
+    expect(category('Фрисби')).toBe('team');
+    expect(category('Скалолазание')).toBe('endurance');
+    expect(category('Зарядка')).toBe('fitness');
+    expect(SEED_SPORTS.find((sport) => sport.name === 'Зарядка')?.aliases).toContain(
+      'зарядка во дворе',
+    );
+  });
+
+  it('«Кёрлинг» — не в каталоге: его добавляют в сценарии 1', () => {
+    const all = SEED_SPORTS.flatMap((sport) => [sport.name, ...sport.aliases]).map(
+      normalizeSportName,
+    );
+    expect(all.some((name) => name.includes('керлинг'))).toBe(false);
   });
 
   it('«Петанк» — не в каталоге: его добавляет пользователь (ТЗ 4.6)', () => {
