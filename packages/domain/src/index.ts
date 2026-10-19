@@ -17,6 +17,12 @@ export {
 export type { StatusTone, StatusView } from './statuses';
 export { normalizeSportName } from './sport-normalize';
 export {
+  DEFAULT_SPORT_CATEGORY,
+  SPORT_CATEGORIES,
+  SPORT_CATEGORY_TITLES,
+} from './sport-categories';
+export type { SportCategory } from './sport-categories';
+export {
   TIME_ZONE,
   dayRange,
   endOfDay,
