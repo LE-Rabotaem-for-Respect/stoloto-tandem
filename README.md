@@ -57,3 +57,9 @@ npm run e2e                       # адрес меняется переменн
 
 Те же lint, типы, тесты и сборка выполняются в GitHub Actions на каждый
 PR в `prod` и push в `prod`.
+
+## Графика
+
+Обложки групп направлений и пиктограммы — собственные, сторонних
+наборов нет. Источники и правила использования —
+[`apps/web/src/shared/illustrations/SOURCES.md`](apps/web/src/shared/illustrations/SOURCES.md).
