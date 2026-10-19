@@ -229,6 +229,40 @@ describe('POST /events', () => {
       'title',
     ],
     ['невидимый пробел в районе', { area: `Цент${String.fromCodePoint(0x200b)}ральный` }, 'area'],
+    // По краям U+FEFF снял бы trim — ставим в середину, чтобы проверить само правило
+    ['BOM в середине города', { city: `Красно${String.fromCodePoint(0xfeff)}ярск` }, 'city'],
+    [
+      'метка слева направо в месте',
+      { placeText: `Поле ${String.fromCodePoint(0x200e)}у школы` },
+      'placeText',
+    ],
+    [
+      'метка справа налево в названии',
+      { title: `Футбол ${String.fromCodePoint(0x200f)}7×7` },
+      'title',
+    ],
+    ['арабская метка в названии', { title: `Футбол ${String.fromCodePoint(0x61c)}7×7` }, 'title'],
+    [
+      'словесный соединитель в районе',
+      { area: `Цент${String.fromCodePoint(0x2060)}ральный` },
+      'area',
+    ],
+    // Многострочные поля: переводы строк можно, остальное — нет
+    [
+      'переворот текста в описании',
+      { description: `Играем ${String.fromCodePoint(0x202e)}7 на 7` },
+      'description',
+    ],
+    [
+      'управляющий символ в «Информации для участников»',
+      { participantInfo: `Раздевалка ${String.fromCodePoint(0x7)}открыта` },
+      'participantInfo',
+    ],
+    [
+      'изоляция направления в вопросе к заявке',
+      { mode: 'approval', applyQuestion: `Ваш ${String.fromCodePoint(0x2067)}опыт?` },
+      'applyQuestion',
+    ],
     ['неверный sportId, новое — null', { sportId: 'not-a-uuid', newSport: null }, 'sportId'],
     ['переворот текста в названии', { title: 'Футбол 7×7 \u202e' }, 'title'],
     ['управляющий символ в месте', { placeText: 'Поле \u0007 у школы' }, 'placeText'],
@@ -313,17 +347,8 @@ describe('GET /events/:id', () => {
 
   it('после перемотки демо-часов назад «новее» оказалась отменённая запись — участник всё равно участник', async () => {
     const viewer = await account('user');
-    // Записался, отменил, записался снова, а часы перемотали назад: у активной записи
-    // время создания раньше, чем у отменённой
-    await prisma.participation.create({
-      data: {
-        eventId,
-        userId: viewer.id,
-        status: 'confirmed',
-        createdAt: new Date('2026-10-19T10:00:00Z'),
-        updatedAt: new Date('2026-10-19T10:00:00Z'),
-      },
-    });
+    // Записался и отменил, часы перемотали назад, записался снова: отменённая запись
+    // создана раньше по порядку, но её время по Clock позже, чем у активной
     await prisma.participation.create({
       data: {
         eventId,
@@ -331,6 +356,15 @@ describe('GET /events/:id', () => {
         status: 'cancelled',
         createdAt: new Date('2026-10-20T10:00:00Z'),
         updatedAt: new Date('2026-10-20T10:00:00Z'),
+      },
+    });
+    await prisma.participation.create({
+      data: {
+        eventId,
+        userId: viewer.id,
+        status: 'confirmed',
+        createdAt: new Date('2026-10-19T10:00:00Z'),
+        updatedAt: new Date('2026-10-19T10:00:00Z'),
       },
     });
     const response = await get(viewer, eventId);
