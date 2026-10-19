@@ -56,7 +56,10 @@ export class AdminController {
 
   @Get('events')
   @Roles('admin')
-  eventsList(@CurrentActor() actor: Actor, @Query() query: AdminEventsQuery): Promise<AdminEventList> {
+  eventsList(
+    @CurrentActor() actor: Actor,
+    @Query() query: AdminEventsQuery,
+  ): Promise<AdminEventList> {
     return this.events.adminList(
       actor,
       { text: query.q || undefined, status: query.status, organizationId: query.organizationId },
