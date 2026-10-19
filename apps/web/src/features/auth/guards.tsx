@@ -25,13 +25,10 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 const PENDING_KEY = 'tandem-pending-action';
-// Действие ждёт входа не дольше 10 минут: вернувшийся позже человек нажмёт кнопку сам
-const PENDING_TTL_MS = 10 * 60_000;
 
 interface PendingAction {
   path: string;
   intent: string;
-  at: number;
 }
 
 function rememberAction(pending: PendingAction) {
@@ -42,15 +39,20 @@ function rememberAction(pending: PendingAction) {
   }
 }
 
-/** Забирает отложенное действие, если его оставил клик гостя на этой странице в этой вкладке. */
+/**
+ * Забирает отложенное действие, если его оставил клик гостя на этой странице
+ * в этой вкладке. Метка одноразовая: вошедший человек на другой странице её
+ * просто выбрасывает — брошенный когда-то вход не запустит действие позже.
+ */
 function takeAction(path: string, intent: string): boolean {
   try {
     const raw = sessionStorage.getItem(PENDING_KEY);
     if (!raw) return false;
     const pending = JSON.parse(raw) as Partial<PendingAction>;
-    if (pending.path !== path || pending.intent !== intent) return false;
+    // Метку для другого действия этой же страницы забирает его собственный хук
+    if (pending.path === path && pending.intent !== intent) return false;
     sessionStorage.removeItem(PENDING_KEY);
-    return typeof pending.at === 'number' && Date.now() - pending.at < PENDING_TTL_MS;
+    return pending.path === path;
   } catch {
     return false;
   }
@@ -83,7 +85,7 @@ export function useAuthAction(intent: string, action: () => void): () => void {
       action();
       return;
     }
-    rememberAction({ path: pathname, intent, at: Date.now() });
+    rememberAction({ path: pathname, intent });
     void navigate(loginPath(pathname + search));
   };
 }

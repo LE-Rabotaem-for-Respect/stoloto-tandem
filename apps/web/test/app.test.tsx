@@ -230,7 +230,7 @@ describe('действие гостя', () => {
     fakeApi({ signedIn: anna });
     sessionStorage.setItem(
       'tandem-pending-action',
-      JSON.stringify({ path: '/events/2', intent: 'join', at: Date.now() }),
+      JSON.stringify({ path: '/events/2', intent: 'join' }),
     );
     const onJoin = vi.fn();
     renderApp(
@@ -244,6 +244,8 @@ describe('действие гостя', () => {
     await screen.findByRole('button', { name: 'Сменить аккаунт' });
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(onJoin).not.toHaveBeenCalled();
+    // Брошенная метка выброшена — позже на той странице действие само не запустится
+    expect(sessionStorage.getItem('tandem-pending-action')).toBeNull();
   });
 
   it('вошедший выполняет действие сразу', async () => {
