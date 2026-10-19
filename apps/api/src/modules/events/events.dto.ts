@@ -136,7 +136,7 @@ export class EventFeedQuery {
 
   @IsOptional()
   @IsUUID('all', { message: 'Выберите направление из списка' })
-  sportId?: string;
+  sport?: string;
 
   @IsOptional()
   @IsIn(SPORT_CATEGORIES, { message: 'Выберите группу из списка' })

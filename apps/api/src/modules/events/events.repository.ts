@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { EventLevel, EventMode, ParticipationStatus, SportCategory } from '@tandem/domain';
+import { escapeLike } from '../../core/prisma/like';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import type { Prisma } from '../../generated/prisma/client';
 
@@ -32,12 +33,16 @@ export interface FeedFilter {
   mode?: EventMode;
 }
 
-const insensitive = (value: string) => ({ equals: value, mode: 'insensitive' as const });
+// Prisma строит и equals без учёта регистра, и contains через ILIKE: ввод экранируется
+const insensitive = (value: string) => ({
+  equals: escapeLike(value),
+  mode: 'insensitive' as const,
+});
 
 function feedWhere(filter: FeedFilter): Prisma.EventWhereInput {
   const and: Prisma.EventWhereInput[] = [{ status: 'published' }, { endsAt: { gt: filter.now } }];
   if (filter.text !== undefined) {
-    const contains = { contains: filter.text, mode: 'insensitive' as const };
+    const contains = { contains: escapeLike(filter.text), mode: 'insensitive' as const };
     and.push({
       OR: [
         { title: contains },
@@ -47,7 +52,7 @@ function feedWhere(filter: FeedFilter): Prisma.EventWhereInput {
           sport: {
             status: 'active',
             OR: [
-              { normalizedName: { contains: filter.sportText ?? '' } },
+              { normalizedName: { contains: escapeLike(filter.sportText ?? '') } },
               { aliases: { has: filter.sportText ?? '' } },
             ],
           },

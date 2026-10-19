@@ -189,6 +189,27 @@ describe('GET /events — фильтры', () => {
     expect(await titles({ date })).toEqual(expected);
   });
 
+  it('ровно полночь по Красноярску — уже следующие сутки; кончилось ровно сейчас — не в ленте', async () => {
+    const ownCity = `${city} граница`;
+    const boundary = { city: ownCity };
+    await event('Ровно в полночь', '2026-10-22T00:00', '2026-10-22T00:30', boundary);
+    await event('Кончилось ровно сейчас', '2026-10-21T09:00', '2026-10-21T10:00', boundary);
+    expect(await titles({ city: ownCity, date: 'tomorrow' })).toEqual(['Ровно в полночь']);
+    expect(await titles({ city: ownCity, date: 'today' })).toEqual([]);
+    expect(await titles({ city: ownCity })).toEqual(['Ровно в полночь']);
+    // Город — без учёта регистра
+    expect(await titles({ city: ownCity.toUpperCase() })).toEqual(['Ровно в полночь']);
+  });
+
+  it('% и _ в тексте, городе и районе — обычные символы, а не шаблон', async () => {
+    expect(await titles({ q: '%' })).toEqual([]);
+    expect(await titles({ q: '_' })).toEqual([]);
+    expect(await titles({ q: 'Ф%бол' })).toEqual([]);
+    expect(await titles({ area: '%' })).toEqual([]);
+    expect((await feed({ city: '%' })).body.items).toEqual([]);
+    expect((await feed({ city: city.replace(' ', '_') })).body.items).toEqual([]);
+  });
+
   it('диапазон дат включает обе границы', async () => {
     expect(await titles({ from: '2026-10-22', to: '2026-10-23' })).toEqual([
       'Пробежка в полночь',
@@ -218,7 +239,7 @@ describe('GET /events — фильтры', () => {
   });
 
   it('направление и группа', async () => {
-    expect(await titles({ sportId: sports.chess })).toEqual(['Блиц в субботу']);
+    expect(await titles({ sport: sports.chess })).toEqual(['Блиц в субботу']);
     expect(await titles({ category: 'intellectual' })).toEqual(['Блиц в субботу']);
   });
 
@@ -271,6 +292,7 @@ describe('GET /events — пагинация и ошибки', () => {
     ['лимит 0', { limit: 0 }, 'limit'],
     ['лимит больше 50', { limit: 51 }, 'limit'],
     ['неизвестная группа', { category: 'mind' }, 'category'],
+    ['направление не UUID', { sport: 'футбол' }, 'sport'],
   ])('%s — 400 с полем', async (_, query, field) => {
     const response = await feed(query);
     expect(response.status).toBe(400);

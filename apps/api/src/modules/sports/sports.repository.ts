@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { SportCategory } from '@tandem/domain';
+import { escapeLike } from '../../core/prisma/like';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import type { Prisma, Sport } from '../../generated/prisma/client';
 
@@ -21,9 +22,6 @@ export interface NewSportRecord {
   category: SportCategory;
   createdById: string;
 }
-
-// В LIKE символы % и _ из запроса — обычные буквы, а не шаблон
-const escapeLike = (text: string) => text.replace(/[\\%_]/g, (char) => `\\${char}`);
 
 @Injectable()
 export class SportsRepository {

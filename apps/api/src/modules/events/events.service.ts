@@ -250,7 +250,7 @@ export class EventsService {
         now,
         text,
         sportText: text && normalizeSportName(text),
-        sportId: query.sportId,
+        sportId: query.sport,
         category: query.category,
         startsFrom: range?.from,
         startsBefore: range?.to,
