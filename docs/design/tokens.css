@@ -7,7 +7,7 @@
  */
 
 :root,
-[data-theme="default"] {
+[data-theme='default'] {
   /* Основная палитра */
   --color-paper: #eef3f2;
   --color-surface: #ffffff;
@@ -58,7 +58,7 @@
   --shadow-card: 0 1px 0 var(--color-line);
 }
 
-[data-theme="contrast"] {
+[data-theme='contrast'] {
   --color-paper: #000000;
   --color-surface: #000000;
   --color-ink: #ffffff;
@@ -109,11 +109,11 @@
 }
 
 :root,
-[data-text="normal"] {
+[data-text='normal'] {
   --text-scale: 1;
 }
 
-[data-text="large"] {
+[data-text='large'] {
   --text-scale: 1.25;
 }
 
@@ -121,16 +121,21 @@
 [data-theme],
 [data-text] {
   /* Шрифты */
-  --font-text: "Golos Text", "Segoe UI", Roboto, Arial, sans-serif;
-  --font-display: "Unbounded", "Golos Text", "Segoe UI", Arial, sans-serif;
+  --font-text: 'Golos Text Variable', 'Golos Text', 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-display:
+    'Unbounded Variable', 'Unbounded', 'Golos Text Variable', 'Segoe UI', Arial, sans-serif;
 
   /* Размеры в rem (уважают настройку шрифта браузера), умножены на масштаб темы.
      База 18 px = 1.125rem. Размер шрифта на html не меняется, иначе rem перестанет быть 16 px */
   --fs-caption: calc(0.9375rem * var(--text-scale)); /* 15 px — только подписи рядом с графикой */
   --fs-body: calc(1.125rem * var(--text-scale)); /* 18 px */
   --fs-lead: calc(1.25rem * var(--text-scale)); /* 20 px */
-  --fs-title: calc(1.5rem * var(--text-scale)); /* 24 px — заголовок карточки и экрана на мобильном */
-  --fs-display: calc(2rem * var(--text-scale)); /* 32 px — число на листке даты, заголовок на десктопе */
+  --fs-title: calc(
+    1.5rem * var(--text-scale)
+  ); /* 24 px — заголовок карточки и экрана на мобильном */
+  --fs-display: calc(
+    2rem * var(--text-scale)
+  ); /* 32 px — число на листке даты, заголовок на десктопе */
   --lh-text: 1.45;
   --lh-tight: 1.15;
 
