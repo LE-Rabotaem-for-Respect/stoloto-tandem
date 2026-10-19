@@ -249,16 +249,19 @@ describe('actions[]: пример для карточки события', () =>
 
   it('у снятого и удалённого мероприятия обсуждение неактивно для всех ролей (ТЗ 2.10)', () => {
     const unavailable = { code: 'post_message', enabled: false, reason: 'Мероприятие недоступно' };
+    const actors = { guest, user, author, orgApproved, orgPending, admin };
     for (const status of ['unpublished', 'deleted'] as const) {
-      for (const actor of [guest, user, author, orgApproved, orgPending, admin]) {
-        const actions = eventActions(
-          actor,
-          { ...userEvent, status, mode: 'free', hasSeats: true },
-          null,
-          now,
-        );
-        const postMessage = actions.find((action) => action.code === 'post_message');
-        expect(postMessage, `${actor.role}, ${status}`).toEqual(unavailable);
+      for (const base of [userEvent, orgEvent]) {
+        for (const [name, actor] of Object.entries(actors)) {
+          const actions = eventActions(
+            actor,
+            { ...base, status, mode: 'free', hasSeats: true },
+            null,
+            now,
+          );
+          const postMessage = actions.find((action) => action.code === 'post_message');
+          expect(postMessage, `${name}, ${status}`).toEqual(unavailable);
+        }
       }
     }
   });
