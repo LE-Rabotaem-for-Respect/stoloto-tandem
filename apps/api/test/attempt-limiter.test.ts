@@ -50,6 +50,36 @@ describe('счётчик попыток', () => {
   });
 });
 
+describe('память счётчика', () => {
+  it('сверх предела ключей забывается самое старое окно, а не новое', () => {
+    const clock = { now: 1_000_000 };
+    const limit = new AttemptLimiter({ attempts: 1, windowMs: 10 * MINUTE }, () => clock.now, 3);
+    for (const key of ['a', 'b', 'c']) {
+      limit.hit(key);
+      clock.now += 1;
+    }
+    limit.hit('d');
+    expect(() => limit.hit('a')).not.toThrow();
+    expect(() => limit.hit('c')).toThrow(ApiError);
+    expect(() => limit.hit('d')).toThrow(ApiError);
+  });
+
+  it('истёкшие окна забываются и не занимают место живых', () => {
+    const clock = { now: 1_000_000 };
+    const limit = new AttemptLimiter({ attempts: 1, windowMs: 10 * MINUTE }, () => clock.now, 2);
+    limit.hit('a');
+    clock.now += 1;
+    limit.hit('b');
+    clock.now += 10 * MINUTE;
+    limit.hit('a');
+    clock.now += 1;
+    limit.hit('c');
+    // «a» и «b» истекли и забыты; новое окно «a» живо, «c» его не вытеснило
+    expect(() => limit.hit('a')).toThrow(ApiError);
+    expect(() => limit.hit('b')).not.toThrow();
+  });
+});
+
 describe('ограничение одновременных вычислений', () => {
   function deferred() {
     let release = () => {};
@@ -88,6 +118,8 @@ describe('ограничение одновременных вычислений
     const queued = gate.run(async () => 'ждал');
     await expect(gate.run(async () => 'лишний')).rejects.toMatchObject({
       code: 'too_many_requests',
+      message: 'Сервер занят. Попробуйте через несколько секунд',
+      retryAfterSeconds: 5,
     });
     first.release();
     await running;

@@ -32,7 +32,9 @@ services:
       db:
         condition: service_healthy
     ports:
-      - '${API_PORT:-3000}:3000'
+      # Только с этого компьютера: api доверяет X-Forwarded-For от внутренних адресов,
+      # снаружи запросы идут через web, а он ставит адрес клиента сам
+      - '127.0.0.1:${API_PORT:-3000}:3000'
 
   web:
     build:

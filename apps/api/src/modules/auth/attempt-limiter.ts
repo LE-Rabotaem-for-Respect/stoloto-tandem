@@ -11,6 +11,7 @@ export interface AuthLimits {
   loginPerIp: Limit;
   loginPerEmail: Limit;
   registerPerIp: Limit;
+  registerPerEmail: Limit;
 }
 
 export const AUTH_LIMITS = Symbol('AUTH_LIMITS');
@@ -25,7 +26,11 @@ export const DEFAULT_AUTH_LIMITS: AuthLimits = {
   loginPerIp: { attempts: 30, windowMs: 10 * MINUTE },
   loginPerEmail: { attempts: 10, windowMs: 10 * MINUTE },
   registerPerIp: { attempts: 10, windowMs: 60 * MINUTE },
+  registerPerEmail: { attempts: 5, windowMs: 60 * MINUTE },
 };
+
+/** Сколько ключей держит один счётчик; сверх — забываются самые старые окна. */
+export const MAX_KEYS = 10_000;
 
 interface Window {
   startedAt: number;
@@ -43,6 +48,7 @@ export class AttemptLimiter {
   constructor(
     private readonly limit: Limit,
     private readonly now: () => number,
+    private readonly maxKeys = MAX_KEYS,
   ) {}
 
   /** Засчитывает попытку; сверх лимита — 429 с `Retry-After`. */
@@ -51,6 +57,9 @@ export class AttemptLimiter {
     this.forgetExpired(now);
     const window = this.windows.get(key);
     if (!window || now - window.startedAt >= this.limit.windowMs) {
+      // Новое окно — в конец: окна в Map идут по времени начала, старые всегда впереди
+      this.windows.delete(key);
+      if (this.windows.size >= this.maxKeys) this.forgetOldest();
       this.windows.set(key, { startedAt: now, count: 1 });
       return;
     }
@@ -67,11 +76,16 @@ export class AttemptLimiter {
     window.count += 1;
   }
 
-  // Старые окна убираются, чтобы память не росла от перебора адресов и почт
+  // Истёкшие окна — в начале Map: перебор останавливается на первом живом
   private forgetExpired(now: number) {
-    if (this.windows.size < 1000) return;
     for (const [key, window] of this.windows) {
-      if (now - window.startedAt >= this.limit.windowMs) this.windows.delete(key);
+      if (now - window.startedAt < this.limit.windowMs) return;
+      this.windows.delete(key);
     }
+  }
+
+  private forgetOldest() {
+    const oldest = this.windows.keys().next();
+    if (!oldest.done) this.windows.delete(oldest.value);
   }
 }

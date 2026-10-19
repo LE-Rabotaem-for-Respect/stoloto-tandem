@@ -25,8 +25,13 @@ export class PasswordHasher {
     return stored !== undefined && matches;
   }
 
+  // Неудачная попытка (например, 429 от полной очереди) не запоминается: иначе вход с
+  // незарегистрированной почтой отвечал бы 429 до перезапуска и выдавал, какие почты есть
   private decoy(): Promise<string> {
-    this.decoyHash ??= this.hash(randomBytes(16).toString('hex'));
+    this.decoyHash ??= this.hash(randomBytes(16).toString('hex')).catch((error: unknown) => {
+      this.decoyHash = undefined;
+      throw error;
+    });
     return this.decoyHash;
   }
 

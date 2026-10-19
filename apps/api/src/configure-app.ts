@@ -10,7 +10,8 @@ export function configureApp(app: INestApplication) {
   };
   express.disable('x-powered-by');
   // Адрес клиента — из X-Forwarded-For, но доверяем ему только от внутренних сетей (nginx web
-  // в Docker); запрос прямо на порт api с поддельным заголовком получит свой настоящий адрес
+  // в Docker). Порт api опубликован только на 127.0.0.1 (docker-compose.yml): снаружи до api
+  // доходят только запросы через web, а он перезаписывает заголовок адресом клиента
   express.set('trust proxy', 'loopback, linklocal, uniquelocal');
   app.use(serverTime(app.get(Clock)));
   app.use(sameOriginWrites());

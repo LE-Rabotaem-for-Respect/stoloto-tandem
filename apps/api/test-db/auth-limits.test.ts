@@ -24,6 +24,7 @@ beforeAll(async () => {
       loginPerIp: { attempts: 5, windowMs: 10 * MINUTE },
       loginPerEmail: { attempts: 3, windowMs: 10 * MINUTE },
       registerPerIp: { attempts: 2, windowMs: 60 * MINUTE },
+      registerPerEmail: { attempts: 2, windowMs: 60 * MINUTE },
     })
     .overrideProvider(REAL_TIME)
     .useValue(() => clock.now)
@@ -93,6 +94,13 @@ describe('лимиты попыток входа и регистрации', () 
     expect(blocked.status).toBe(429);
     expect(hash).toHaveBeenCalledTimes(1);
     hash.mockRestore();
+  });
+
+  it('регистрация: лимит по почте — с другого адреса тоже 429', async () => {
+    const email = `busy-${randomUUID()}@example.ru`;
+    expect((await register('192.0.2.20', email)).status).toBe(201);
+    expect((await register('192.0.2.21', email)).status).toBe(409);
+    expect((await register('192.0.2.22', email)).status).toBe(429);
   });
 
   it('адрес клиента — самый правый недоверенный: подставленные левее значения не обходят лимит', async () => {

@@ -25,6 +25,7 @@ export class AuthService {
   private readonly loginPerIp: AttemptLimiter;
   private readonly loginPerEmail: AttemptLimiter;
   private readonly registerPerIp: AttemptLimiter;
+  private readonly registerPerEmail: AttemptLimiter;
 
   constructor(
     private readonly repository: AuthRepository,
@@ -38,6 +39,7 @@ export class AuthService {
     this.loginPerIp = new AttemptLimiter(limits.loginPerIp, realNow);
     this.loginPerEmail = new AttemptLimiter(limits.loginPerEmail, realNow);
     this.registerPerIp = new AttemptLimiter(limits.registerPerIp, realNow);
+    this.registerPerEmail = new AttemptLimiter(limits.registerPerEmail, realNow);
   }
 
   /**
@@ -46,6 +48,7 @@ export class AuthService {
    */
   async register(dto: RegisterDto, ip: string, previousToken?: string): Promise<SignedIn> {
     this.registerPerIp.hit(ip);
+    this.registerPerEmail.hit(dto.email);
     if (await this.repository.findUserByEmail(dto.email)) {
       throw new ApiError('conflict', EMAIL_TAKEN);
     }
