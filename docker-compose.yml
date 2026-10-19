@@ -14,8 +14,6 @@ services:
       retries: 10
 
   api:
-    # Имя образа общее для всех стендов: scripts/stands.sh собирает его один раз
-    image: stoloto-tandem-api
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -39,7 +37,6 @@ services:
       - '127.0.0.1:${API_PORT:-3000}:3000'
 
   web:
-    image: stoloto-tandem-web
     build:
       context: .
       dockerfile: apps/web/Dockerfile

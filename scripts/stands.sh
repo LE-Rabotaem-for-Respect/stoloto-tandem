@@ -3,7 +3,7 @@
 # Каждый стенд — отдельный проект Compose: своя база, свой секрет сессий, свои порты
 # (stands/stand-N.env). Сброс и перемотка демо-часов на одном стенде другие не трогают.
 #
-#   sh scripts/stands.sh up [stand-1 …]     собрать образы и поднять стенды
+#   sh scripts/stands.sh up [stand-1 …]     собрать и поднять стенды
 #   sh scripts/stands.sh down [stand-1 …]   остановить (данные стендов сохраняются)
 #   sh scripts/stands.sh ps [stand-1 …]     состояние контейнеров
 #   sh scripts/stands.sh logs stand-2       журнал стенда
@@ -25,7 +25,15 @@ case "$action" in
 esac
 
 if [ $# -eq 0 ]; then
-  set -- $(ls stands | sed -n 's/\.env$//p')
+  for file in stands/*.env; do
+    [ -f "$file" ] || continue
+    name=${file#stands/}
+    set -- "$@" "${name%.env}"
+  done
+  if [ $# -eq 0 ]; then
+    echo "Нет ни одного стенда: в каталоге stands/ нет файлов *.env" >&2
+    exit 2
+  fi
 fi
 
 for stand in "$@"; do
@@ -35,22 +43,20 @@ for stand in "$@"; do
   fi
 done
 
-# Compose для стенда: имя проекта и переменные — из stands/<стенд>.env
+# Compose для стенда: имя проекта и переменные — из stands/<стенд>.env. Переменные
+# стенда из окружения shell сбрасываются: иначе они перекрыли бы файл у всех стендов
 compose() {
   stand=$1
   shift
-  docker compose -p "$stand" --env-file "stands/$stand.env" "$@"
+  env -u STAND_ID -u WEB_PORT -u API_PORT -u DEMO_MODE -u SESSION_SECRET \
+    docker compose -p "$stand" --env-file "stands/$stand.env" "$@"
 }
-
-# Образы общие для всех стендов (image в docker-compose.yml): собираются один раз
-if [ "$action" = up ]; then
-  compose "$1" build
-fi
 
 for stand in "$@"; do
   case "$action" in
+    # Слои образов общие в кэше сборки: второй и третий стенд собираются быстро
     up)
-      compose "$stand" up -d
+      compose "$stand" up -d --build
       echo "$stand — порт $(sed -n 's/^WEB_PORT=//p' "stands/$stand.env")"
       ;;
     down) compose "$stand" down ;;

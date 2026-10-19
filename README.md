@@ -97,14 +97,17 @@ npm run migrate:deploy -w @tandem/api
 три берутся из одного `docker-compose.yml`, и каждый — отдельный проект Compose
 со своей базой, своим секретом сессий и своими портами:
 
-| Стенд     | Приложение | API  | Файл                 |
-| --------- | ---------- | ---- | -------------------- |
-| `stand-1` | 8081       | 3001 | `stands/stand-1.env` |
-| `stand-2` | 8082       | 3002 | `stands/stand-2.env` |
-| `stand-3` | 8083       | 3003 | `stands/stand-3.env` |
+| Стенд     | Приложение | API (только на сервере) | Файл                 |
+| --------- | ---------- | ----------------------- | -------------------- |
+| `stand-1` | 8081       | 3001                    | `stands/stand-1.env` |
+| `stand-2` | 8082       | 3002                    | `stands/stand-2.env` |
+| `stand-3` | 8083       | 3003                    | `stands/stand-3.env` |
+
+Порт API открыт только на `127.0.0.1` сервера; снаружи api доступен через
+приложение: `http://<сервер>:8081/api/…`.
 
 ```sh
-sh scripts/stands.sh up              # собрать образы один раз и поднять все стенды
+sh scripts/stands.sh up              # собрать и поднять все стенды
 sh scripts/stands.sh up stand-2      # только один стенд
 sh scripts/stands.sh ps              # состояние
 sh scripts/stands.sh logs stand-1    # журнал стенда

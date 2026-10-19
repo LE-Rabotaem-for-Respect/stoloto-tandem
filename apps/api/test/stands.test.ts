@@ -41,6 +41,18 @@ describe('стенды stand-1…3 (stands/*.env)', () => {
     expect(ports.filter((port) => ['80', '8080', '3000'].includes(port ?? ''))).toEqual([]);
   });
 
+  it('docker-compose.yml передаёт переменные стенда и не мешает поднять три проекта рядом', () => {
+    const compose = readFileSync(resolve(standsDir, '../docker-compose.yml'), 'utf8');
+    // Значения из stands/*.env доходят до api и до опубликованных портов
+    expect(compose).toContain('STAND_ID: ${STAND_ID:-}');
+    expect(compose).toContain('DEMO_MODE: ${DEMO_MODE:-true}');
+    expect(compose).toMatch(/\$\{API_PORT:-\d+\}:3000/);
+    expect(compose).toMatch(/\$\{WEB_PORT:-\d+\}:80/);
+    // Постоянное имя контейнера или образа у собираемых сервисов столкнуло бы проекты
+    expect(compose).not.toMatch(/container_name:/);
+    expect(compose.match(/^\s+image:/gm)).toHaveLength(1);
+  });
+
   it('у каждого стенда своё имя cookie входа: стенды на одном адресе не делят вход', () => {
     const secret = 'test-session-secret-0123456789abcdef';
     const names = stands.map(
