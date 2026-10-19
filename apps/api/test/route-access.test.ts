@@ -1,8 +1,8 @@
 import 'reflect-metadata';
-import { RequestMethod } from '@nestjs/common';
+import { All, Controller, Get, Post, RequestMethod } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
-import { ModulesContainer } from '@nestjs/core';
+import { MetadataScanner, ModulesContainer } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -19,37 +19,105 @@ interface Route {
   controller: object;
 }
 
-const WRITES = [RequestMethod.POST, RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE];
+// Читающие методы; всё остальное, в том числе `@All()`, считается изменяющим
+const READS = [RequestMethod.GET, RequestMethod.HEAD, RequestMethod.OPTIONS];
 
-// Все маршруты приложения: контроллеры всех модулей и их методы с HTTP-методом
-function collectRoutes(modules: ModulesContainer): Route[] {
-  const routes: Route[] = [];
+type ControllerClass = (new (...args: never[]) => object) & { name: string };
+
+function collectControllers(modules: ModulesContainer): ControllerClass[] {
+  const controllers: ControllerClass[] = [];
   for (const module of modules.values()) {
     for (const wrapper of module.controllers.values()) {
-      const controller = wrapper.metatype as (new (...args: never[]) => object) | null;
-      if (!controller) continue;
-      const prototype = controller.prototype as Record<string, unknown>;
-      for (const key of Object.getOwnPropertyNames(prototype)) {
-        const handler = prototype[key];
-        if (key === 'constructor' || typeof handler !== 'function') continue;
-        const method = Reflect.getMetadata(METHOD_METADATA, handler) as RequestMethod | undefined;
-        const path = Reflect.getMetadata(PATH_METADATA, handler) as string | undefined;
-        if (method === undefined || path === undefined) continue;
-        routes.push({ name: `${controller.name}.${key}`, method, handler, controller });
-      }
+      if (wrapper.metatype) controllers.push(wrapper.metatype as ControllerClass);
+    }
+  }
+  return controllers;
+}
+
+// Методы — как их находит Nest: по всей цепочке прототипов, с унаследованными
+function collectRoutes(controllers: ControllerClass[]): Route[] {
+  const scanner = new MetadataScanner();
+  const routes: Route[] = [];
+  for (const controller of controllers) {
+    const prototype = controller.prototype as Record<string, unknown>;
+    for (const key of scanner.getAllMethodNames(prototype)) {
+      const handler = prototype[key];
+      if (typeof handler !== 'function') continue;
+      const method = Reflect.getMetadata(METHOD_METADATA, handler) as RequestMethod | undefined;
+      const path = Reflect.getMetadata(PATH_METADATA, handler) as string | undefined;
+      if (method === undefined || path === undefined) continue;
+      routes.push({ name: `${controller.name}.${key}`, method, handler, controller });
     }
   }
   return routes;
 }
 
-describe('метки доступа маршрутов', () => {
+const unmarkedWrites = (routes: Route[]) =>
+  routes
+    .filter((route) => !READS.includes(route.method))
+    .filter(
+      (route) =>
+        !Reflect.getMetadata(PUBLIC_KEY, route.handler) &&
+        !Reflect.getMetadata(ROLES_KEY, route.handler),
+    )
+    .map((route) => route.name);
+
+const publicControllers = (controllers: ControllerClass[]) =>
+  controllers
+    .filter((controller) => Reflect.getMetadata(PUBLIC_KEY, controller))
+    .map((controller) => controller.name);
+
+// Образцы того, что проверка обязана заметить: унаследованный POST и @All без метки
+class BaseWrites {
+  @Post('reset')
+  reset() {
+    return undefined;
+  }
+}
+
+@Controller('probe')
+class InheritedWrites extends BaseWrites {
+  @All('any')
+  any() {
+    return undefined;
+  }
+
+  @Get()
+  read() {
+    return undefined;
+  }
+}
+
+@Controller('probe-public')
+class PublicController {}
+Reflect.defineMetadata(PUBLIC_KEY, true, PublicController);
+
+describe('проверка меток видит то, что регистрирует Nest', () => {
+  it('унаследованный изменяющий маршрут и @All без метки', () => {
+    const routes = collectRoutes([InheritedWrites]);
+    expect(routes.map((route) => route.name).sort()).toEqual([
+      'InheritedWrites.any',
+      'InheritedWrites.read',
+      'InheritedWrites.reset',
+    ]);
+    expect(unmarkedWrites(routes).sort()).toEqual(['InheritedWrites.any', 'InheritedWrites.reset']);
+  });
+
+  it('@Public на контроллере без единого своего маршрута', () => {
+    expect(publicControllers([InheritedWrites, PublicController])).toEqual(['PublicController']);
+  });
+});
+
+describe('метки доступа маршрутов приложения', () => {
+  let controllers: ControllerClass[];
   let routes: Route[];
   let close: () => Promise<void>;
 
   beforeAll(async () => {
     process.env.DATABASE_URL ??= 'postgresql://unused@127.0.0.1:1/unused';
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    routes = collectRoutes(moduleRef.get(ModulesContainer));
+    controllers = collectControllers(moduleRef.get(ModulesContainer));
+    routes = collectRoutes(controllers);
     close = () => moduleRef.close();
   });
 
@@ -73,23 +141,11 @@ describe('метки доступа маршрутов', () => {
   });
 
   it('@Public не стоит ни на одном контроллере', () => {
-    const controllers = new Set(routes.map((route) => route.controller));
-    const marked = [...controllers].filter((controller) =>
-      Reflect.getMetadata(PUBLIC_KEY, controller),
-    );
-    expect(marked.map((controller) => (controller as { name: string }).name)).toEqual([]);
+    expect(publicControllers(controllers)).toEqual([]);
   });
 
   it('у каждого изменяющего маршрута метка доступа стоит на самом методе', () => {
-    const unmarked = routes
-      .filter((route) => WRITES.includes(route.method))
-      .filter(
-        (route) =>
-          !Reflect.getMetadata(PUBLIC_KEY, route.handler) &&
-          !Reflect.getMetadata(ROLES_KEY, route.handler),
-      )
-      .map((route) => route.name);
-    expect(unmarked).toEqual([]);
+    expect(unmarkedWrites(routes)).toEqual([]);
   });
 });
 
