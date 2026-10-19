@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canCreateEvent,
   canEditOrganization,
+  canEditMessage,
   canJoin,
   canLeave,
   canManageEvent,
@@ -198,6 +199,34 @@ describe('policies по таблице ТЗ 4.4', () => {
             );
           }
         }
+      }
+    });
+  });
+
+  describe('править и удалять своё сообщение', () => {
+    const own = { authorUserId: 'u-anna' };
+    const byOrg = { authorUserId: 'u-ladya' };
+    it('гость — после входа', () => {
+      expect(canEditMessage(guest, userEvent, own)).toEqual(loginFirst);
+    });
+    it('автор — да, остальные — нет', () => {
+      expect(canEditMessage(user, userEvent, own)).toEqual(yes);
+      expect(canEditMessage(author, userEvent, own)).toEqual(no('not_message_author'));
+      expect(canEditMessage(admin, userEvent, own)).toEqual(no('not_message_author'));
+    });
+    it('организация — своё и только при approved', () => {
+      expect(canEditMessage(orgApproved, userEvent, byOrg)).toEqual(yes);
+      expect(canEditMessage(orgApproved, userEvent, own)).toEqual(no('not_message_author'));
+      const byPadel = { authorUserId: 'u-padel' };
+      expect(canEditMessage(orgPending, userEvent, byPadel)).toEqual(
+        no('organization_not_approved'),
+      );
+    });
+    it('в снятом и удалённом мероприятии — нельзя и автору (ТЗ 2.10)', () => {
+      for (const status of ['unpublished', 'deleted'] as const) {
+        expect(canEditMessage(user, { ...userEvent, status }, own), status).toEqual(
+          no('event_not_available'),
+        );
       }
     });
   });

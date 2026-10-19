@@ -10,6 +10,7 @@ export const ACTION_CODES = [
   'cancel_event',
   'view_participant_info',
   'post_message',
+  'edit_message',
   'edit_organization',
   'submit_organization',
   'hide_message',

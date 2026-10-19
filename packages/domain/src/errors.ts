@@ -26,6 +26,7 @@ const POLICY_ERROR_CODES = [
   'participants_only',
   'not_organization_owner',
   'admins_only',
+  'not_message_author',
 ] as const;
 
 /** Закрытый список кодов ошибок API: `{ code, message, fields? }` (DECISION-002). */
@@ -62,6 +63,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   participants_only: 'Информация доступна подтверждённым участникам и организатору',
   not_organization_owner: 'Это может сделать только представитель организации',
   admins_only: 'Доступно только администратору',
+  not_message_author: 'Это может сделать только автор сообщения',
   invalid_transition: 'Действие недоступно в текущем статусе',
   already_joined: 'Вы уже записаны на это мероприятие',
   rejected_final: 'Заявка отклонена, подать её повторно нельзя',
@@ -100,6 +102,7 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   participants_only: 403,
   not_organization_owner: 403,
   admins_only: 403,
+  not_message_author: 403,
   invalid_transition: 409,
   already_joined: 409,
   rejected_final: 409,

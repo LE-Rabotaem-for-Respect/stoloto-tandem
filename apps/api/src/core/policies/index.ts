@@ -1,6 +1,7 @@
 export {
   canCreateEvent,
   canEditOrganization,
+  canEditMessage,
   canJoin,
   canLeave,
   canManageEvent,

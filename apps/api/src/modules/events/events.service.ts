@@ -191,18 +191,30 @@ export class EventsService {
   }
 
   /**
+   * Мероприятие и запись зрителя, если ему видно мероприятие (ТЗ 2.10); иначе — одинаково
+   * «Мероприятие недоступно». Одно правило для карточки и обсуждения: снятое видят
+   * организатор, администратор и записавшиеся.
+   */
+  async viewable(
+    actor: Actor,
+    id: string,
+  ): Promise<{ event: EventWithCard; participation: ParticipationStatus | null }> {
+    const event = isUUID(id) ? await this.events.findCard(id) : null;
+    if (!event) throw new ApiError('event_not_available');
+    const participation =
+      actor.role === 'user' ? await this.events.viewerParticipation(id, actor.userId) : null;
+    const view = canViewEvent(actor, event, participation);
+    if (!view.allowed) throw new ApiError(view.code);
+    return { event, participation };
+  }
+
+  /**
    * Карточка мероприятия (ТЗ 2.2): статус для показа, организатор, запись текущего
    * пользователя и `actions[]` из тех же политик, что проверяют действия.
    * Недоступное этому пользователю и несуществующее — одинаково «Мероприятие недоступно».
    */
   async card(actor: Actor, id: string): Promise<EventCard> {
-    const event = isUUID(id) ? await this.events.findCard(id) : null;
-    if (!event) throw new ApiError('event_not_available');
-
-    const participation =
-      actor.role === 'user' ? await this.events.viewerParticipation(id, actor.userId) : null;
-    const view = canViewEvent(actor, event, participation);
-    if (!view.allowed) throw new ApiError(view.code);
+    const { event, participation } = await this.viewable(actor, id);
 
     const now = this.clock.now();
     const confirmedCount = await this.events.confirmedCount(id);
