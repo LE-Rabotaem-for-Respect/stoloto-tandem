@@ -212,6 +212,7 @@
     }
 
     .when-relative {
+      font-size: var(--fs-caption);
       color: var(--color-ink-muted);
     }
 
@@ -282,6 +283,7 @@
     }
 
     .seat-row li[data-free] {
+      border-color: var(--color-line-strong);
       background: var(--color-surface);
     }
 
@@ -297,7 +299,7 @@
     /* Статус: текст + иконка + цвет */
     .status {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: var(--space-3);
       padding: var(--space-3) var(--space-4);
       border-radius: var(--radius-control);
@@ -313,6 +315,9 @@
     .status--off { color: var(--status-off-fg); background: var(--status-off-bg); }
 
     .status-text { flex: 1; }
+
+    /* Иконка по первой строке текста: (1.45em − 1.25em) / 2 */
+    .status .icon { margin-top: 0.1em; }
 
     .mode-badge {
       display: inline-flex;
