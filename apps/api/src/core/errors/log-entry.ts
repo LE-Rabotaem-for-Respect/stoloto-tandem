@@ -10,16 +10,24 @@ const hasOwnMessage = (error: Error) =>
   error instanceof ApiError || error instanceof TransitionError;
 
 // Кадр V8: «at функция (путь:строка:столбец)» или «at путь:строка:столбец». Функция —
-// идентификаторы через точку (с async, new, [as x], <anonymous>, #приватные), путь — без
-// пробелов, а «@» — только в начале части пути (node_modules/@prisma): в имени с пробелом
-// или в пути вида «anna@demo» мог оказаться текст сообщения
+// идентификаторы через точку (с async, new, [as x], <anonymous>, #приватные). Путь — белый
+// список ASCII-символов по частям: «@» только в начале части (node_modules/@prisma), «\» —
+// только разделитель в путях вида C:\. Так не проходят почта, «%40», «＠», кириллица,
+// управляющие и невидимые символы (ANSI-последовательности рисуют поддельные строки журнала)
 const identifier = String.raw`(?:#?[\w$]+|<anonymous>)`;
 const functionName = String.raw`(?:async )?(?:new )?${identifier}(?:\.${identifier})*(?: \[as [\w$]+\])?`;
-const location = String.raw`(?:node:|file:\/\/|[A-Za-z]:[\\/]|\/)(?:[^()\s@]|(?<=[\\/])@)*:\d+:\d+`;
+const part = String.raw`[\w.$~+-]*`;
+const posixPath = String.raw`\/@?${part}(?:\/@?${part})*`;
+const windowsPath = String.raw`[A-Za-z]:\\@?${part}(?:\\@?${part})*`;
+const location = String.raw`(?:node:${part}(?:\/${part})*|file:\/\/(?:\/[A-Za-z]:)?${posixPath}|${windowsPath}|${posixPath}):\d+:\d+`;
 const frameLine = new RegExp(
   String.raw`^ +at (?:${functionName} \(${location}\)|(?:async )?${location})$`,
 );
 const frameLike = /^ +at /;
+const anyFrameLike = /\n +at /;
+
+/** Строка вместо кадров, когда `stack` не совпал с сообщением */
+const FRAMES_SKIPPED = '(кадры стека не записаны)';
 
 /** Длина заголовка «имя: сообщение» (или «имя» при пустом сообщении) в начале `stack`, иначе -1. */
 function headerLength(stack: string, message: unknown): number {
@@ -38,15 +46,15 @@ function headerLength(stack: string, message: unknown): number {
  * сообщения вида «    at …» иначе прошли бы за кадры. Если `stack` начинается ровно с этого
  * заголовка, кадры — сплошной блок сразу после него, до первой строки другого вида: так
  * отбрасывается и склеенное «Caused by». Если заголовок не совпал (сообщение или стек
- * изменили после создания ошибки, в том числе укоротили посреди строки), остаются лишь
- * строки формата кадра из всего `stack`.
+ * изменили после создания ошибки, в том числе укоротили или очистили), где кончается
+ * сообщение, уже не узнать — кадры не пишутся, вместо них пометка.
  */
 function stackFrames(error: Error): string[] {
   const stack = typeof error.stack === 'string' ? error.stack : '';
   const length = headerLength(stack, error.message);
   const rest = length < 0 ? '' : stack.slice(length);
   if (length < 0 || (rest && !rest.startsWith('\n'))) {
-    return stack.split('\n').filter((line) => frameLine.test(line));
+    return anyFrameLike.test(stack) ? [FRAMES_SKIPPED] : [];
   }
   const frames: string[] = [];
   for (const line of rest.split('\n').slice(1)) {
@@ -58,7 +66,9 @@ function stackFrames(error: Error): string[] {
 }
 
 function describeError(error: Error): string {
-  const name = safeName.test(error.name) ? error.name : 'Error';
+  // Читаем один раз: геттер мог бы отдать на проверку одно, а в журнал — другое
+  const rawName: unknown = error.name;
+  const name = typeof rawName === 'string' && safeName.test(rawName) ? rawName : 'Error';
   const rawCode: unknown = 'code' in error ? error.code : undefined;
   const code = typeof rawCode === 'string' && safeCode.test(rawCode) ? ` ${rawCode}` : '';
   const head = hasOwnMessage(error) ? `${name}${code}: ${error.message}` : `${name}${code}`;
