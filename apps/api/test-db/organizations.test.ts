@@ -106,6 +106,13 @@ describe('профиль организации', () => {
     expect(noSite.body.website).toBeNull();
   });
 
+  it('свою организацию с данными представителя браузер не кеширует', async () => {
+    const { cookie, id } = await organizationAccount();
+    const own = await http().get(`/organizations/${id}`).set('Cookie', cookie);
+    expect(own.status).toBe(200);
+    expect(own.headers['cache-control']).toBe('no-store');
+  });
+
   it('ошибки полей: неверная ссылка и несуществующее направление', async () => {
     const { cookie, id } = await organizationAccount();
     const badSite = await http()

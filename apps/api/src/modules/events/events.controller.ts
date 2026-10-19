@@ -26,7 +26,8 @@ export class EventsController {
     return this.events.feed(query);
   }
 
-  // Гость видит карточки опубликованных событий (ТЗ 2.6); что ещё ему видно — решает canViewEvent
+  // Гость видит карточки опубликованных событий (ТЗ 2.6); что ещё ему видно — решает canViewEvent.
+  // Ответ зависит от того, кто смотрит («Информация для участников»): кешировать его нельзя
   @Public()
   @Get(':id')
   card(@CurrentActor() actor: Actor, @Param('id') id: string): Promise<EventCard> {

@@ -1,6 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { Clock, serverTime } from './core/clock';
-import { ApiExceptionFilter, sameOriginWrites, validationPipe } from './core/errors';
+import { ApiExceptionFilter, noStore, sameOriginWrites, validationPipe } from './core/errors';
 
 /** Общая настройка приложения: одна и та же в main.ts и в тестах; вызывать до init(). */
 export function configureApp(app: INestApplication) {
@@ -14,6 +14,7 @@ export function configureApp(app: INestApplication) {
   // доходят только запросы через web, а он перезаписывает заголовок адресом клиента
   express.set('trust proxy', 'loopback, linklocal, uniquelocal');
   app.use(serverTime(app.get(Clock)));
+  app.use(noStore());
   app.use(sameOriginWrites());
   app.useGlobalPipes(validationPipe());
   app.useGlobalFilters(new ApiExceptionFilter());

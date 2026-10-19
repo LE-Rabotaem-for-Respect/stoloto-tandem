@@ -160,12 +160,34 @@ describe('POST /events', () => {
     expect(search.body.items).toEqual([expect.objectContaining({ id: response.body.sport.id })]);
   });
 
+  it('эмодзи с соединителем и селектором начертания и мягкий перенос — допустимы', async () => {
+    const runner = String.fromCodePoint(0x1f3c3, 0x200d, 0x2640, 0xfe0f);
+    const softHyphen = String.fromCodePoint(0xad);
+    const title = `Бег ${runner} вместе`;
+    const description = `Пробеж${softHyphen}ка по набережной ${runner}`;
+    const response = await post(igor, { ...validEvent(), title, description });
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({ title, description });
+  });
+
   it('в описании и «Информации для участников» допустимы переводы строк', async () => {
     const newline = String.fromCharCode(10);
     const description = `Играем 7 на 7${newline}Команды делим на месте`;
     const response = await post(igor, { ...validEvent(), description });
     expect(response.status).toBe(201);
     expect(response.body.description).toBe(description);
+  });
+
+  it('переводы строк Windows в описании сохраняются как обычные', async () => {
+    const [cr, lf] = [String.fromCharCode(13), String.fromCharCode(10)];
+    const response = await post(igor, {
+      ...validEvent(),
+      description: `Играем 7 на 7${cr}${lf}Команды делим на месте${cr}Мяч есть`,
+      participantInfo: `Вход со двора${cr}${lf}Раздевалка открыта`,
+    });
+    expect(response.status).toBe(201);
+    expect(response.body.description).toBe(`Играем 7 на 7${lf}Команды делим на месте${lf}Мяч есть`);
+    expect(response.body.participantInfo).toBe(`Вход со двора${lf}Раздевалка открыта`);
   });
 
   it('режим «по заявке» сохраняет вопрос к заявке', async () => {
@@ -207,6 +229,79 @@ describe('POST /events', () => {
     ['неизвестный уровень', { level: 'pro' }, 'level'],
     ['нет направления', { sportId: undefined }, 'sportId'],
     ['нет направления, новое — null', { sportId: undefined, newSport: null }, 'sportId'],
+    ['новое направление — пустой массив', { sportId: undefined, newSport: [] }, 'newSport'],
+    [
+      'новое направление — массив объектов',
+      { sportId: undefined, newSport: [{ name: 'Падел' }] },
+      'newSport',
+    ],
+    [
+      'изоляция направления текста в названии',
+      { title: `Футбол 7×7 ${String.fromCodePoint(0x2066)}` },
+      'title',
+    ],
+    ['невидимый пробел в районе', { area: `Цент${String.fromCodePoint(0x200b)}ральный` }, 'area'],
+    // По краям U+FEFF снял бы trim — ставим в середину, чтобы проверить само правило
+    ['BOM в середине города', { city: `Красно${String.fromCodePoint(0xfeff)}ярск` }, 'city'],
+    [
+      'метка слева направо в месте',
+      { placeText: `Поле ${String.fromCodePoint(0x200e)}у школы` },
+      'placeText',
+    ],
+    [
+      'метка справа налево в названии',
+      { title: `Футбол ${String.fromCodePoint(0x200f)}7×7` },
+      'title',
+    ],
+    ['арабская метка в названии', { title: `Футбол ${String.fromCodePoint(0x61c)}7×7` }, 'title'],
+    // Не перечень символов, а классы невидимого целиком
+    [
+      'невидимый оператор внутри слова в названии',
+      { title: `Фут${String.fromCodePoint(0x2063)}бол 7×7` },
+      'title',
+    ],
+    ['тег в названии', { title: `Футбол 7×7 ${String.fromCodePoint(0xe0041)}` }, 'title'],
+    [
+      'заполнитель хангыля вместо названия',
+      { title: String.fromCodePoint(0x3164).repeat(5) },
+      'title',
+    ],
+    [
+      'подстрочная аннотация в названии',
+      { title: `Футбол ${String.fromCodePoint(0xfff9)}7×7` },
+      'title',
+    ],
+    [
+      'разделитель строк в названии',
+      { title: `Футбол${String.fromCodePoint(0x2028)}7×7` },
+      'title',
+    ],
+    [
+      'разделитель абзацев в описании',
+      { description: `Играем${String.fromCodePoint(0x2029)}7 на 7` },
+      'description',
+    ],
+    [
+      'словесный соединитель в районе',
+      { area: `Цент${String.fromCodePoint(0x2060)}ральный` },
+      'area',
+    ],
+    // Многострочные поля: переводы строк можно, остальное — нет
+    [
+      'переворот текста в описании',
+      { description: `Играем ${String.fromCodePoint(0x202e)}7 на 7` },
+      'description',
+    ],
+    [
+      'управляющий символ в «Информации для участников»',
+      { participantInfo: `Раздевалка ${String.fromCodePoint(0x7)}открыта` },
+      'participantInfo',
+    ],
+    [
+      'изоляция направления в вопросе к заявке',
+      { mode: 'approval', applyQuestion: `Ваш ${String.fromCodePoint(0x2067)}опыт?` },
+      'applyQuestion',
+    ],
     ['неверный sportId, новое — null', { sportId: 'not-a-uuid', newSport: null }, 'sportId'],
     ['переворот текста в названии', { title: 'Футбол 7×7 \u202e' }, 'title'],
     ['управляющий символ в месте', { placeText: 'Поле \u0007 у школы' }, 'placeText'],
@@ -260,7 +355,9 @@ describe('GET /events/:id', () => {
   });
 
   it('«Информация для участников» — подтверждённому участнику, организатору и администратору', async () => {
-    const [confirmed, pending, waitlist] = await Promise.all([
+    const [confirmed, pending, waitlist, rejected, cancelled] = await Promise.all([
+      account('user'),
+      account('user'),
       account('user'),
       account('user'),
       account('user'),
@@ -268,6 +365,8 @@ describe('GET /events/:id', () => {
     await participation(eventId, confirmed.id, 'confirmed');
     await participation(eventId, pending.id, 'pending');
     await participation(eventId, waitlist.id, 'waitlist');
+    await participation(eventId, rejected.id, 'rejected');
+    await participation(eventId, cancelled.id, 'cancelled');
 
     const info = async (who: Account | null) => (await get(who, eventId)).body.participantInfo;
     expect(await info(igor)).toBe('Раздевалка открыта с 18:30');
@@ -275,12 +374,55 @@ describe('GET /events/:id', () => {
     expect(await info(admin)).toBe('Раздевалка открыта с 18:30');
     expect(await info(pending)).toBeNull();
     expect(await info(waitlist)).toBeNull();
+    expect(await info(rejected)).toBeNull();
+    expect(await info(cancelled)).toBeNull();
     expect(await info(anna)).toBeNull();
     expect(await info(orgApproved)).toBeNull();
     expect(await info(null)).toBeNull();
 
     const forParticipant = await get(confirmed, eventId);
     expect(forParticipant.body.participation).toBe('confirmed');
+  });
+
+  it('после перемотки демо-часов назад «новее» оказалась отменённая запись — участник всё равно участник', async () => {
+    const viewer = await account('user');
+    // Записался и отменил, часы перемотали назад, записался снова: отменённая запись
+    // создана раньше по порядку, но её время по Clock позже, чем у активной
+    await prisma.participation.create({
+      data: {
+        eventId,
+        userId: viewer.id,
+        status: 'cancelled',
+        createdAt: new Date('2026-10-20T10:00:00Z'),
+        updatedAt: new Date('2026-10-20T10:00:00Z'),
+      },
+    });
+    await prisma.participation.create({
+      data: {
+        eventId,
+        userId: viewer.id,
+        status: 'confirmed',
+        createdAt: new Date('2026-10-19T10:00:00Z'),
+        updatedAt: new Date('2026-10-19T10:00:00Z'),
+      },
+    });
+    const response = await get(viewer, eventId);
+    expect(response.body.participation).toBe('confirmed');
+    expect(response.body.participantInfo).toBe('Раздевалка открыта с 18:30');
+  });
+
+  it('карточка, лента, /me и ответы с ошибкой не кешируются', async () => {
+    expect((await get(anna, eventId)).headers['cache-control']).toBe('no-store');
+    expect((await get(null, eventId)).headers['cache-control']).toBe('no-store');
+    const me = await http().get('/me').set('Cookie', anna.cookie);
+    expect(me.status).toBe(200);
+    expect(me.headers['cache-control']).toBe('no-store');
+    const feed = await http().get('/events');
+    expect(feed.status).toBe(200);
+    expect(feed.headers['cache-control']).toBe('no-store');
+    const missing = await get(anna, randomUUID());
+    expect(missing.status).toBe(404);
+    expect(missing.headers['cache-control']).toBe('no-store');
   });
 
   it('гость видит опубликованное мероприятие, запись предлагает после входа', async () => {

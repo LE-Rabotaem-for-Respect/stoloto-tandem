@@ -52,3 +52,4 @@ export {
 export type { TimeRange } from './time';
 export { EVENT_LEVELS, EVENT_LEVEL_TITLES } from './event-levels';
 export type { EventLevel } from './event-levels';
+export { MULTI_LINE_TEXT, SINGLE_LINE_TEXT, normalizeLineBreaks } from './text';
