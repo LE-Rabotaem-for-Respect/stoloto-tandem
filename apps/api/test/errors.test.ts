@@ -1,15 +1,22 @@
 import 'reflect-metadata';
-import { Body, Controller, Get, Logger, Module, Post } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Module, Param, Post } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { ERROR_CODES, participationMachine } from '@tandem/domain';
+import {
+  ERROR_CODES,
+  ERROR_HTTP_STATUS,
+  ERROR_MESSAGES,
+  participationMachine,
+} from '@tandem/domain';
+import type { ErrorCode } from '@tandem/domain';
 import { IsInt, IsNotEmpty, IsString, Min } from 'class-validator';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { configureApp } from '../src/configure-app';
 import { ClockModule, ClockStateSource, REAL_TIME } from '../src/core/clock';
 import { STAND_CONFIG } from '../src/core/config';
-import { ApiError, ERROR_HTTP_STATUS } from '../src/core/errors';
+import { ApiError } from '../src/core/errors';
+import { canJoin } from '../src/core/policies';
 import { Prisma } from '../src/generated/prisma/client';
 
 const serverTime = '2026-10-19T05:00:00.000Z';
@@ -40,6 +47,28 @@ class ProbeController {
   @Get('api-error')
   apiError() {
     throw new ApiError('event_not_joinable');
+  }
+
+  @Get('code/:code')
+  code(@Param('code') code: ErrorCode) {
+    throw new ApiError(code);
+  }
+
+  // Так сервис записи откажет по политике: мероприятие снято модератором (сценарий 6)
+  @Get('join-unpublished')
+  joinUnpublished() {
+    const decision = canJoin(
+      { role: 'user', userId: 'u-anna' },
+      {
+        status: 'unpublished',
+        startsAt: new Date('2026-10-24T05:00:00Z'),
+        endsAt: new Date('2026-10-24T08:00:00Z'),
+        organizerUserId: null,
+        organizerOrgId: 'o-ladya',
+      },
+      new Date(serverTime),
+    );
+    if (!decision.allowed) throw new ApiError(decision.code);
   }
 
   @Get('api-error-fields')
@@ -237,10 +266,40 @@ describe('core/errors: единый формат ошибок { code, message, f
   });
 });
 
-describe('core/errors: таблица HTTP-кодов', () => {
-  it('у каждого кода — допустимый HTTP-код', () => {
-    for (const code of ERROR_CODES) {
-      expect([400, 401, 403, 404, 409, 413, 500, 503], code).toContain(ERROR_HTTP_STATUS[code]);
-    }
+describe('core/errors: HTTP-статус каждой ошибки из таблицы @tandem/domain', () => {
+  let app: INestApplication;
+  const http = () => request(app.getHttpServer());
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({ imports: [ProbeModule, ClockModule] })
+      .overrideProvider(STAND_CONFIG)
+      .useValue({ demoMode: false, standId: null })
+      .overrideProvider(ClockStateSource)
+      .useValue({ read: async () => ({ offsetSeconds: 0, lastResetAt: null }) })
+      .overrideProvider(REAL_TIME)
+      .useValue(() => Date.parse(serverTime))
+      .compile();
+    app = moduleRef.createNestApplication({ logger: false });
+    configureApp(app);
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it.each(ERROR_CODES)('%s — свой статус и формат { code, message }', async (code) => {
+    const response = await http().get(`/probe/code/${code}`);
+    expect(response.status).toBe(ERROR_HTTP_STATUS[code]);
+    expect(response.body).toEqual({ code, message: ERROR_MESSAGES[code] });
+  });
+
+  it('запись на снятое с публикации мероприятие — 409 «Мероприятие недоступно для записи»', async () => {
+    const response = await http().get('/probe/join-unpublished');
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      code: 'event_not_joinable',
+      message: 'Мероприятие недоступно для записи',
+    });
   });
 });

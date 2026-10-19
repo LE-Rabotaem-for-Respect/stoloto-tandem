@@ -1,11 +1,10 @@
 import { Catch, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common';
-import { TransitionError, errorMessage } from '@tandem/domain';
+import { ERROR_HTTP_STATUS, TransitionError, errorMessage } from '@tandem/domain';
 import type { ErrorCode } from '@tandem/domain';
 import { Prisma } from '../../generated/prisma/client';
 import { ApiError } from './api-error';
 import type { ErrorFields } from './api-error';
-import { ERROR_HTTP_STATUS } from './http-status';
 
 export interface ErrorBody {
   code: ErrorCode;
