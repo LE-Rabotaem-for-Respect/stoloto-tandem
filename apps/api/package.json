@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:db": "prisma generate && vitest run --config vitest.db.config.mts",
     "migrate:dev": "prisma migrate dev",
-    "migrate:deploy": "prisma migrate deploy"
+    "migrate:deploy": "prisma migrate deploy",
+    "seed": "node dist/seed.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.2.7",

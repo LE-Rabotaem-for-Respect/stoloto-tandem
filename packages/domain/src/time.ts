@@ -101,6 +101,21 @@ export function weekendRange(now: Date): TimeRange {
   return { from: zonedMidnight(from), to: zonedMidnight(shiftDays(sunday, 1)) };
 }
 
+const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Сутки календарной даты «ГГГГ-ММ-ДД» по времени платформы — для фильтра
+ * «диапазон дат». Несуществующая дата («2030-02-30») и другой формат — `null`.
+ */
+export function calendarDayRange(value: string): TimeRange | null {
+  const match = CALENDAR_DATE.exec(value);
+  if (!match) return null;
+  const date = { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
+  const check = new Date(Date.UTC(date.year, date.month - 1, date.day));
+  if (check.getUTCMonth() !== date.month - 1 || check.getUTCDate() !== date.day) return null;
+  return { from: zonedMidnight(date), to: zonedMidnight(shiftDays(date, 1)) };
+}
+
 function within(date: Date, { from, to }: TimeRange): boolean {
   return date >= from && date < to;
 }

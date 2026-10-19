@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   canCreateEvent,
   canEditOrganization,
+  canEditMessage,
   canJoin,
+  canLeave,
   canManageEvent,
   canModerate,
   canPostMessage,
@@ -99,6 +101,24 @@ describe('policies по таблице ТЗ 4.4', () => {
     });
   });
 
+  describe('отменить свою запись или заявку', () => {
+    it('гость — после входа; организация и администратор — нет', () => {
+      expect(canLeave(guest, userEvent, now)).toEqual(loginFirst);
+      expect(canLeave(orgApproved, userEvent, now)).toEqual(no('users_only'));
+      expect(canLeave(admin, userEvent, now)).toEqual(no('users_only'));
+    });
+    it('только у опубликованного и не завершённого (ТЗ 4.3, 2.10)', () => {
+      const finished = { ...userEvent, endsAt: new Date('2026-10-19T04:59:59Z') };
+      expect(canLeave(user, userEvent, now)).toEqual(yes);
+      for (const status of ['cancelled', 'unpublished', 'deleted'] as const) {
+        expect(canLeave(user, { ...userEvent, status }, now), status).toEqual(
+          no('event_not_joinable'),
+        );
+      }
+      expect(canLeave(user, finished, now)).toEqual(no('event_not_joinable'));
+    });
+  });
+
   describe('видеть «Информацию для участников»', () => {
     it('гость — нет', () => {
       expect(canSeeParticipantInfo(guest, userEvent, null)).toEqual(loginFirst);
@@ -179,6 +199,34 @@ describe('policies по таблице ТЗ 4.4', () => {
             );
           }
         }
+      }
+    });
+  });
+
+  describe('править и удалять своё сообщение', () => {
+    const own = { authorUserId: 'u-anna' };
+    const byOrg = { authorUserId: 'u-ladya' };
+    it('гость — после входа', () => {
+      expect(canEditMessage(guest, userEvent, own)).toEqual(loginFirst);
+    });
+    it('автор — да, остальные — нет', () => {
+      expect(canEditMessage(user, userEvent, own)).toEqual(yes);
+      expect(canEditMessage(author, userEvent, own)).toEqual(no('not_message_author'));
+      expect(canEditMessage(admin, userEvent, own)).toEqual(no('not_message_author'));
+    });
+    it('организация — своё и только при approved', () => {
+      expect(canEditMessage(orgApproved, userEvent, byOrg)).toEqual(yes);
+      expect(canEditMessage(orgApproved, userEvent, own)).toEqual(no('not_message_author'));
+      const byPadel = { authorUserId: 'u-padel' };
+      expect(canEditMessage(orgPending, userEvent, byPadel)).toEqual(
+        no('organization_not_approved'),
+      );
+    });
+    it('в снятом и удалённом мероприятии — нельзя и автору (ТЗ 2.10)', () => {
+      for (const status of ['unpublished', 'deleted'] as const) {
+        expect(canEditMessage(user, { ...userEvent, status }, own), status).toEqual(
+          no('event_not_available'),
+        );
       }
     });
   });

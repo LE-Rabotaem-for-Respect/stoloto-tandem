@@ -42,6 +42,12 @@ const toItem = ({ id, name, category, isCustom }: SportItem): SportItem => ({
 export class SportsService {
   constructor(private readonly sports: SportsRepository) {}
 
+  /** Направление, выбранное из подсказок; скрытое выбрать нельзя. */
+  async findActive(id: string, tx?: Db): Promise<SportItem | null> {
+    const sport = await this.sports.findActiveById(id, tx);
+    return sport && toItem(sport);
+  }
+
   /** Подсказки для автодополнения и фильтра по направлению (ТЗ 2.3). Скрытые не показываются. */
   async search(query = '', limit = DEFAULT_LIMIT): Promise<SportSearchResult> {
     const normalized = normalizeSportName(query);
@@ -50,6 +56,12 @@ export class SportsService {
       items: rows.map(toItem),
       exactMatch: normalized !== '' && rows.some((row) => row.exact),
     };
+  }
+
+  /** Все ли направления из списка есть в каталоге и не скрыты. */
+  async allActive(ids: readonly string[]): Promise<boolean> {
+    const unique = new Set(ids);
+    return (await this.sports.countActive([...unique])) === unique.size;
   }
 
   /**

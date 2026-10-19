@@ -12,6 +12,7 @@ const GENERAL_ERROR_CODES = [
   'invalid_credentials',
   'unsupported_media_type',
   'cross_site_request',
+  'too_many_requests',
 ] as const;
 
 /** Отказы политик доступа (ТЗ 4.4). */
@@ -25,6 +26,7 @@ const POLICY_ERROR_CODES = [
   'participants_only',
   'not_organization_owner',
   'admins_only',
+  'not_message_author',
 ] as const;
 
 /** Закрытый список кодов ошибок API: `{ code, message, fields? }` (DECISION-002). */
@@ -51,6 +53,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   invalid_credentials: 'Неверная почта или пароль',
   unsupported_media_type: 'Неподдерживаемый формат данных',
   cross_site_request: 'Запрос с другого сайта отклонён',
+  too_many_requests: 'Слишком много попыток. Попробуйте позже',
   event_not_available: 'Мероприятие недоступно',
   event_not_joinable: 'Мероприятие недоступно для записи',
   own_event: 'Нельзя записаться на своё мероприятие',
@@ -60,6 +63,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   participants_only: 'Информация доступна подтверждённым участникам и организатору',
   not_organization_owner: 'Это может сделать только представитель организации',
   admins_only: 'Доступно только администратору',
+  not_message_author: 'Это может сделать только автор сообщения',
   invalid_transition: 'Действие недоступно в текущем статусе',
   already_joined: 'Вы уже записаны на это мероприятие',
   rejected_final: 'Заявка отклонена, подать её повторно нельзя',
@@ -74,7 +78,7 @@ export const errorMessage = (code: ErrorCode): string => ERROR_MESSAGES[code];
 /**
  * HTTP-код каждой ошибки: 400 — неверные данные, 401 — нужен вход,
  * 403 — нет прав, 404 — нет объекта, 409 — конфликт с состоянием,
- * 413 — слишком большое тело, 415 — тело не в формате JSON, 503 — база занята, 500 — непредвиденное.
+ * 413 — слишком большое тело, 415 — тело не в формате JSON, 429 — лимит попыток, 503 — база занята, 500 — непредвиденное.
  */
 export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   validation_failed: 400,
@@ -88,6 +92,7 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   invalid_credentials: 401,
   unsupported_media_type: 415,
   cross_site_request: 403,
+  too_many_requests: 429,
   event_not_available: 404,
   event_not_joinable: 409,
   own_event: 403,
@@ -97,6 +102,7 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   participants_only: 403,
   not_organization_owner: 403,
   admins_only: 403,
+  not_message_author: 403,
   invalid_transition: 409,
   already_joined: 409,
   rejected_final: 409,

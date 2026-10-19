@@ -12,6 +12,9 @@ import type { AuthRequest } from './roles';
 import { toSelfView } from './user-view';
 import type { SelfView } from './user-view';
 
+// Адрес клиента: за nginx — из X-Forwarded-For (trust proxy только для внутренних сетей)
+const clientIp = (req: AuthRequest) => req.ip ?? 'unknown';
+
 @Controller()
 export class AuthController {
   constructor(
@@ -26,7 +29,7 @@ export class AuthController {
     @Req() req: AuthRequest,
     @Res({ passthrough: true }) res: CookieResponse,
   ): Promise<SelfView> {
-    return this.respond(await this.auth.register(dto, req.sessionToken), res);
+    return this.respond(await this.auth.register(dto, clientIp(req), req.sessionToken), res);
   }
 
   @Post('auth/login')
@@ -37,7 +40,7 @@ export class AuthController {
     @Req() req: AuthRequest,
     @Res({ passthrough: true }) res: CookieResponse,
   ): Promise<SelfView> {
-    return this.respond(await this.auth.login(dto, req.sessionToken), res);
+    return this.respond(await this.auth.login(dto, clientIp(req), req.sessionToken), res);
   }
 
   @Post('auth/demo-login')
@@ -60,6 +63,7 @@ export class AuthController {
     clearSessionCookie(res, this.config.cookieName);
   }
 
+  // Свои данные аккаунта: не кешируются, как и все ответы api (noStore в configure-app)
   @Get('me')
   @SignedInOnly()
   me(@Req() req: AuthRequest): SelfView {

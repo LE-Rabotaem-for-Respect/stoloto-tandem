@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { SportCategory } from '@tandem/domain';
+import { escapeLike } from '../../core/prisma/like';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import type { Prisma, Sport } from '../../generated/prisma/client';
 
@@ -21,9 +22,6 @@ export interface NewSportRecord {
   category: SportCategory;
   createdById: string;
 }
-
-// В LIKE символы % и _ из запроса — обычные буквы, а не шаблон
-const escapeLike = (text: string) => text.replace(/[\\%_]/g, (char) => `\\${char}`);
 
 @Injectable()
 export class SportsRepository {
@@ -65,6 +63,15 @@ export class SportsRepository {
     const rank = (sport: Sport) =>
       (sport.status === 'active' ? 0 : 2) + (sport.normalizedName === normalizedName ? 0 : 1);
     return candidates.sort((a, b) => rank(a) - rank(b))[0] ?? null;
+  }
+
+  /** Сколько из этих направлений есть в каталоге и не скрыты. */
+  countActive(ids: readonly string[]): Promise<number> {
+    return this.prisma.sport.count({ where: { id: { in: [...ids] }, status: 'active' } });
+  }
+
+  findActiveById(id: string, tx?: Db): Promise<Sport | null> {
+    return (tx ?? this.prisma).sport.findFirst({ where: { id, status: 'active' } });
   }
 
   /**
