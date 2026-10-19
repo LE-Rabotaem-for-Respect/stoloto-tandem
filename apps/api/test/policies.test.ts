@@ -5,6 +5,7 @@ import {
   canEditOrganization,
   canEditMessage,
   canJoin,
+  canLeave,
   canManageEvent,
   canModerate,
   canPostMessage,
@@ -97,6 +98,24 @@ describe('policies по таблице ТЗ 4.4', () => {
       }
       expect(canJoin(user, finished, now)).toEqual(no('event_not_joinable'));
       expect(canJoin(user, ongoing, now)).toEqual(yes);
+    });
+  });
+
+  describe('отменить свою запись или заявку', () => {
+    it('гость — после входа; организация и администратор — нет', () => {
+      expect(canLeave(guest, userEvent, now)).toEqual(loginFirst);
+      expect(canLeave(orgApproved, userEvent, now)).toEqual(no('users_only'));
+      expect(canLeave(admin, userEvent, now)).toEqual(no('users_only'));
+    });
+    it('только у опубликованного и не завершённого (ТЗ 4.3, 2.10)', () => {
+      const finished = { ...userEvent, endsAt: new Date('2026-10-19T04:59:59Z') };
+      expect(canLeave(user, userEvent, now)).toEqual(yes);
+      for (const status of ['cancelled', 'unpublished', 'deleted'] as const) {
+        expect(canLeave(user, { ...userEvent, status }, now), status).toEqual(
+          no('event_not_joinable'),
+        );
+      }
+      expect(canLeave(user, finished, now)).toEqual(no('event_not_joinable'));
     });
   });
 
