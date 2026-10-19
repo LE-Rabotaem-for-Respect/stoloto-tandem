@@ -83,7 +83,8 @@ export class OrganizationsService {
     if (organization.status !== 'draft') {
       const missing = missingForSubmit({
         ...organization,
-        ...changes,
+        // В DTO не заданные в запросе поля могут быть undefined — они не меняют профиль
+        ...Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined)),
         sports: uniqueSports ?? organization.sports,
       });
       if (Object.keys(missing).length > 0) throw new ApiError('validation_failed', missing);
