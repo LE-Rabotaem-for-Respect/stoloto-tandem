@@ -67,7 +67,9 @@ export class OrganizationDecisionDto {
   @IsIn(ORGANIZATION_DECISIONS, { message: 'Решение: одобрить или отклонить' })
   decision!: AdminOrganizationDecision;
 
-  @ValidateIf((dto: OrganizationDecisionDto) => dto.decision === 'reject' || dto.reason !== undefined)
+  @ValidateIf(
+    (dto: OrganizationDecisionDto) => dto.decision === 'reject' || dto.reason !== undefined,
+  )
   @trim()
   @IsString({ message: 'Укажите причину отказа' })
   @MaxLength(500, { message: 'Причина — не длиннее 500 символов' })

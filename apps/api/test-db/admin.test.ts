@@ -70,13 +70,16 @@ async function pendingOrganization(name: string) {
   const { cookie, body } = await signUp('organization', name);
   const id = body.organization?.id ?? '';
   const sport = await createSport();
-  await http().patch(`/organizations/${id}`).set('Cookie', cookie).send({
-    description: 'Турниры и занятия',
-    city: 'Красноярск',
-    contacts: '+7 391 000-00-01',
-    representativeRole: 'Тренер',
-    sportIds: [sport.id],
-  });
+  await http()
+    .patch(`/organizations/${id}`)
+    .set('Cookie', cookie)
+    .send({
+      description: 'Турниры и занятия',
+      city: 'Красноярск',
+      contacts: '+7 391 000-00-01',
+      representativeRole: 'Тренер',
+      sportIds: [sport.id],
+    });
   const submitted = await http().post(`/organizations/${id}/submit`).set('Cookie', cookie);
   expect(submitted.body).toMatchObject({ status: 'pending' });
   return { id, cookie };
@@ -91,9 +94,7 @@ describe('доступ к админке', () => {
       () => http().get('/admin/organizations'),
       () => http().get('/admin/events'),
       () =>
-        http()
-          .post(`/admin/organizations/${randomUUID()}/decision`)
-          .send({ decision: 'approve' }),
+        http().post(`/admin/organizations/${randomUUID()}/decision`).send({ decision: 'approve' }),
     ];
     for (const route of routes) {
       expect((await route()).status).toBe(401);
