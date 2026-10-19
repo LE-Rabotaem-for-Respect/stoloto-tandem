@@ -9,6 +9,8 @@ export type { SignedInRole } from '../../core/access';
 /** Что guard кладёт в запрос: кто действует и чем вошёл. */
 export interface AuthRequest {
   headers: { cookie?: string };
+  /** Адрес клиента по `trust proxy` Express. */
+  ip?: string;
   actor?: Actor;
   user?: UserWithOrganization;
   sessionToken?: string;

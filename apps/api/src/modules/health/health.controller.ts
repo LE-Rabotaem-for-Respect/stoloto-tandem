@@ -3,8 +3,8 @@ import { TIME_ZONE } from '@tandem/domain';
 import { Public } from '../../core/access';
 
 @Controller('health')
-@Public()
 export class HealthController {
+  @Public()
   @Get()
   check() {
     return { status: 'ok', timeZone: TIME_ZONE };
