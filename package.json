@@ -17,7 +17,8 @@
     "format": "prettier --write .",
     "typecheck": "npm run build:domain && npm run typecheck --workspaces --if-present",
     "test": "npm run build:domain && npm run test --workspaces --if-present",
-    "e2e": "npm run e2e -w @tandem/e2e"
+    "e2e": "npm run e2e -w @tandem/e2e",
+    "test:db": "npm run test:db -w @tandem/api"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

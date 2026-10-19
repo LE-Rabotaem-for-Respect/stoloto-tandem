@@ -33,6 +33,37 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  db:
+    # Тесты ограничений на настоящей PostgreSQL. Нужен Docker, как и заданию compose
+    runs-on: ${{ vars.CI_DOCKER_RUNNER || vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    env:
+      PG_CONTAINER: ci-pg-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Запуск PostgreSQL
+        run: |
+          # Порт на хосте выбирает Docker: на компьютере участника 5432 может быть занят.
+          # Готовность — по TCP: при первичной инициализации сервер слушает только сокет
+          docker run --detach --name "$PG_CONTAINER" --publish 127.0.0.1::5432 \
+            -e POSTGRES_USER=tandem -e POSTGRES_PASSWORD=tandem -e POSTGRES_DB=tandem \
+            postgres:17-alpine
+          for i in $(seq 1 30); do
+            docker exec "$PG_CONTAINER" pg_isready -h 127.0.0.1 -U tandem -d tandem && break
+            sleep 2
+          done
+          port=$(docker port "$PG_CONTAINER" 5432/tcp | head -n 1 | sed 's/.*://')
+          echo "TEST_DATABASE_URL=postgresql://tandem:tandem@127.0.0.1:$port/tandem" >> "$GITHUB_ENV"
+      - run: npm run test:db
+      - name: Остановка PostgreSQL
+        if: always()
+        run: docker rm --force --volumes "$PG_CONTAINER" || true
+
   compose:
     # Нужен Docker: CI_DOCKER_RUNNER — метка runner'ов, где он есть (wfr-docker)
     runs-on: ${{ vars.CI_DOCKER_RUNNER || vars.CI_RUNNER || 'ubuntu-latest' }}
@@ -53,6 +84,13 @@ jobs:
           curl --fail --silent --show-error "http://localhost:$API_PORT/health"
           curl --fail --silent --show-error "http://localhost:$WEB_PORT/api/health"
           curl --fail --silent --show-error "http://localhost:$WEB_PORT/" | grep -q '<div id="root">'
+      - name: Миграции применены при старте api
+        run: |
+          applied=$(docker compose exec -T db psql -U tandem -d tandem -tAc \
+            "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
+          expected=$(find apps/api/prisma/migrations -name migration.sql | wc -l)
+          echo "применено $applied из $expected"
+          test "$applied" -eq "$expected"
       - name: Логи сервисов
         if: failure()
         run: docker compose logs

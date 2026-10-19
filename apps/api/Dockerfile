@@ -20,11 +20,19 @@ COPY packages/domain/package.json packages/domain/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY e2e/package.json e2e/
-RUN npm ci --omit=dev --ignore-scripts -w @tandem/api -w @tandem/domain && npm cache clean --force
+RUN apk add --no-cache openssl
+# Движок миграций скачивается при сборке: в работающем контейнере node_modules только для чтения
+RUN npm ci --omit=dev --ignore-scripts -w @tandem/api -w @tandem/domain \
+  && npm rebuild @prisma/engines prisma \
+  && npm cache clean --force
 COPY --from=build /app/packages/domain/dist packages/domain/dist
 COPY --from=build /app/apps/api/dist apps/api/dist
+COPY apps/api/prisma apps/api/prisma
+COPY apps/api/prisma.config.ts apps/api/
+WORKDIR /app/apps/api
 USER node
 EXPOSE 3000
-HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=10 \
+HEALTHCHECK --interval=5s --timeout=3s --start-period=30s --retries=10 \
   CMD wget -qO- http://127.0.0.1:3000/health || exit 1
-CMD ["node", "apps/api/dist/main.js"]
+# Перед запуском применяются миграции; при ошибке api не стартует
+CMD ["sh", "-c", "npx prisma migrate deploy && exec node dist/main.js"]
