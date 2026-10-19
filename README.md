@@ -59,6 +59,35 @@ npm run migrate:deploy -w @tandem/api
 - Частичные уникальные индексы (одна неотменённая запись на пару «событие —
   пользователь») заданы в схеме через `where`.
 
+## Ядро API
+
+Общие части api — в `apps/api/src/core`; модули пользуются только ими.
+
+- **Время — только из `Clock`** (`core/clock`). `Clock.now()` синхронный.
+  При `DEMO_MODE=true` к нему прибавляется сдвиг демо-часов из таблицы
+  `app_state` своего стенда, вне демо-режима сдвиг не применяется. Сдвиг
+  кешируется в памяти процесса и загружается до приёма запросов, поэтому на
+  стенд — **один процесс api**. После записи сдвига или сброса демо-данных
+  вызовите `clock.refresh()`. Каждый ответ несёт заголовок `X-Server-Time`,
+  `GET /clock` отдаёт `{ now, demoMode, standId, lastResetAt }`. ESLint
+  запрещает `Date.now()` и `new Date()` без аргументов везде, кроме
+  `core/clock` в api и `shared/clock` в web (хук `useClock()`).
+- **Ошибки** (`core/errors`) приходят как `{ code, message, fields? }`.
+  `code` — из закрытого списка `ERROR_CODES` в `@tandem/domain`, там же
+  тексты; HTTP-код задаёт `ERROR_HTTP_STATUS`. В сервисе бросайте
+  `new ApiError('event_not_joinable')`; отказы автоматов, ошибки DTO и
+  нарушения уникальности фильтр переводит сам. Тексты ошибок полей DTO
+  пишутся в декораторах `class-validator` по-русски.
+- **Доменные события** (`core/event-bus`): полный перечень —
+  `events.ts`. Публикуйте через `eventBus.afterCommit(async (emit) =>
+prisma.$transaction(…))`, тогда события уйдут только после коммита.
+  Обработчик — метод с `@OnDomainEvent('ParticipationConfirmed')`; он идёт
+  асинхронно, его ошибка попадает в журнал и не ломает действие.
+- **Права** (`core/policies`): функции по таблице ТЗ 4.4 (`canJoin`,
+  `canManageEvent`, `canSeeParticipantInfo`, …) возвращают решение с кодом
+  отказа. Сервис по нему бросает ошибку, а `toAction()` превращает его в
+  элемент `actions[]` ответа. Пример — `eventActions()` для карточки события.
+
 ## Проверки
 
 ```sh
