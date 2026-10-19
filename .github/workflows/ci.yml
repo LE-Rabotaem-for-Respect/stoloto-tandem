@@ -107,7 +107,7 @@ jobs:
     timeout-minutes: 30
     env:
       # Свои порты и имя проекта: не мешать заданию compose и стенду участника
-      COMPOSE_PROJECT_NAME: ci-e2e-${{ github.run_id }}
+      COMPOSE_PROJECT_NAME: stoloto-tandem-ci-e2e-${{ github.run_id }}
       WEB_PORT: 18180
       API_PORT: 13100
       BASE_URL: http://localhost:18180
@@ -123,9 +123,9 @@ jobs:
         run: npx playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium
       - name: Остатки прошлых прогонов
         # Если runner оборвался посреди задания, контейнеры прошлого прогона держат порты;
-        # убираются только контейнеры этого задания — по префиксу имени проекта
+        # убираются только контейнеры этого задания — по началу имени (якорь ^) с именем репозитория
         run: |
-          stale=$(docker ps -aq --filter "name=ci-e2e-")
+          stale=$(docker ps -aq --filter "name=^/?stoloto-tandem-ci-e2e-")
           if [ -n "$stale" ]; then docker rm --force --volumes $stale; fi
       - name: Запуск docker compose
         run: docker compose up --build --detach --wait --wait-timeout 300
