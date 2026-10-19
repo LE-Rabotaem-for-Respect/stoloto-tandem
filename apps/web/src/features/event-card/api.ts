@@ -43,12 +43,15 @@ export function useEventCard(id: string) {
   });
 }
 
-/** Записаться или подать заявку; после ответа карточка перечитывается. */
-export function useJoinEvent(id: string) {
+/** Записаться (подать заявку) или отменить запись; после ответа карточка перечитывается. */
+export function useParticipationAction(id: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      apiRequest<unknown>(`/events/${encodeURIComponent(id)}/join`, { method: 'POST', body: {} }),
+    mutationFn: (action: 'join' | 'leave') =>
+      apiRequest<unknown>(`/events/${encodeURIComponent(id)}/${action}`, {
+        method: 'POST',
+        body: {},
+      }),
     onSettled: () => client.invalidateQueries({ queryKey: eventCardKey(id) }),
   });
 }

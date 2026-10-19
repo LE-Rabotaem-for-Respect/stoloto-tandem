@@ -31,6 +31,19 @@ const LABELS: Partial<Record<ActionCode, string>> = {
   delete_event: 'Удалить',
 };
 
+// Управление ведёт на экран изменения, сообщение — в обсуждение; у модерации свой раздел
+const TARGETS: Partial<Record<ActionCode, (eventId: string) => string>> = {
+  edit_event: (eventId) => `/events/${eventId}/edit`,
+  reschedule_event: (eventId) => `/events/${eventId}/edit`,
+  cancel_event: (eventId) => `/events/${eventId}/edit`,
+  post_message: () => '#discussion',
+};
+
+/** Куда ведёт доступное действие; `null` — своего экрана в карточке нет (модерация). */
+export function actionTarget(code: ActionCode, eventId: string): string | null {
+  return TARGETS[code]?.(eventId) ?? null;
+}
+
 /** Подпись действия; запись зависит от режима: «Записаться» или «Подать заявку». */
 export function actionLabel(code: ActionCode, mode: 'free' | 'approval'): string {
   if (code === 'join') return mode === 'free' ? 'Записаться' : 'Подать заявку';

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppProviders, AppRoutes, createQueryClient } from '../src/App';
 import {
   actionLabel,
+  actionTarget,
   isOrganizerView,
   primaryAction,
   secondaryActions,
@@ -81,6 +82,8 @@ function fakeApi({ signedIn = false, cardFor }: FakeOptions = {}) {
           return cardFor ? cardFor(me) : json(200, me ? card() : card({ actions: [guestJoin] }));
         case 'POST /api/events/e1/join':
           return json(201, { status: 'confirmed' });
+        case 'POST /api/events/e1/leave':
+          return json(200, { status: 'cancelled' });
         default:
           return json(404, { code: 'not_found', message: 'Не найдено' });
       }
@@ -127,6 +130,14 @@ describe('действия карточки по actions[]', () => {
     expect(actionLabel('join', 'free')).toBe('Записаться');
     expect(actionLabel('join', 'approval')).toBe('Подать заявку');
     expect(actionLabel('leave', 'free')).toBe('Отменить запись');
+  });
+
+  it('адреса действий: управление — экран изменения, сообщение — обсуждение, модерация — нет', () => {
+    expect(actionTarget('reschedule_event', 'e1')).toBe('/events/e1/edit');
+    expect(actionTarget('cancel_event', 'e1')).toBe('/events/e1/edit');
+    expect(actionTarget('post_message', 'e1')).toBe('#discussion');
+    expect(actionTarget('unpublish_event', 'e1')).toBeNull();
+    expect(actionTarget('delete_event', 'e1')).toBeNull();
   });
 });
 
@@ -264,8 +275,80 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     const participants = screen.getByRole('tab', { name: 'Участники и заявки' });
     expect(participants.getAttribute('aria-selected')).toBe('true');
     expect(participants).toBe(document.activeElement);
+    // Фокус Tab — только на выбранной вкладке; панель, на которую ссылается вкладка, есть
+    expect(participants.tabIndex).toBe(0);
+    expect(cardTab.tabIndex).toBe(-1);
+    expect(document.getElementById(cardTab.getAttribute('aria-controls') ?? '')).not.toBeNull();
     screen.getByText('Здесь будут участники и заявки на это мероприятие.');
     expect(screen.queryByRole('article')).toBeNull();
+
+    await user.keyboard('{ArrowLeft}');
+    expect(cardTab.getAttribute('aria-selected')).toBe('true');
+    expect(cardTab).toBe(document.activeElement);
+    screen.getByRole('article', { name: 'Пробежка 5 км на Татышеве' });
+  });
+
+  it('администратор: модерация не ведёт на экран изменения организатора', async () => {
+    fakeApi({
+      cardFor: () =>
+        json(
+          200,
+          card({
+            actions: [
+              { code: 'join', enabled: false, reason: 'Администратор не записывается' },
+              { code: 'unpublish_event', enabled: true },
+              { code: 'delete_event', enabled: true },
+            ],
+          }),
+        ),
+    });
+    renderCard();
+
+    await screen.findByText('Снять с публикации — в разделе модерации');
+    screen.getByText('Удалить — в разделе модерации');
+    expect(screen.queryByRole('link', { name: /Снять с публикации|Удалить|Изменить/ })).toBeNull();
+    expect(screen.queryByRole('tab')).toBeNull();
+  });
+
+  it('запись: кнопка заблокирована на время запроса, ошибка сервера — рядом', async () => {
+    let release: (response: Response) => void = () => undefined;
+    const { calls } = fakeApi({ signedIn: true });
+    const base = vi.mocked(fetch).getMockImplementation();
+    vi.mocked(fetch).mockImplementation(async (url, init) => {
+      if (String(url) === '/api/events/e1/join') {
+        calls.push('POST /api/events/e1/join');
+        return new Promise<Response>((resolve) => {
+          release = resolve;
+        });
+      }
+      return base ? base(url, init) : json(404, {});
+    });
+    const user = userEvent.setup();
+    renderCard();
+
+    const button = await screen.findByRole('button', { name: 'Записаться' });
+    await user.click(button);
+    await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(true));
+    release(json(409, { code: 'event_full', message: 'Мест нет' }));
+
+    expect((await screen.findByRole('alert')).textContent).toBe('Мест нет');
+    await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
+    expect(calls.filter((call) => call === 'POST /api/events/e1/join')).toHaveLength(1);
+  });
+
+  it('отмена записи — своим запросом', async () => {
+    const { calls } = fakeApi({
+      signedIn: true,
+      cardFor: () =>
+        json(
+          200,
+          card({ participation: 'confirmed', actions: [{ code: 'leave', enabled: true }] }),
+        ),
+    });
+    const user = userEvent.setup();
+    renderCard();
+    await user.click(await screen.findByRole('button', { name: 'Отменить запись' }));
+    await waitFor(() => expect(calls).toContain('POST /api/events/e1/leave'));
   });
 
   it('участнику вкладок организатора нет', async () => {
