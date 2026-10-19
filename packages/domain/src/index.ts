@@ -1,4 +1,8 @@
 export * from './state-machines';
+export { ACTION_CODES } from './actions';
+export type { Action, ActionCode } from './actions';
+export { ERROR_CODES, ERROR_MESSAGES, errorMessage } from './errors';
+export type { ErrorCode } from './errors';
 export { EVENT_DISPLAY_STATUSES, displayStatus } from './display-status';
 export type { DisplayStatusEvent, EventDisplayStatus } from './display-status';
 export {
