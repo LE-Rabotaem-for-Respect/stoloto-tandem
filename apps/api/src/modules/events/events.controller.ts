@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import type { Actor } from '../../core/policies';
 import { CurrentActor, Public, SignedIn } from '../auth';
 import { CreateEventDto, EventFeedQuery } from './events.dto';
@@ -30,7 +30,6 @@ export class EventsController {
   // Ответ зависит от того, кто смотрит («Информация для участников»): кешировать его нельзя
   @Public()
   @Get(':id')
-  @Header('Cache-Control', 'private, no-store')
   card(@CurrentActor() actor: Actor, @Param('id') id: string): Promise<EventCard> {
     return this.events.card(actor, id);
   }
