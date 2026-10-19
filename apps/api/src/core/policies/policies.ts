@@ -62,6 +62,17 @@ export function canJoin(actor: Actor, event: PolicyEvent, now: Date): Decision {
   return allow;
 }
 
+/**
+ * Отменить свою запись или заявку. У снятого, удалённого, отменённого и завершённого
+ * мероприятия записи не меняются (ТЗ 4.3, 2.10). Статус записи проверяет автомат.
+ */
+export function canLeave(actor: Actor, event: PolicyEvent, now: Date): Decision {
+  if (actor.role === 'guest') return loginFirst;
+  if (actor.role !== 'user') return deny('users_only');
+  if (event.status !== 'published' || now >= event.endsAt) return deny('event_not_joinable');
+  return allow;
+}
+
 export function canSeeParticipantInfo(
   actor: Actor,
   event: PolicyEvent,

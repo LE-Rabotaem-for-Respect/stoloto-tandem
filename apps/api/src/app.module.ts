@@ -7,6 +7,7 @@ import { DemoModule } from './modules/demo';
 import { EventsModule } from './modules/events/events.module';
 import { HealthModule } from './modules/health/health.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
+import { ParticipationsModule } from './modules/participations/participations.module';
 import { SportsModule } from './modules/sports/sports.module';
 
 @Module({
@@ -20,6 +21,7 @@ import { SportsModule } from './modules/sports/sports.module';
     HealthModule,
     SportsModule,
     EventsModule,
+    ParticipationsModule,
   ],
 })
 export class AppModule {}
