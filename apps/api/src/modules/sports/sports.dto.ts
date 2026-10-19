@@ -1,4 +1,9 @@
-import { SPORT_CATEGORIES, SPORT_NAME_PATTERN, cleanSportName } from '@tandem/domain';
+import {
+  SPORT_CATEGORIES,
+  SPORT_NAME_MAX_LENGTH,
+  SPORT_NAME_PATTERN,
+  cleanSportName,
+} from '@tandem/domain';
 import type { SportCategory } from '@tandem/domain';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -12,8 +17,6 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-
-export const SPORT_NAME_MAX_LENGTH = 50;
 
 export const SPORT_NAME_RULE = `Название направления — от 2 до ${SPORT_NAME_MAX_LENGTH} символов: буквы, цифры, пробелы и знаки . , ' ( ) × / + -`;
 

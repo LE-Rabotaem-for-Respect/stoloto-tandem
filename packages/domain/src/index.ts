@@ -16,6 +16,7 @@ export {
 } from './statuses';
 export type { StatusTone, StatusView } from './statuses';
 export {
+  SPORT_NAME_MAX_LENGTH,
   SPORT_NAME_PATTERN,
   cleanSportName,
   isValidSportName,
