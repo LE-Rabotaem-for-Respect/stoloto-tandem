@@ -169,10 +169,16 @@ describe('policies по таблице ТЗ 4.4', () => {
       expect(canPostMessage(admin, userEvent)).toEqual(no('forbidden'));
     });
     it('в снятое и удалённое — нельзя никому: новые действия заблокированы (ТЗ 2.10)', () => {
+      const actors = { guest, user, author, orgApproved, orgPending, admin };
       for (const status of ['unpublished', 'deleted'] as const) {
-        const event = { ...userEvent, status };
-        expect(canPostMessage(user, event), status).toEqual(no('event_not_available'));
-        expect(canPostMessage(author, event), status).toEqual(no('event_not_available'));
+        for (const base of [userEvent, orgEvent]) {
+          const event = { ...base, status };
+          for (const [name, actor] of Object.entries(actors)) {
+            expect(canPostMessage(actor, event), `${name}, ${status}`).toEqual(
+              no('event_not_available'),
+            );
+          }
+        }
       }
     });
   });
@@ -239,5 +245,21 @@ describe('actions[]: пример для карточки события', () =>
   it('администратор получает модерацию, а не управление', () => {
     const codes = card(admin).map((action) => action.code);
     expect(codes).toEqual(['join', 'post_message', 'unpublish_event', 'delete_event']);
+  });
+
+  it('у снятого и удалённого мероприятия обсуждение неактивно для всех ролей (ТЗ 2.10)', () => {
+    const unavailable = { code: 'post_message', enabled: false, reason: 'Мероприятие недоступно' };
+    for (const status of ['unpublished', 'deleted'] as const) {
+      for (const actor of [guest, user, author, orgApproved, orgPending, admin]) {
+        const actions = eventActions(
+          actor,
+          { ...userEvent, status, mode: 'free', hasSeats: true },
+          null,
+          now,
+        );
+        const postMessage = actions.find((action) => action.code === 'post_message');
+        expect(postMessage, `${actor.role}, ${status}`).toEqual(unavailable);
+      }
+    }
   });
 });
