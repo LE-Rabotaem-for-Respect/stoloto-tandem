@@ -125,13 +125,22 @@ export class EventsRepository {
     return this.prisma.participation.count({ where: { eventId, status: 'confirmed' } });
   }
 
-  /** Последняя запись пользователя на мероприятие; `null` — записи не было. */
+  /**
+   * Запись пользователя на мероприятие: неотменённая (такая у пары одна), а если её нет —
+   * последняя отменённая. `createdAt` — время Clock: после перемотки демо-часов назад
+   * отменённая запись может оказаться «новее» активной, поэтому активная ищется первой.
+   */
   async viewerParticipation(eventId: string, userId: string): Promise<ParticipationStatus | null> {
-    const participation = await this.prisma.participation.findFirst({
-      where: { eventId, userId },
-      orderBy: { createdAt: 'desc' },
+    const active = await this.prisma.participation.findFirst({
+      where: { eventId, userId, status: { not: 'cancelled' } },
       select: { status: true },
     });
-    return participation?.status ?? null;
+    if (active) return active.status;
+    const cancelled = await this.prisma.participation.findFirst({
+      where: { eventId, userId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { status: true },
+    });
+    return cancelled?.status ?? null;
   }
 }

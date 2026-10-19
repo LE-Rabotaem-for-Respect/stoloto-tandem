@@ -6,6 +6,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -39,11 +40,15 @@ const isoDate = () =>
       : value,
   );
 
-// Управляющие и форматирующие символы: U+202E переворачивает текст в ленте, U+200B невидим
+// Управляющие символы и опасные форматирующие: управление направлением текста
+// (U+202A–202E, U+2066–2069, метки U+200E/F переворачивают текст в ленте), U+200B и
+// U+FEFF невидимы. Соединитель U+200D и селекторы начертания (составные эмодзи 🏃‍♀️)
+// и мягкий перенос U+00AD допустимы: они приходят при обычном вводе и копировании
 const HIDDEN_CHARS = 'В тексте есть недопустимые символы';
-const singleLine = () => Matches(/^[^\p{Cc}\p{Cf}]*$/u, { message: HIDDEN_CHARS });
+const singleLine = () => Matches(/^[^\p{Cc}\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]*$/u, { message: HIDDEN_CHARS });
 // В многострочном тексте из управляющих допустимы только перевод строки и табуляция
-const multiLine = () => Matches(/^(?:[^\p{Cc}\p{Cf}]|[\n\r\t])*$/u, { message: HIDDEN_CHARS });
+const multiLine = () =>
+  Matches(/^(?:[^\p{Cc}\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]|[\n\r\t])*$/u, { message: HIDDEN_CHARS });
 
 /**
  * Создание мероприятия (ТЗ 2.2). Организатор не вводится — его задаёт аккаунт.
@@ -68,7 +73,9 @@ export class CreateEventDto {
   @IsUUID('all', { message: 'Выберите направление из списка или добавьте новое' })
   sportId?: string;
 
+  // Массив прошёл бы ValidateNested поэлементно и обошёл проверку sportId
   @IsOptional()
+  @IsObject({ message: 'Новое направление — название и группа' })
   @ValidateNested()
   @Type(() => NewSportDto)
   newSport?: NewSportDto;

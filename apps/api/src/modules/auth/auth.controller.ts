@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, Inject, Post, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  Inject,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { AUTH_CONFIG } from './auth-config';
 import type { AuthConfig } from './auth-config';
 import { AuthService } from './auth.service';
@@ -63,8 +74,10 @@ export class AuthController {
     clearSessionCookie(res, this.config.cookieName);
   }
 
+  // Свои данные аккаунта: ни браузер, ни прокси не хранят их у себя
   @Get('me')
   @SignedInOnly()
+  @Header('Cache-Control', 'private, no-store')
   me(@Req() req: AuthRequest): SelfView {
     // Guard пропускает сюда только запрос с действующей сессией
     if (!req.user) throw new Error('Нет пользователя сессии после проверки входа');
