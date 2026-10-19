@@ -20,8 +20,13 @@ function allowOrThrow(decision: Decision) {
   if (!decision.allowed) throw new ApiError(decision.code);
 }
 
+type RequiredProfile = Pick<
+  OrganizationRecord,
+  'name' | 'description' | 'city' | 'contacts' | 'representativeName' | 'representativeRole'
+> & { sports: readonly unknown[] };
+
 /** Что ещё не заполнено для отправки на проверку (ТЗ 2.9, п. 1). */
-function missingForSubmit(organization: OrganizationRecord): Record<string, string> {
+function missingForSubmit(organization: RequiredProfile): Record<string, string> {
   const fields: Record<string, string> = {};
   const required = [
     ['name', 'Укажите название'],
@@ -70,6 +75,19 @@ export class OrganizationsService {
       throw new ApiError('validation_failed', { sportIds: 'Такого направления нет в каталоге' });
     }
     const changes = website === undefined ? profile : { ...profile, website: website || null };
+
+    // После отправки на проверку обязательное поле очистить нельзя: иначе одобренная
+    // организация (её правки применяются сразу) осталась бы без города, контактов, направлений
+    const organization = await this.repository.find(id);
+    if (!organization) throw new ApiError('not_found', undefined, NOT_FOUND);
+    if (organization.status !== 'draft') {
+      const missing = missingForSubmit({
+        ...organization,
+        ...changes,
+        sports: uniqueSports ?? organization.sports,
+      });
+      if (Object.keys(missing).length > 0) throw new ApiError('validation_failed', missing);
+    }
     return toOwnView(await this.repository.updateProfile(id, changes, uniqueSports));
   }
 

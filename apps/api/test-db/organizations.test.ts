@@ -246,4 +246,32 @@ describe('отправка на проверку и решение админи�
       .send({ city: 'Дивногорск' });
     expect(edited.body).toMatchObject({ status: 'approved', city: 'Дивногорск' });
   });
+
+  it('после отправки обязательные поля не очищаются — ни на проверке, ни у одобренной', async () => {
+    const { cookie, id } = await organizationAccount();
+    await completeProfile(cookie, id);
+    await http().post(`/organizations/${id}/submit`).set('Cookie', cookie);
+    const emptied = { description: '', city: '   ', contacts: '', sportIds: [] };
+
+    const pending = await http().patch(`/organizations/${id}`).set('Cookie', cookie).send(emptied);
+    expect(pending.status).toBe(400);
+    expect(Object.keys(pending.body.fields).sort()).toEqual([
+      'city',
+      'contacts',
+      'description',
+      'sportIds',
+    ]);
+
+    await app.get(OrganizationsService).decide(await admin(), id, 'approve');
+    const approved = await http()
+      .patch(`/organizations/${id}`)
+      .set('Cookie', cookie)
+      .send({ representativeName: '' });
+    expect(approved.status).toBe(400);
+    expect(approved.body.fields).toEqual({ representativeName: 'Укажите, кто представитель' });
+
+    const page = await http().get(`/organizations/${id}`);
+    expect(page.body).toMatchObject({ city: 'Красноярск', contacts: '+7 900 000-00-00' });
+    expect(page.body.sports).toHaveLength(1);
+  });
 });
