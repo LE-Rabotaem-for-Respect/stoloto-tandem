@@ -5,6 +5,8 @@ import type { Prisma } from '../../generated/prisma/client';
 
 export type Db = Prisma.TransactionClient;
 
+// Строку события модуль участия читает сам, в обход сервиса мероприятий: DECISION-002
+// требует блокировать её и считать места в одной транзакции сервиса участия
 const eventSelect = {
   id: true,
   organizerUserId: true,

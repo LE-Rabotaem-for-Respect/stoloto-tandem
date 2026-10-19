@@ -10,6 +10,7 @@ import { STAND_CONFIG } from '../src/core/config';
 import { EventBus } from '../src/core/event-bus';
 import type { Prisma } from '../src/generated/prisma/client';
 import { hashPassword } from '../src/modules/auth/password';
+import { ParticipationsRepository } from '../src/modules/participations/participations.repository';
 import { databaseUrl, participation, prisma } from './db';
 
 const COOKIE = 'tandem_session';
@@ -368,7 +369,25 @@ describe('лимит мест', () => {
   it('одновременные запросы на последнее место не превышают лимит', async () => {
     const event = await createEvent({ capacity: 1 });
     const racers = [anna, igor, ...(await Promise.all([1, 2, 3].map(() => account('user'))))];
+
+    // Барьер: посчитав места, запрос ждёт остальных до 500 мс. Без блокировки строки события
+    // все насчитают ноль и запишутся; с ней следующий дойдёт до подсчёта только после
+    // фиксации предыдущего — так пересечение не зависит от того, как придут запросы
+    const repository = app.get(ParticipationsRepository);
+    const count = repository.confirmedCount.bind(repository);
+    let arrived = 0;
+    let releaseAll: () => void = () => undefined;
+    const allArrived = new Promise<void>((resolve) => (releaseAll = resolve));
+    const spy = vi.spyOn(repository, 'confirmedCount').mockImplementation(async (...args) => {
+      const result = await count(...args);
+      arrived += 1;
+      if (arrived === racers.length) releaseAll();
+      await Promise.race([allArrived, new Promise((resolve) => setTimeout(resolve, 500))]);
+      return result;
+    });
     const responses = await Promise.all(racers.map((who) => join(who, event.id)));
+    spy.mockRestore();
+
     const codes = responses.map((response) => response.status).sort();
     expect(codes).toEqual([201, 409, 409, 409, 409]);
     for (const response of responses.filter((r) => r.status === 409)) {
