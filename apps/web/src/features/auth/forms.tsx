@@ -3,7 +3,8 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiRequestError } from '../../shared/api';
 import { Field } from '../../shared/ui/Field';
-import { useDemoLogin, useLogin, useRegister, useStandInfo } from './api';
+import { useStandInfo } from '../../shared/clock';
+import { useDemoLogin, useLogin, useRegister } from './api';
 import type { RegisterBody } from './api';
 
 interface FormError {
