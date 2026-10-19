@@ -25,6 +25,10 @@ export type MessageRecord = Prisma.MessageGetPayload<{ select: typeof messageSel
 export class MessagesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  countByStatus(status: MessageStatus): Promise<number> {
+    return this.prisma.message.count({ where: { status } });
+  }
+
   /** Обсуждение целиком, по времени: новые подгружаются раз в 30 секунд (ТЗ 2.7). */
   list(eventId: string): Promise<MessageRecord[]> {
     return this.prisma.message.findMany({

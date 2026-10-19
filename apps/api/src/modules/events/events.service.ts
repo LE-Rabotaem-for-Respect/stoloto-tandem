@@ -26,6 +26,7 @@ import type { ErrorFields } from '../../core/errors';
 import { EventBus, domainEvent } from '../../core/event-bus';
 import {
   canCreateEvent,
+  canModerate,
   canSeeParticipantInfo,
   canViewEvent,
   eventActions,
@@ -59,6 +60,26 @@ export interface EventCard {
   /** Только подтверждённым участникам, организатору и администратору; остальным — `null`. */
   participantInfo: string | null;
   actions: Action[];
+}
+
+/** Строка поиска в админке: статус и причина видны, направление — под своим названием. */
+export interface AdminEventItem {
+  id: string;
+  title: string;
+  sport: { id: string; name: string; category: SportCategory };
+  organizer: EventCard['organizer'];
+  startsAt: Date;
+  city: string;
+  status: EventStatus;
+  statusReason: string | null;
+  createdAt: Date;
+}
+
+export interface AdminEventList {
+  items: AdminEventItem[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 /** Строка ленты: только то, что помещается в карточку ленты (ТЗ 2.11). */
@@ -293,6 +314,41 @@ export class EventsService {
       limit,
       offset,
     };
+  }
+
+  /** Поиск мероприятий для администратора (ТЗ 2.10): все статусы, новые сверху. */
+  async adminList(
+    actor: Actor,
+    filter: { text?: string; status?: EventStatus; organizationId?: string },
+    page: { limit: number; offset: number },
+  ): Promise<AdminEventList> {
+    const decision = canModerate(actor);
+    if (!decision.allowed) throw new ApiError(decision.code);
+    const { events, total } = await this.events.adminSearch(
+      { text: filter.text, status: filter.status, organizerOrgId: filter.organizationId },
+      page,
+    );
+    return {
+      items: events.map((event) => ({
+        id: event.id,
+        title: event.title,
+        sport: { id: event.sport.id, name: event.sport.name, category: event.sport.category },
+        organizer: organizerOf(event),
+        startsAt: event.startsAt,
+        city: event.city,
+        status: event.status,
+        statusReason: event.statusReason,
+        createdAt: event.createdAt,
+      })),
+      total,
+      ...page,
+    };
+  }
+
+  /** Сколько мероприятий снято с публикации за последние 7 дней (обзор админки). */
+  countUnpublishedLastWeek(): Promise<number> {
+    const weekAgo = new Date(this.clock.now().getTime() - 7 * 24 * 60 * 60 * 1000);
+    return this.events.countStatusSince('unpublished', weekAgo);
   }
 
   private startsRange(query: EventFeedQuery, now: Date): Partial<TimeRange> | undefined {

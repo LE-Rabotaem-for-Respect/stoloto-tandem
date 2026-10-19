@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { organizationMachine } from '@tandem/domain';
+import type { OrganizationStatus } from '@tandem/domain';
 import { Clock } from '../../core/clock';
 import { ApiError } from '../../core/errors';
 import { EventBus, domainEvent } from '../../core/event-bus';
@@ -160,6 +161,22 @@ export class OrganizationsService {
       );
     });
     return this.ownView(id);
+  }
+
+  /** Организации для администратора (ТЗ 2.10): заявка целиком — статус, причина, представитель. */
+  async adminList(
+    actor: Actor,
+    filter: { text?: string; status?: OrganizationStatus },
+    page: { limit: number; offset: number },
+  ): Promise<{ items: OwnOrganizationView[]; total: number; limit: number; offset: number }> {
+    allowOrThrow(canModerate(actor));
+    const { organizations, total } = await this.repository.adminSearch(filter, page);
+    return { items: organizations.map(toOwnView), total, ...page };
+  }
+
+  /** Заявки, которые ждут решения администратора (обзор админки). */
+  countPending(): Promise<number> {
+    return this.repository.countByStatus('pending');
   }
 
   private async ownView(id: string): Promise<OwnOrganizationView> {

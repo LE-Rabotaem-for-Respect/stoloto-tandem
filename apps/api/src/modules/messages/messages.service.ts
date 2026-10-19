@@ -56,6 +56,11 @@ export class MessagesService {
     private readonly bus: EventBus,
   ) {}
 
+  /** Сообщения, скрытые модератором (обзор админки). */
+  countHidden(): Promise<number> {
+    return this.messages.countByStatus('hidden_by_moderator');
+  }
+
   async list(actor: Actor, eventId: string): Promise<ThreadView[]> {
     const event = await this.visibleEvent(actor, eventId);
     const views = (await this.messages.list(event.id)).map((message) =>
