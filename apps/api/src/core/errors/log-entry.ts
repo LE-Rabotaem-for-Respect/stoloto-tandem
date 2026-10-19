@@ -12,13 +12,14 @@ const hasOwnMessage = (error: Error) =>
 // Кадр V8: «at функция (путь:строка:столбец)» или «at путь:строка:столбец». Функция —
 // идентификаторы через точку (с async, new, [as x], <anonymous>, #приватные). Путь — белый
 // список ASCII-символов по частям: «@» только в начале части (node_modules/@prisma), «\» —
-// только разделитель в путях вида C:\. Так не проходят почта, «%40», «＠», кириллица,
-// управляющие и невидимые символы (ANSI-последовательности рисуют поддельные строки журнала)
+// только разделитель в путях вида C:\, разделитель в одном пути одного вида (C:\… или C:/…,
+// как пишут пути vitest и vite). Так не проходят почта, «%40», «＠», кириллица, управляющие
+// и невидимые символы (ANSI-последовательности рисуют поддельные строки журнала)
 const identifier = String.raw`(?:#?[\w$]+|<anonymous>)`;
 const functionName = String.raw`(?:async )?(?:new )?${identifier}(?:\.${identifier})*(?: \[as [\w$]+\])?`;
 const part = String.raw`[\w.$~+-]*`;
 const posixPath = String.raw`\/@?${part}(?:\/@?${part})*`;
-const windowsPath = String.raw`[A-Za-z]:\\@?${part}(?:\\@?${part})*`;
+const windowsPath = String.raw`[A-Za-z]:(?:\\@?${part}(?:\\@?${part})*|\/@?${part}(?:\/@?${part})*)`;
 const location = String.raw`(?:node:${part}(?:\/${part})*|file:\/\/(?:\/[A-Za-z]:)?${posixPath}|${windowsPath}|${posixPath}):\d+:\d+`;
 const frameLine = new RegExp(
   String.raw`^ +at (?:${functionName} \(${location}\)|(?:async )?${location})$`,

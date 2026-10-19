@@ -206,6 +206,7 @@ describe('logEntry: запись об ошибке для журнала по б
         'login ok',
       ],
       ['невидимый символ в пути', `    at /x${String.fromCharCode(0x200b)}y.js:1:1`, 'y.js'],
+      ['разные разделители в пути C:', '    at f (C:\\x/@y.js:1:1)', 'y.js'],
     ])('кадр-подделка: %s', (_, line, secret) => {
       for (const stack of [`Error: ok${newline}${line}`, `Error: другое${newline}${line}`]) {
         const error = new Error('ok');
@@ -245,6 +246,8 @@ describe('logEntry: запись об ошибке для журнала по б
       '    at RouterExplorer.x (C:\\app\\node_modules\\@nestjs\\core\\router.js:1:1)',
       '    at async file:///app/dist/run.mjs:2801:20',
       '    at run (file:///C:/work/dist/run.mjs:3:7)',
+      '    at C:/work/apps/api/test/x.test.ts:6:14',
+      '    at run (C:/work/node_modules/@vitest/runner/dist/index.js:1:1)',
       '    at Holder.#secret (/app/dist/x.js:1:1)',
       '    at Object.<anonymous> (/app/node_modules/.bin/vite-node~x+y.js:1:1)',
     ])('%s', (frame) => {
