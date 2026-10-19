@@ -69,6 +69,21 @@ describe('logEntry: запись об ошибке для журнала по б
     expect(entry).not.toContain('Received');
   });
 
+  it('заголовок «Имя [КОД]» при пустом сообщении — кадры на месте', () => {
+    const error = Object.assign(new Error(''), { code: 'ERR_X' });
+    error.stack = `Error [ERR_X]${String.fromCharCode(10)}    at run (/app/x.js:1:1)`;
+    expect(logEntry(error)).toBe(`Error ERR_X${String.fromCharCode(10)}    at run (/app/x.js:1:1)`);
+  });
+
+  it.each([
+    ['код ошибки — лишь начало кода в скобках', 'ERR', 'Error [ERR_X]'],
+    ['недопустимое имя перед скобками', 'ERR_X', 'Ошибка 1 [ERR_X]'],
+  ])('заголовок не принят: %s', (_, code, header) => {
+    const error = Object.assign(new Error('ok'), { code });
+    error.stack = `${header}: ok${String.fromCharCode(10)}    at run (/app/x.js:1:1)`;
+    expect(logEntry(error)).toMatch(/\(кадры стека не записаны\)$/);
+  });
+
   it('код в заголовке stack не совпал с кодом ошибки — кадры не пишутся', () => {
     for (const code of [undefined, 'ERR_OTHER', `${email}`]) {
       const error = Object.assign(new Error('ok'), { code });
