@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { displayStatus, eventMachine } from '@tandem/domain';
+import { SPORT_CATEGORY_TITLES, displayStatus, eventMachine } from '@tandem/domain';
 import type {
   Action,
   EventDisplayStatus,
@@ -155,6 +155,7 @@ export class EventsService {
     const confirmedCount = await this.events.confirmedCount(id);
     const hasSeats = event.capacity === null || confirmedCount < event.capacity;
     const seesInfo = canSeeParticipantInfo(actor, event, participation).allowed;
+    const hidden = event.sport.status === 'hidden';
 
     return {
       id: event.id,
@@ -162,9 +163,10 @@ export class EventsService {
       description: event.description,
       sport: {
         id: event.sport.id,
-        name: event.sport.name,
-        // Мероприятие со скрытым направлением показывается в группе «Другое» (ТЗ 2.3)
-        category: event.sport.status === 'hidden' ? 'other' : event.sport.category,
+        // Мероприятие со скрытым направлением показывается в группе «Другое» (ТЗ 2.3),
+        // а скрытое некорректное название не показывается и в самой карточке
+        name: hidden ? SPORT_CATEGORY_TITLES.other : event.sport.name,
+        category: hidden ? 'other' : event.sport.category,
         isCustom: event.sport.isCustom,
       },
       organizer: organizerOf(event),

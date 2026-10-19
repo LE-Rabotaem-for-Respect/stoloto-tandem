@@ -160,6 +160,14 @@ describe('POST /events', () => {
     expect(search.body.items).toEqual([expect.objectContaining({ id: response.body.sport.id })]);
   });
 
+  it('в описании и «Информации для участников» допустимы переводы строк', async () => {
+    const newline = String.fromCharCode(10);
+    const description = `Играем 7 на 7${newline}Команды делим на месте`;
+    const response = await post(igor, { ...validEvent(), description });
+    expect(response.status).toBe(201);
+    expect(response.body.description).toBe(description);
+  });
+
   it('режим «по заявке» сохраняет вопрос к заявке', async () => {
     const response = await post(igor, {
       ...validEvent(),
@@ -198,6 +206,10 @@ describe('POST /events', () => {
     ['неизвестный режим', { mode: 'open' }, 'mode'],
     ['неизвестный уровень', { level: 'pro' }, 'level'],
     ['нет направления', { sportId: undefined }, 'sportId'],
+    ['нет направления, новое — null', { sportId: undefined, newSport: null }, 'sportId'],
+    ['неверный sportId, новое — null', { sportId: 'not-a-uuid', newSport: null }, 'sportId'],
+    ['переворот текста в названии', { title: 'Футбол 7×7 \u202e' }, 'title'],
+    ['управляющий символ в месте', { placeText: 'Поле \u0007 у школы' }, 'placeText'],
     ['лишнее поле', { organizerOrgId: randomUUID() }, 'organizerOrgId'],
   ])('%s — 400 с полем', async (_, change, field) => {
     const response = await post(anna, { ...validEvent(), ...change });
@@ -248,15 +260,21 @@ describe('GET /events/:id', () => {
   });
 
   it('«Информация для участников» — подтверждённому участнику, организатору и администратору', async () => {
-    const [confirmed, pending] = await Promise.all([account('user'), account('user')]);
+    const [confirmed, pending, waitlist] = await Promise.all([
+      account('user'),
+      account('user'),
+      account('user'),
+    ]);
     await participation(eventId, confirmed.id, 'confirmed');
     await participation(eventId, pending.id, 'pending');
+    await participation(eventId, waitlist.id, 'waitlist');
 
     const info = async (who: Account | null) => (await get(who, eventId)).body.participantInfo;
     expect(await info(igor)).toBe('Раздевалка открыта с 18:30');
     expect(await info(confirmed)).toBe('Раздевалка открыта с 18:30');
     expect(await info(admin)).toBe('Раздевалка открыта с 18:30');
     expect(await info(pending)).toBeNull();
+    expect(await info(waitlist)).toBeNull();
     expect(await info(anna)).toBeNull();
     expect(await info(orgApproved)).toBeNull();
     expect(await info(null)).toBeNull();
@@ -308,7 +326,7 @@ describe('GET /events/:id', () => {
     await prisma.sport.update({ where: { id: event.sportId }, data: { status: 'hidden' } });
     const response = await get(anna, id);
     await prisma.sport.update({ where: { id: event.sportId }, data: { status: 'active' } });
-    expect(response.body.sport.category).toBe('other');
+    expect(response.body.sport).toMatchObject({ name: 'Другое', category: 'other' });
   });
 
   it.each(['не-uuid', randomUUID()])('несуществующее мероприятие (%s) — 404', async (id) => {

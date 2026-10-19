@@ -9,6 +9,7 @@ import {
   IsString,
   IsUUID,
   Length,
+  Matches,
   MaxLength,
   ValidateIf,
   ValidateNested,
@@ -35,6 +36,12 @@ const isoDate = () =>
       : value,
   );
 
+// Управляющие и форматирующие символы: U+202E переворачивает текст в ленте, U+200B невидим
+const HIDDEN_CHARS = 'В тексте есть недопустимые символы';
+const singleLine = () => Matches(/^[^\p{Cc}\p{Cf}]*$/u, { message: HIDDEN_CHARS });
+// В многострочном тексте из управляющих допустимы только перевод строки и табуляция
+const multiLine = () => Matches(/^(?:[^\p{Cc}\p{Cf}]|[\n\r\t])*$/u, { message: HIDDEN_CHARS });
+
 /**
  * Создание мероприятия (ТЗ 2.2). Организатор не вводится — его задаёт аккаунт.
  * Направление — либо `sportId` из подсказок, либо `newSport` («Добавить как новое»).
@@ -44,15 +51,17 @@ export class CreateEventDto {
   @trim()
   @IsString({ message: 'Укажите название' })
   @Length(5, 80, { message: 'Название — от 5 до 80 символов' })
+  @singleLine()
   title!: string;
 
   @trim()
   @IsString({ message: 'Добавьте описание' })
   @IsNotEmpty({ message: 'Добавьте описание' })
   @MaxLength(2000, { message: 'Описание — не длиннее 2000 символов' })
+  @multiLine()
   description!: string;
 
-  @ValidateIf((dto: CreateEventDto) => dto.newSport === undefined)
+  @ValidateIf((dto: CreateEventDto) => dto.newSport == null)
   @IsUUID('all', { message: 'Выберите направление из списка или добавьте новое' })
   sportId?: string;
 
@@ -72,22 +81,26 @@ export class CreateEventDto {
   @trim()
   @IsString({ message: 'Укажите город' })
   @Length(2, 80, { message: 'Город — от 2 до 80 символов' })
+  @singleLine()
   city!: string;
 
   @trim()
   @IsString({ message: 'Укажите район или ориентир' })
   @Length(2, 120, { message: 'Район или ориентир — от 2 до 120 символов' })
+  @singleLine()
   area!: string;
 
   @trim()
   @IsString({ message: 'Укажите адрес или опишите место' })
   @Length(3, 300, { message: 'Адрес или описание места — от 3 до 300 символов' })
+  @singleLine()
   placeText!: string;
 
   @IsOptional()
   @trim()
   @IsString({ message: 'Информация для участников — текст' })
   @MaxLength(2000, { message: 'Информация для участников — не длиннее 2000 символов' })
+  @multiLine()
   participantInfo?: string;
 
   @IsIn(EVENT_MODES, { message: 'Выберите режим записи' })
@@ -97,6 +110,7 @@ export class CreateEventDto {
   @trim()
   @IsString({ message: 'Вопрос к заявке — текст' })
   @MaxLength(300, { message: 'Вопрос к заявке — не длиннее 300 символов' })
+  @multiLine()
   applyQuestion?: string;
 
   @IsIn(EVENT_LEVELS, { message: 'Выберите уровень' })
