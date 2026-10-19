@@ -103,5 +103,85 @@ describe('logEntry: запись об ошибке для журнала по б
       expect(entry).not.toContain(email);
       expect(entry.split(newline).slice(1)).not.toHaveLength(0);
     });
+
+    it('сообщение укоротили до первой строки после чтения stack', () => {
+      const error = new Error(`Привет${fakeFrame}`);
+      expect(error.stack).toContain(email);
+      error.message = error.message.split(newline)[0] ?? '';
+      expect(logEntry(error)).not.toContain(email);
+    });
+
+    it('сообщение очистили после чтения stack', () => {
+      const error = new Error(`Привет${fakeFrame}`);
+      expect(error.stack).toContain(email);
+      error.message = '';
+      const entry = logEntry(error);
+      expect(entry).not.toContain(email);
+      expect(entry.split(newline).slice(1)).not.toHaveLength(0);
+    });
+
+    it('сообщение совпадает с именем ошибки', () => {
+      const error = new Error('Error');
+      error.stack = `Error: Error${fakeFrame}`;
+      expect(logEntry(error)).not.toContain(email);
+    });
+
+    it('к стеку приклеен стек причины (Caused by) — его строки не идут', () => {
+      const cause = new Error(`Причина${fakeFrame}`);
+      const error = new Error('Не удалось');
+      error.stack += `${newline}Caused by: ${cause.stack ?? ''}`;
+      const entry = logEntry(error);
+      expect(entry).not.toContain(email);
+      expect(entry).not.toContain('Caused by');
+      expect(entry.split(newline).slice(1)).not.toHaveLength(0);
+    });
+
+    it('stack подменён, а сообщение совпадает с его заголовком', () => {
+      const error = new Error('ok');
+      error.stack = `Error: ok${newline}    at ${email}`;
+      expect(logEntry(error)).toBe('Error');
+    });
+
+    it('нестроковое сообщение', () => {
+      for (const message of [5, {}]) {
+        const error = new Error('x');
+        error.stack = `Error: ${String(message)}${fakeFrame}`;
+        Object.defineProperty(error, 'message', { value: message });
+        expect(logEntry(error)).not.toContain(email);
+      }
+    });
+
+    it.each([
+      ['имя функции с пробелом', '    at Anna Ivanova (/x.js:1:1)', 'Anna'],
+      ['путь с @', `    at /home/${email}:1:1`, email],
+      ['путь с @ в скобках', `    at run (/home/${email}/x.js:1:1)`, email],
+    ])('кадр-подделка: %s', (_, line, secret) => {
+      for (const stack of [`Error: ok${newline}${line}`, `Error: другое${newline}${line}`]) {
+        const error = new Error('ok');
+        error.stack = stack;
+        expect(logEntry(error), stack).not.toContain(secret);
+      }
+    });
+  });
+
+  describe('настоящие кадры V8 проходят', () => {
+    const newline = String.fromCharCode(10);
+
+    it.each([
+      '    at g (/app/dist/x.js:6:39)',
+      '    at /app/dist/x.js:6:39',
+      '    at async Promise.all (index 0)',
+      '    at new ApiError (file:///app/dist/x.mjs:1:1)',
+      '    at Object.<anonymous> (C:\\work\\x.js:1:1)',
+      '    at Foo.bar [as baz] (node:internal/modules/cjs/loader:1554:14)',
+      '    at async process.processTicksAndRejections (node:internal/process/task_queues:105:5)',
+    ])('%s', (frame) => {
+      const error = new Error('ok');
+      error.stack = `Error: ok${newline}${frame}${newline}    at last (/app/x.js:1:1)`;
+      const entry = logEntry(error).split(newline);
+      // Кадр без пути не пишется, но и не обрывает блок: следующий кадр на месте
+      expect(entry).toContain('    at last (/app/x.js:1:1)');
+      if (frame !== '    at async Promise.all (index 0)') expect(entry).toContain(frame);
+    });
   });
 });
