@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DemoAccountKey } from '@tandem/domain';
 import { ApiRequestError, apiRequest } from '../../shared/api';
+import { CLOCK_KEY } from '../../shared/clock';
 
 /** Текущий пользователь — ответ `GET /me` (только свои поля, без хеша пароля). */
 export interface Me {
@@ -12,14 +13,6 @@ export interface Me {
   bio: string | null;
   settings: unknown;
   organization: { id: string; name: string; status: string } | null;
-}
-
-/** Режим стенда — из `GET /clock`, а не из сборки: образ один на все стенды. */
-export interface StandInfo {
-  now: string;
-  demoMode: boolean;
-  standId: string | null;
-  lastResetAt: string | null;
 }
 
 export interface LoginBody {
@@ -36,7 +29,6 @@ export interface RegisterBody {
 }
 
 export const ME_KEY = ['me'] as const;
-const STAND_KEY = ['clock'] as const;
 
 /** `null` — гость. */
 export function useMe() {
@@ -54,21 +46,13 @@ export function useMe() {
   });
 }
 
-export function useStandInfo() {
-  return useQuery({
-    queryKey: STAND_KEY,
-    queryFn: () => apiRequest<StandInfo>('/clock'),
-    staleTime: 60_000,
-  });
-}
-
 // После входа под другим аккаунтом данные прежнего пользователя в кеше не нужны
 function useSignIn<Body>(path: string) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (body: Body) => apiRequest<Me>(path, { method: 'POST', body }),
     onSuccess: (me) => {
-      client.removeQueries({ predicate: (query) => query.queryKey[0] !== STAND_KEY[0] });
+      client.removeQueries({ predicate: (query) => query.queryKey[0] !== CLOCK_KEY[0] });
       client.setQueryData(ME_KEY, me);
     },
   });
@@ -83,7 +67,7 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => apiRequest<undefined>('/auth/logout', { method: 'POST' }),
     onSuccess: () => {
-      client.removeQueries({ predicate: (query) => query.queryKey[0] !== STAND_KEY[0] });
+      client.removeQueries({ predicate: (query) => query.queryKey[0] !== CLOCK_KEY[0] });
       client.setQueryData(ME_KEY, null);
     },
   });
