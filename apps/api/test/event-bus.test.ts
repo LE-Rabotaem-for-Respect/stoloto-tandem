@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { Injectable, Logger } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -46,6 +47,12 @@ class Handlers {
 
   @OnDomainEvent('ParticipationConfirmed')
   notify(event: DomainEvent<'ParticipationConfirmed'>) {
+    this.received.push(event);
+  }
+
+  @OnDomainEvent('EventRestored')
+  @OnEvent('EventUpdated')
+  restoredOrUpdated(event: DomainEvent<'EventRestored'> | DomainEvent<'EventUpdated'>) {
     this.received.push(event);
   }
 
@@ -146,7 +153,10 @@ describe('core/event-bus: публикация и обработчики', () =>
     await nextTick();
     expect(handlers.received).toHaveLength(1);
     expect(logged).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(logged.mock.calls)).toContain('обработчик уведомлений упал');
+    const written = String(logged.mock.calls[0]?.[0]);
+    expect(written).toContain('Handlers.failing');
+    expect(written).toContain('обработчик уведомлений упал');
+    expect(written).toMatch(/\n\s+at /);
   });
 
   it('ошибка Prisma в обработчике — в журнале без аргументов вызова, действие выполнено', async () => {
@@ -158,10 +168,28 @@ describe('core/event-bus: публикация и обработчики', () =>
     expect(result).toBe('сообщение сохранено');
     expect(handlers.received).toEqual([posted()]);
     const written = JSON.stringify(logged.mock.calls);
-    expect(written).toContain('MessagePosted');
+    expect(written).toContain('Handlers.prismaFailing');
     expect(written).toContain('PrismaClientValidationError');
     expect(written).not.toContain('anna@demo');
     expect(written).not.toContain('вас приняли');
+  });
+
+  it('подписки других декораторов метода сохраняются', async () => {
+    const restored = domainEvent('EventRestored', {
+      eventId: 'e-1',
+      actorId: 'u-admin',
+      occurredAt,
+    });
+    const updated = domainEvent('EventUpdated', {
+      eventId: 'e-1',
+      fields: ['title'],
+      actorId: 'u-organizer',
+      occurredAt,
+    });
+    bus.publish(restored, updated);
+    await nextTick();
+    expect(handlers.received).toHaveLength(2);
+    expect(handlers.received).toEqual(expect.arrayContaining([restored, updated]));
   });
 
   it('afterCommit публикует события только после успешной работы', async () => {

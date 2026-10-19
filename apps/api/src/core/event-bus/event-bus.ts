@@ -37,15 +37,19 @@ type Handler = ((...args: unknown[]) => unknown) & { [guarded]?: true };
  * вызова Prisma. С `suppressErrors` библиотека сама пишет в журнал текст
  * ошибки целиком, поэтому он выключен.
  */
-function guard(type: DomainEventType, handler: Handler): Handler {
+function guard(name: string, handler: Handler): Handler {
   if (handler[guarded]) return handler;
   const wrapped: Handler = async function (this: unknown, ...args: unknown[]) {
     try {
       return await handler.apply(this, args);
     } catch (error) {
-      logger.error(`Обработчик ${type} упал: ${logEntry(error)}`);
+      logger.error(`Обработчик ${name} упал: ${logEntry(error)}`);
     }
   };
+  // Метаданные других декораторов метода (в том числе подписки) остаются на обёртке
+  for (const key of Reflect.getMetadataKeys(handler)) {
+    Reflect.defineMetadata(key, Reflect.getMetadata(key, handler), wrapped);
+  }
   wrapped[guarded] = true;
   return wrapped;
 }
@@ -54,6 +58,7 @@ function guard(type: DomainEventType, handler: Handler): Handler {
 export const OnDomainEvent =
   (type: DomainEventType): MethodDecorator =>
   (target, key, descriptor) => {
-    descriptor.value = guard(type, descriptor.value as Handler) as typeof descriptor.value;
+    const name = `${target.constructor.name}.${String(key)}`;
+    descriptor.value = guard(name, descriptor.value as Handler) as typeof descriptor.value;
     return OnEvent(type, { async: true, suppressErrors: false })(target, key, descriptor);
   };
