@@ -73,6 +73,7 @@ function renderApp(path: string, routes = <AppRoutes />) {
 }
 
 beforeEach(() => {
+  joinVisible = true;
   localStorage.clear();
   sessionStorage.clear();
   delete document.documentElement.dataset.theme;
@@ -211,6 +212,13 @@ function BackButton() {
   );
 }
 
+// Кнопку страница показывает не всегда: роль вошедшего, загрузка, уже записан
+let joinVisible = true;
+
+function MaybeJoin({ onJoin }: { onJoin(): void }) {
+  return joinVisible ? <JoinButton onJoin={onJoin} /> : <p>Кнопки нет</p>;
+}
+
 function JoinButton({ onJoin }: { onJoin(): void }) {
   const join = useAuthAction('join', onJoin);
   return (
@@ -321,6 +329,108 @@ describe('действие гостя', () => {
 
     await screen.findByRole('button', { name: 'Записаться' });
     await waitFor(() => expect(onJoin).toHaveBeenCalledTimes(1));
+  });
+
+  it('действие, не выполненное на странице без кнопки, позже не срабатывает', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp(
+      '/events/1',
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route index element={<BackButton />} />
+          <Route path="events/:id" element={<MaybeJoin onJoin={onJoin} />} />
+          <Route path="login" element={<LoginPage />} />
+        </Route>
+      </Routes>,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    // После входа кнопки на странице нет — действие некому выполнить
+    joinVisible = false;
+    await userEvent.type(await screen.findByLabelText('Почта'), 'anna@demo');
+    await userEvent.type(screen.getByLabelText('Пароль'), 'demo');
+    await userEvent.click(screen.getByRole('button', { name: 'Войти' }));
+    await screen.findByText('Кнопки нет');
+
+    // Человек ушёл на главную, кнопка появилась, он вернулся «Назад»
+    await userEvent.click(screen.getByRole('link', { name: 'Спорт вместе' }));
+    joinVisible = true;
+    await userEvent.click(await screen.findByRole('button', { name: 'Назад' }));
+    await screen.findByRole('button', { name: 'Записаться' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).not.toHaveBeenCalled();
+  });
+
+  it('после смены аккаунта отложенное действие прежнего гостя не выполняется', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp(
+      '/events/1',
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="events/:id" element={<MaybeJoin onJoin={onJoin} />} />
+          <Route
+            path="login"
+            element={
+              <>
+                <BackButton />
+                <LoginPage />
+              </>
+            }
+          />
+        </Route>
+      </Routes>,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    joinVisible = false;
+    await userEvent.type(await screen.findByLabelText('Почта'), 'anna@demo');
+    await userEvent.type(screen.getByLabelText('Пароль'), 'demo');
+    await userEvent.click(screen.getByRole('button', { name: 'Войти' }));
+    await screen.findByText('Кнопки нет');
+
+    // Другой человек: «Сменить аккаунт», вход, затем кнопка видна
+    await userEvent.click(screen.getByRole('button', { name: 'Сменить аккаунт' }));
+    await userEvent.type(await screen.findByLabelText('Почта'), 'anna@demo');
+    await userEvent.type(screen.getByLabelText('Пароль'), 'demo');
+    joinVisible = true;
+    await userEvent.click(screen.getByRole('button', { name: 'Войти' }));
+    await screen.findByRole('button', { name: 'Записаться' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).not.toHaveBeenCalled();
+  });
+
+  it('две кнопки одного действия на странице выполняют его один раз', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp(
+      '/events/1',
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route
+            path="events/:id"
+            element={
+              <>
+                <JoinButton onJoin={onJoin} />
+                <JoinButton onJoin={onJoin} />
+              </>
+            }
+          />
+          <Route path="login" element={<LoginPage />} />
+        </Route>
+      </Routes>,
+    );
+
+    await userEvent.click((await screen.findAllByRole('button', { name: 'Записаться' }))[0]!);
+    await userEvent.type(await screen.findByLabelText('Почта'), 'anna@demo');
+    await userEvent.type(screen.getByLabelText('Пароль'), 'demo');
+    await userEvent.click(screen.getByRole('button', { name: 'Войти' }));
+
+    await screen.findAllByRole('button', { name: 'Записаться' });
+    await waitFor(() => expect(onJoin).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).toHaveBeenCalledTimes(1);
   });
 
   it('под StrictMode отложенное действие выполняется ровно один раз', async () => {

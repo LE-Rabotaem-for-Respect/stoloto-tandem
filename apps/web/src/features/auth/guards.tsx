@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 import { useMe } from './api';
-import { loginPath, pendingActionFrom } from './return-path';
+import { takePendingAction, usePendingSlot } from './pending-action';
+import { loginPath } from './return-path';
 import type { PendingAction } from './return-path';
 
 /** Раздел только для вошедших: гостя отправляет на вход и возвращает сюда же. */
@@ -28,34 +29,30 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 /**
  * Действие, которое гостю сначала предлагает войти (ТЗ 2.6). Клик гостя ведёт на
  * вход и несёт действие в `state` навигации; успешный вход возвращает его сюда,
- * и страница выполняет его один раз, стирая из истории. Адрес страницы действие
- * не запускает, а брошенный вход не оставляет ничего, что сработало бы позже.
+ * каркас переносит его в память (`usePendingActionRelay`) и стирает из истории,
+ * а хук выполняет его один раз — для того, кто вошёл, и пока он на этой странице.
+ * Адрес страницы, «Назад» и другой аккаунт действие не запускают.
  */
 export function useAuthAction(intent: string, action: () => void): () => void {
   const me = useMe();
   const location = useLocation();
   const navigate = useNavigate();
   const latest = useRef(action);
-  // Запись истории, чьё действие уже выполнено: StrictMode запускает эффект дважды
-  const done = useRef<string | null>(null);
+  const slot = usePendingSlot();
 
   useEffect(() => {
     latest.current = action;
   });
 
-  const signedIn = Boolean(me.data);
-  const { pathname, search, hash, key, state } = location;
+  const userId = me.data?.id ?? null;
+  const { pathname, search } = location;
   useEffect(() => {
-    const pending = pendingActionFrom(state);
-    if (!signedIn || pending?.path !== pathname || pending.intent !== intent) return;
-    if (done.current === key) return;
-    done.current = key;
-    void navigate(pathname + search + hash, { replace: true, state: null });
-    latest.current();
-  }, [signedIn, pathname, search, hash, key, state, intent, navigate]);
+    // Забирает слот один из хуков: две кнопки одного действия не выполнят его дважды
+    if (userId && takePendingAction(pathname, intent, userId)) latest.current();
+  }, [slot, userId, pathname, intent]);
 
   return () => {
-    if (signedIn) {
+    if (userId) {
       action();
       return;
     }

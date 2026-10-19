@@ -2,7 +2,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { IconName } from '../../shared/illustrations';
 import { useTheme } from '../../shared/theme';
 import { Icon } from '../../shared/ui/Icon';
-import { loginPath, returnPath, useLogout, useMe } from '../auth';
+import { loginPath, returnPath, useLogout, useMe, usePendingActionRelay } from '../auth';
 
 /** Пять пунктов (ТЗ 2.8): нижняя панель на мобильном, верхнее меню на компьютере. */
 export const NAV_ITEMS: readonly { to: string; label: string; icon: IconName }[] = [
@@ -90,6 +90,7 @@ function Account() {
 }
 
 export function AppLayout() {
+  usePendingActionRelay();
   return (
     <div className="app">
       <a className="skip-link" href="#main">
