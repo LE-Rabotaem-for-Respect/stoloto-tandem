@@ -36,8 +36,14 @@ export class AuthGuard implements CanActivate {
       request.actor = { role: 'guest' };
     }
 
-    // Метка метода важнее метки контроллера; без меток — только для вошедших
-    const access = this.accessOf(context.getHandler()) ?? this.accessOf(context.getClass());
+    // Метка метода важнее метки контроллера; без меток — только для вошедших.
+    // Открыть маршрут гостю можно только меткой на методе: `@Public()` на контроллере
+    // открыл бы и методы, которые в него добавят позже без своей метки
+    const controllerRoles = this.reflector.get<SignedInRole[] | undefined>(
+      ROLES_KEY,
+      context.getClass(),
+    );
+    const access = this.accessOf(context.getHandler()) ?? controllerRoles;
     if (access === 'public') return true;
     if (request.actor.role === 'guest') throw new ApiError('unauthorized');
     if (access && !access.includes(request.actor.role)) throw new ApiError('forbidden');
