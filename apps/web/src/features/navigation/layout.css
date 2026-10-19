@@ -1,7 +1,22 @@
-/* Шапка 56 px и нижняя панель 64 px (docs/design.md, «Первый экран карточки события»). */
+/* Шапка и нижняя панель — бюджет первого экрана в docs/design.md («Первый экран карточки события»). */
 
 .app {
+  --nav-height: 64px;
+  /* Подписи нижней панели: пятая часть ширины 360 px */
+  --nav-label-size: 0.8125rem;
   min-height: 100vh;
+}
+
+/* Фокус при обходе Tab не прячется под нижней панелью */
+html {
+  scroll-padding-bottom: calc(var(--nav-height) + var(--space-2));
+}
+
+/* Шапка и верхнее меню прилипают вместе: меню не наезжает на шапку любой высоты */
+.app-top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .skip-link {
@@ -19,9 +34,6 @@
 }
 
 .app-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -33,7 +45,10 @@
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
   min-width: 0;
+  min-height: var(--tap-min);
   margin-right: auto;
   overflow: hidden;
   white-space: nowrap;
@@ -78,6 +93,12 @@
   min-width: 0;
 }
 
+.account-error {
+  flex-basis: 100%;
+  color: var(--status-bad-fg);
+  font-size: var(--fs-caption);
+}
+
 .account-name {
   overflow-wrap: anywhere;
   font-weight: 600;
@@ -93,6 +114,13 @@
     gap: 0 var(--space-2);
   }
 
+  /* В сетке растягивается на всю колонку — иначе длинное название наезжает на переключатели */
+  .brand {
+    display: block;
+    margin-right: 0;
+    line-height: var(--tap-min);
+  }
+
   .account {
     grid-column: 1 / -1;
     border-top: var(--border-width) solid var(--color-line);
@@ -102,7 +130,7 @@
 .app-main {
   max-width: 1200px;
   margin: 0 auto;
-  padding: var(--space-5) var(--space-4) calc(64px + var(--space-6));
+  padding: var(--space-5) var(--space-4) calc(var(--nav-height) + var(--space-6));
 }
 
 .app-main:focus {
@@ -138,7 +166,7 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
-  min-height: 64px;
+  min-height: var(--nav-height);
   padding: var(--space-1) 2px;
   color: var(--color-ink-muted);
   font-size: var(--fs-caption);
@@ -159,16 +187,18 @@
   box-shadow: inset 0 3px 0 var(--color-marker);
 }
 
-/* «Крупный текст» на узком экране: подписи панели не помещаются в пятую часть ширины */
-[data-text='large'] .main-nav-link {
-  font-size: calc(0.8125rem * var(--text-scale));
+/* «Крупный текст» на узком экране: подписи панели не помещаются в пятую часть ширины.
+   Только для нижней панели — верхнее меню остаётся размером основного текста */
+@media (max-width: 767px) {
+  [data-text='large'] .main-nav-link {
+    font-size: calc(var(--nav-label-size) * var(--text-scale));
+  }
 }
 
 /* С 768 px панель становится верхним меню под шапкой */
 @media (min-width: 768px) {
   .main-nav {
-    position: sticky;
-    top: 56px;
+    position: static;
     bottom: auto;
     border-top: 0;
     border-bottom: var(--border-width) solid var(--color-line);
@@ -196,6 +226,10 @@
 
   .app-main {
     padding-bottom: var(--space-6);
+  }
+
+  html {
+    scroll-padding-bottom: 0;
   }
 
   h1 {

@@ -23,8 +23,7 @@ function ThemeSwitches() {
         aria-pressed={theme.largeText}
         onClick={theme.toggleLargeText}
       >
-        <span aria-hidden="true">А+</span>
-        <span className="visually-hidden">Крупный текст</span>
+        А+<span className="visually-hidden"> Крупный текст</span>
       </button>
       <button
         className="header-button"
@@ -47,6 +46,13 @@ function Account() {
   const location = useLocation();
 
   if (me.isPending) return null;
+  if (me.isError) {
+    return (
+      <button className="header-link" type="button" onClick={() => void me.refetch()}>
+        Нет связи — повторить
+      </button>
+    );
+  }
   if (!me.data) {
     return (
       <Link className="header-link" to={loginPath(location.pathname + location.search)}>
@@ -74,6 +80,11 @@ function Account() {
       >
         Сменить аккаунт
       </button>
+      {logout.isError && (
+        <span className="account-error" role="alert">
+          Не удалось выйти. Попробуйте ещё раз
+        </span>
+      )}
     </div>
   );
 }
@@ -84,25 +95,27 @@ export function AppLayout() {
       <a className="skip-link" href="#main">
         Перейти к содержимому
       </a>
-      <header className="app-header">
-        <Link className="brand" to="/">
-          Спорт вместе
-        </Link>
-        <ThemeSwitches />
-        <Account />
-      </header>
-      <nav className="main-nav" aria-label="Основные разделы">
-        <ul>
-          {NAV_ITEMS.map((item) => (
-            <li key={item.to}>
-              <NavLink to={item.to} end={item.to === '/'} className="main-nav-link">
-                <Icon name={item.icon} />
-                <span>{item.label}</span>
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <div className="app-top">
+        <header className="app-header">
+          <Link className="brand" to="/">
+            Спорт вместе
+          </Link>
+          <ThemeSwitches />
+          <Account />
+        </header>
+        <nav className="main-nav" aria-label="Основные разделы">
+          <ul>
+            {NAV_ITEMS.map((item) => (
+              <li key={item.to}>
+                <NavLink to={item.to} end={item.to === '/'} className="main-nav-link">
+                  <Icon name={item.icon} />
+                  <span>{item.label}</span>
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
       <main id="main" className="app-main" tabIndex={-1}>
         <Outlet />
       </main>

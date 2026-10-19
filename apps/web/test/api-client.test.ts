@@ -74,4 +74,11 @@ describe('возврат после входа', () => {
     expect(safeNext('//evil.example')).toBe('/');
     expect(safeNext('/\\evil.example')).toBe('/');
   });
+
+  it('управляющие символы в адресе не уводят на чужой сайт', () => {
+    expect(safeNext('/\t/evil.example')).toBe('/');
+    expect(safeNext('/\n/evil.example')).toBe('/');
+    expect(safeNext('/\r/evil.example')).toBe('/');
+    expect(safeNext('/events/1?tab=faq#q2')).toBe('/events/1?tab=faq#q2');
+  });
 });

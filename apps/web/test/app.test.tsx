@@ -24,7 +24,7 @@ const json = (status: number, body?: unknown) =>
   });
 
 /** Небольшой api в памяти: вход, выход, профиль, режим стенда. */
-function fakeApi({ demoMode = false, signedIn = null as Me | null } = {}) {
+function fakeApi({ demoMode = false, signedIn = null as Me | null, meDown = false } = {}) {
   let me = signedIn;
   const calls: string[] = [];
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
@@ -32,6 +32,7 @@ function fakeApi({ demoMode = false, signedIn = null as Me | null } = {}) {
     calls.push(call);
     switch (call) {
       case 'GET /api/me':
+        if (meDown) return json(502, { code: 'internal', message: 'Что-то пошло не так' });
         return me ? json(200, me) : json(401, { code: 'unauthorized', message: 'Войдите' });
       case 'GET /api/clock':
         return json(200, {
@@ -72,6 +73,7 @@ function renderApp(path: string, routes = <AppRoutes />) {
 
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
   delete document.documentElement.dataset.theme;
   delete document.documentElement.dataset.text;
 });
@@ -107,6 +109,15 @@ describe('каркас приложения', () => {
     expect(await screen.findByRole('heading', { name: 'Мои записи' })).toBeTruthy();
     expect(screen.getByText('Анна')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Сменить аккаунт' })).toBeTruthy();
+  });
+
+  it('сбой /me — ошибка с повтором, а не уход на вход', async () => {
+    fakeApi({ meDown: true });
+    renderApp('/my');
+    expect((await screen.findByRole('alert')).textContent).toContain('Не удалось проверить вход');
+    expect(screen.getByRole('button', { name: 'Повторить' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Нет связи — повторить' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Вход' })).toBeNull();
   });
 
   it('неверный пароль — сообщение, вход не выполнен', async () => {
@@ -197,6 +208,42 @@ describe('действие гостя', () => {
 
     await screen.findByRole('button', { name: 'Записаться' });
     await waitFor(() => expect(onJoin).toHaveBeenCalledTimes(1));
+  });
+
+  it('ссылка с ?intent= у вошедшего ничего не делает сама', async () => {
+    fakeApi({ signedIn: anna });
+    const onJoin = vi.fn();
+    renderApp(
+      '/events/1?intent=join',
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="events/:id" element={<JoinButton onJoin={onJoin} />} />
+        </Route>
+      </Routes>,
+    );
+    await screen.findByRole('button', { name: 'Сменить аккаунт' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).not.toHaveBeenCalled();
+  });
+
+  it('действие, отложенное на другой странице, здесь не выполняется', async () => {
+    fakeApi({ signedIn: anna });
+    sessionStorage.setItem(
+      'tandem-pending-action',
+      JSON.stringify({ path: '/events/2', intent: 'join', at: Date.now() }),
+    );
+    const onJoin = vi.fn();
+    renderApp(
+      '/events/1',
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="events/:id" element={<JoinButton onJoin={onJoin} />} />
+        </Route>
+      </Routes>,
+    );
+    await screen.findByRole('button', { name: 'Сменить аккаунт' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).not.toHaveBeenCalled();
   });
 
   it('вошедший выполняет действие сразу', async () => {
