@@ -1,4 +1,4 @@
-export { TransitionError, defineMachine } from './machine';
+export { TRANSITION_ERROR_CODES, TransitionError, defineMachine } from './machine';
 export type {
   Denial,
   Machine,

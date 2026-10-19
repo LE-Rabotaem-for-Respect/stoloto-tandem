@@ -49,7 +49,9 @@ export default tseslint.config(
     rules: reactHooks.configs.recommended.rules,
   },
   {
+    // В web «сейчас» считает только хук useClock() в shared/clock: время сервера плюс разница часов
     files: ['apps/web/src/**', 'packages/domain/src/**'],
+    ignores: ['apps/web/src/shared/clock/**'],
     rules: { 'no-restricted-syntax': ['error', ...currentTime] },
   },
   {

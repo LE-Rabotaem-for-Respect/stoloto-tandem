@@ -1,11 +1,13 @@
-export type TransitionErrorCode =
-  | 'invalid_transition'
-  | 'already_joined'
-  | 'rejected_final'
-  | 'no_seats'
-  | 'reason_required'
-  | 'event_started'
-  | 'start_not_in_future';
+export const TRANSITION_ERROR_CODES = [
+  'invalid_transition',
+  'already_joined',
+  'rejected_final',
+  'no_seats',
+  'reason_required',
+  'event_started',
+  'start_not_in_future',
+] as const;
+export type TransitionErrorCode = (typeof TRANSITION_ERROR_CODES)[number];
 
 /** Запрещённый переход автомата. `message` — готовый текст для пользователя. */
 export class TransitionError extends Error {

@@ -28,4 +28,10 @@ describe('правило ESLint о текущем времени', () => {
       await timeErrors('export const a = new Date();\n', 'apps/api/src/core/clock/clock.ts'),
     ).toBe(0);
   });
+
+  it('в web исключение — только хук useClock() в shared/clock', async () => {
+    const code = 'export const a = Date.now();\n';
+    expect(await timeErrors(code, 'apps/web/src/shared/clock/use-clock.ts')).toBe(0);
+    expect(await timeErrors(code, 'apps/web/src/shared/ui/x.ts')).toBe(1);
+  });
 });
