@@ -50,14 +50,22 @@ describe('тексты статусов по ТЗ', () => {
 
   it('мероприятия (4.3)', () => {
     expect(EVENT_STATUS_VIEW).toMatchObject({
-      open: { text: 'Набор открыт', tone: 'ok' },
-      full: { text: 'Мест нет — можно встать в лист ожидания', tone: 'queue' },
-      rescheduled: { text: 'Перенесено', tone: 'warn' },
-      ongoing: { text: 'Идёт', tone: 'ok' },
-      finished: { text: 'Завершено', tone: 'off' },
-      cancelled: { text: 'Отменено организатором', tone: 'bad' },
-      unpublished: { text: 'Снято с публикации модератором', tone: 'off' },
-      deleted: { text: 'Удалено модератором', tone: 'off' },
+      open: { text: 'Набор открыт', icon: 'action-join', tone: 'ok' },
+      full: {
+        text: 'Мест нет — можно встать в лист ожидания',
+        icon: 'status-full',
+        tone: 'queue',
+      },
+      rescheduled: { text: 'Перенесено', icon: 'status-rescheduled', tone: 'warn' },
+      ongoing: { text: 'Идёт', icon: 'status-ongoing', tone: 'ok' },
+      finished: { text: 'Завершено', icon: 'status-finished', tone: 'off' },
+      cancelled: {
+        text: 'Отменено организатором',
+        icon: 'status-event-cancelled',
+        tone: 'bad',
+      },
+      unpublished: { text: 'Снято с публикации модератором', icon: 'action-hide', tone: 'off' },
+      deleted: { text: 'Удалено модератором', icon: 'action-delete', tone: 'off' },
     });
   });
 
