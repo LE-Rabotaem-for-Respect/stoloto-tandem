@@ -7,7 +7,7 @@ import { clearSessionCookie, setSessionCookie } from './cookies';
 import { DemoModeGuard } from './demo-mode.guard';
 import type { CookieResponse } from './cookies';
 import { DemoLoginDto, LoginDto, RegisterDto } from './dto';
-import { SignedIn as SignedInOnly } from './roles';
+import { Public, SignedIn as SignedInOnly } from './roles';
 import type { AuthRequest } from './roles';
 import { toSelfView } from './user-view';
 import type { SelfView } from './user-view';
@@ -20,6 +20,7 @@ export class AuthController {
   ) {}
 
   @Post('auth/register')
+  @Public()
   async register(
     @Body() dto: RegisterDto,
     @Req() req: AuthRequest,
@@ -29,6 +30,7 @@ export class AuthController {
   }
 
   @Post('auth/login')
+  @Public()
   @HttpCode(200)
   async login(
     @Body() dto: LoginDto,
@@ -39,6 +41,7 @@ export class AuthController {
   }
 
   @Post('auth/demo-login')
+  @Public()
   @UseGuards(DemoModeGuard)
   @HttpCode(200)
   async demoLogin(
@@ -50,6 +53,7 @@ export class AuthController {
   }
 
   @Post('auth/logout')
+  @Public()
   @HttpCode(204)
   async logout(@Req() req: AuthRequest, @Res({ passthrough: true }) res: CookieResponse) {
     await this.auth.logout(req.sessionToken);
@@ -65,7 +69,10 @@ export class AuthController {
   }
 
   private respond({ user, token }: SignedIn, res: CookieResponse): SelfView {
-    setSessionCookie(res, this.config.cookieName, token, this.config.sessionTtlMs);
+    setSessionCookie(res, this.config.cookieName, token, {
+      maxAge: this.config.sessionTtlMs,
+      secure: this.config.cookieSecure,
+    });
     return toSelfView(user);
   }
 }

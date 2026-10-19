@@ -39,6 +39,13 @@ const PHC = /^\$argon2id\$v=19\$m=(\d+),t=(\d+),p=(\d+)\$([A-Za-z0-9+/]+)\$([A-Z
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const [, memory, passes, parallelism, nonce, hash] = PHC.exec(stored) ?? [];
   if (!nonce || !hash) return false;
+  // Хеш слабее минимума (подложенный в базу или устаревший) не принимается
+  if (
+    Number(memory) < PASSWORD_HASH_PARAMS.memory ||
+    Number(passes) < PASSWORD_HASH_PARAMS.passes
+  ) {
+    return false;
+  }
   const expected = Buffer.from(hash, 'base64');
   const key = await derive(password, Buffer.from(nonce, 'base64'), {
     memory: Number(memory),

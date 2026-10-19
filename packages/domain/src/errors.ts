@@ -10,6 +10,8 @@ const GENERAL_ERROR_CODES = [
   'busy',
   'internal',
   'invalid_credentials',
+  'unsupported_media_type',
+  'cross_site_request',
 ] as const;
 
 /** Отказы политик доступа (ТЗ 4.4). */
@@ -47,6 +49,8 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   busy: 'Сервер занят, попробуйте ещё раз',
   internal: 'Что-то пошло не так. Попробуйте ещё раз',
   invalid_credentials: 'Неверная почта или пароль',
+  unsupported_media_type: 'Неподдерживаемый формат данных',
+  cross_site_request: 'Запрос с другого сайта отклонён',
   event_not_available: 'Мероприятие недоступно',
   event_not_joinable: 'Мероприятие недоступно для записи',
   own_event: 'Нельзя записаться на своё мероприятие',
@@ -70,7 +74,7 @@ export const errorMessage = (code: ErrorCode): string => ERROR_MESSAGES[code];
 /**
  * HTTP-код каждой ошибки: 400 — неверные данные, 401 — нужен вход,
  * 403 — нет прав, 404 — нет объекта, 409 — конфликт с состоянием,
- * 413 — слишком большое тело, 503 — база занята, 500 — непредвиденное.
+ * 413 — слишком большое тело, 415 — тело не в формате JSON, 503 — база занята, 500 — непредвиденное.
  */
 export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   validation_failed: 400,
@@ -82,6 +86,8 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   busy: 503,
   internal: 500,
   invalid_credentials: 401,
+  unsupported_media_type: 415,
+  cross_site_request: 403,
   event_not_available: 404,
   event_not_joinable: 409,
   own_event: 403,

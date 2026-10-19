@@ -1,9 +1,10 @@
-import { SetMetadata, createParamDecorator } from '@nestjs/common';
+import { createParamDecorator } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
 import type { Actor } from '../../core/policies';
 import type { UserWithOrganization } from './auth.repository';
 
-export type SignedInRole = Exclude<Actor['role'], 'guest'>;
+export { PUBLIC_KEY, Public, ROLES_KEY, Roles, SignedIn } from '../../core/access';
+export type { SignedInRole } from '../../core/access';
 
 /** Что guard кладёт в запрос: кто действует и чем вошёл. */
 export interface AuthRequest {
@@ -12,14 +13,6 @@ export interface AuthRequest {
   user?: UserWithOrganization;
   sessionToken?: string;
 }
-
-export const ROLES_KEY = 'auth:roles';
-
-/** Маршрут доступен только этим ролям: гостю — 401, остальным — 403. */
-export const Roles = (...roles: SignedInRole[]) => SetMetadata(ROLES_KEY, roles);
-
-/** Маршрут доступен любому, кто вошёл. */
-export const SignedIn = () => Roles('user', 'org', 'admin');
 
 /** Кто выполняет запрос; без входа — гость. */
 export const CurrentActor = createParamDecorator(

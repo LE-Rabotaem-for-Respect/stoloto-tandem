@@ -9,7 +9,7 @@ import { AuthGuard } from '../src/modules/auth/auth.guard';
 import type { UserWithOrganization } from '../src/modules/auth/auth.repository';
 import { readCookie } from '../src/modules/auth/cookies';
 import { PASSWORD_HASH_PARAMS, hashPassword, verifyPassword } from '../src/modules/auth/password';
-import { ROLES_KEY, toActor } from '../src/modules/auth/roles';
+import { PUBLIC_KEY, ROLES_KEY, toActor } from '../src/modules/auth/roles';
 import type { AuthRequest, SignedInRole } from '../src/modules/auth/roles';
 import type { SessionService } from '../src/modules/auth/session.service';
 
@@ -20,6 +20,13 @@ describe('настройки входа', () => {
     expect(() => loadAuthConfig({})).toThrow(/SESSION_SECRET/);
     expect(() => loadAuthConfig({ SESSION_SECRET: 'short' })).toThrow(/SESSION_SECRET/);
     expect(() => loadAuthConfig({ SESSION_SECRET: '   ' + 'b'.repeat(10) + '   ' })).toThrow();
+  });
+
+  it('Secure у cookie — только по явной настройке стенда с HTTPS', () => {
+    expect(loadAuthConfig({ SESSION_SECRET: secret }).cookieSecure).toBe(false);
+    expect(
+      loadAuthConfig({ SESSION_SECRET: secret, SESSION_COOKIE_SECURE: 'true' }).cookieSecure,
+    ).toBe(true);
   });
 
   it('имя cookie содержит номер стенда: стенды на разных портах не делят вход', () => {
@@ -51,6 +58,12 @@ describe('пароли', () => {
     expect(await verifyPassword('', first)).toBe(false);
   });
 
+  it('хеш с параметрами ниже минимума не принимается и с верным паролем', async () => {
+    const strong = await hashPassword('demo');
+    const weak = strong.replace(/m=\d+,t=\d+/, 'm=1024,t=1');
+    expect(await verifyPassword('demo', weak)).toBe(false);
+  });
+
   it('испорченный или чужой формат хеша — не совпадение, а не ошибка', async () => {
     expect(await verifyPassword('demo', 'hash')).toBe(false);
     expect(await verifyPassword('demo', '')).toBe(false);
@@ -67,7 +80,12 @@ describe('cookie', () => {
   });
 });
 
-const config: AuthConfig = { sessionSecret: secret, cookieName: 'sid', sessionTtlMs: 1000 };
+const config: AuthConfig = {
+  sessionSecret: secret,
+  cookieName: 'sid',
+  sessionTtlMs: 1000,
+  cookieSecure: false,
+};
 
 function user(role: 'user' | 'org' | 'admin'): UserWithOrganization {
   return {
@@ -84,38 +102,71 @@ function user(role: 'user' | 'org' | 'admin'): UserWithOrganization {
   };
 }
 
-function guardFor(sessionUser: UserWithOrganization | null, roles?: SignedInRole[]) {
+interface RouteAccess {
+  /** Метки метода. */
+  handler?: { roles?: SignedInRole[]; public?: boolean };
+  /** Метки контроллера. */
+  controller?: { roles?: SignedInRole[]; public?: boolean };
+}
+
+function mark(target: object, access?: { roles?: SignedInRole[]; public?: boolean }) {
+  if (access?.roles) Reflect.defineMetadata(ROLES_KEY, access.roles, target);
+  if (access?.public) Reflect.defineMetadata(PUBLIC_KEY, true, target);
+}
+
+function guardFor(sessionUser: UserWithOrganization | null, access: RouteAccess = {}) {
   const reflector = new Reflector();
   const handler = () => undefined;
-  if (roles) Reflect.defineMetadata(ROLES_KEY, roles, handler);
+  class Controller {}
+  mark(handler, access.handler);
+  mark(Controller, access.controller);
   const sessions = { resolve: async () => sessionUser } as unknown as SessionService;
   const request: AuthRequest = { headers: { cookie: sessionUser ? 'sid=token' : undefined } };
   const context = {
     switchToHttp: () => ({ getRequest: () => request }),
     getHandler: () => handler,
-    getClass: () => class {},
+    getClass: () => Controller,
   } as unknown as ExecutionContext;
   return { run: () => new AuthGuard(reflector, sessions, config).canActivate(context), request };
 }
 
 describe('проверка ролей', () => {
-  it('маршрут без ролей открыт гостю, в запросе — гость', async () => {
-    const { run, request } = guardFor(null);
+  it('открытый маршрут (@Public) пускает гостя, в запросе — гость', async () => {
+    const { run, request } = guardFor(null, { controller: { public: true } });
     await expect(run()).resolves.toBe(true);
     expect(request.actor).toEqual({ role: 'guest' });
   });
 
+  it('маршрут без меток закрыт для гостя и открыт любому вошедшему', async () => {
+    await expect(guardFor(null).run()).rejects.toMatchObject({ code: 'unauthorized' });
+    await expect(guardFor(user('user')).run()).resolves.toBe(true);
+    await expect(guardFor(user('admin')).run()).resolves.toBe(true);
+  });
+
   it('гостю закрытый маршрут — 401, чужой роли — 403', async () => {
-    const guest = guardFor(null, ['user']);
+    const guest = guardFor(null, { handler: { roles: ['user'] } });
     await expect(guest.run()).rejects.toMatchObject({ code: 'unauthorized' });
-    const wrongRole = guardFor(user('user'), ['admin']);
+    const wrongRole = guardFor(user('user'), { handler: { roles: ['admin'] } });
     const error = await wrongRole.run().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ code: 'forbidden' });
   });
 
+  it('метка метода важнее метки контроллера — в обе стороны', async () => {
+    const closedInPublic = guardFor(null, {
+      controller: { public: true },
+      handler: { roles: ['admin'] },
+    });
+    await expect(closedInPublic.run()).rejects.toMatchObject({ code: 'unauthorized' });
+    const openInClosed = guardFor(null, {
+      controller: { roles: ['admin'] },
+      handler: { public: true },
+    });
+    await expect(openInClosed.run()).resolves.toBe(true);
+  });
+
   it('нужная роль проходит; роль и организация — из базы', async () => {
-    const { run, request } = guardFor(user('org'), ['org']);
+    const { run, request } = guardFor(user('org'), { handler: { roles: ['org'] } });
     await expect(run()).resolves.toBe(true);
     expect(request.actor).toEqual({
       role: 'org',

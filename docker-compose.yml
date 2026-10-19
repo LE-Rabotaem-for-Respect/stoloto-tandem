@@ -25,6 +25,7 @@ services:
       STAND_ID: ${STAND_ID:-}
       # Пусто — секрет создаётся при первом старте и хранится в томе api-secrets
       SESSION_SECRET: ${SESSION_SECRET:-}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
     volumes:
       - api-secrets:/var/lib/tandem
     depends_on:

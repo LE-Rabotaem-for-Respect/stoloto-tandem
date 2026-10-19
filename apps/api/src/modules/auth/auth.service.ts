@@ -31,9 +31,6 @@ export class AuthService {
 
   /** Аккаунт организации сразу получает свою организацию в статусе `draft` (ТЗ 2.6, 2.9). */
   async register(dto: RegisterDto, previousToken?: string): Promise<SignedIn> {
-    if (isDemoEmail(dto.email)) {
-      throw new ApiError('validation_failed', { email: 'Адреса @demo заняты демо-аккаунтами' });
-    }
     const isOrganization = dto.accountType === 'organization';
     const user = await this.repository.createUser(
       {

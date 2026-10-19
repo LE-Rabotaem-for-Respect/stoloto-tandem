@@ -23,8 +23,13 @@ export interface CookieResponse {
 
 const cookieOptions = { httpOnly: true, sameSite: 'lax', path: '/' } as const;
 
-export function setSessionCookie(res: CookieResponse, name: string, token: string, maxAge: number) {
-  res.cookie(name, token, { ...cookieOptions, maxAge });
+export function setSessionCookie(
+  res: CookieResponse,
+  name: string,
+  token: string,
+  options: { maxAge: number; secure: boolean },
+) {
+  res.cookie(name, token, { ...cookieOptions, ...options });
 }
 
 export function clearSessionCookie(res: CookieResponse, name: string) {

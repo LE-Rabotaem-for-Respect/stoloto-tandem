@@ -33,8 +33,8 @@ export class RegisterDto {
   name!: string;
 
   @email()
-  @IsEmail({}, { message: 'Укажите почту, например anna@mail.ru' })
   @MaxLength(254, { message: 'Слишком длинная почта' })
+  @IsEmail({}, { message: 'Укажите почту, например anna@mail.ru' })
   email!: string;
 
   @IsString({ message: 'Придумайте пароль' })
@@ -48,17 +48,18 @@ export class RegisterDto {
   organizationName?: string;
 }
 
-// У демо-аккаунтов почта без домена верхнего уровня (`anna@demo`), поэтому формат почты при входе не проверяется
+// У демо-аккаунтов почта без домена верхнего уровня (`anna@demo`), поэтому формат почты при входе не проверяется.
+// Длина проверяется первой в списке, чтобы для пустого поля первой шла ошибка «Укажите …»
 export class LoginDto {
   @email()
+  @MaxLength(254, { message: 'Слишком длинная почта' })
   @IsString({ message: 'Укажите почту' })
   @IsNotEmpty({ message: 'Укажите почту' })
-  @MaxLength(254, { message: 'Слишком длинная почта' })
   email!: string;
 
+  @MaxLength(128, { message: 'Слишком длинный пароль' })
   @IsString({ message: 'Укажите пароль' })
   @IsNotEmpty({ message: 'Укажите пароль' })
-  @MaxLength(128, { message: 'Слишком длинный пароль' })
   password!: string;
 }
 

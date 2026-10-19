@@ -125,12 +125,12 @@ describe('регистрация', () => {
     expect(response.body.fields).toEqual({ email: 'Эта почта уже зарегистрирована' });
   });
 
-  it('адреса @demo заняты демо-аккаунтами', async () => {
+  it('адреса @demo не регистрируются: у них нет домена верхнего уровня', async () => {
     const response = await request(demoApp.getHttpServer())
       .post('/auth/register')
       .send({ accountType: 'person', name: 'Анна', email: 'maria@demo', password: 'пароль-1234' });
     expect(response.status).toBe(400);
-    expect(response.body.fields).toHaveProperty('email');
+    expect(response.body.fields).toEqual({ email: 'Укажите почту, например anna@mail.ru' });
   });
 
   it('роль из тела запроса не принимается', async () => {
@@ -185,6 +185,37 @@ describe('вход, профиль и выход', () => {
       });
       expect(response.headers['set-cookie']).toBeUndefined();
     }
+  });
+
+  it('пустые поля входа — «Укажите почту» и «Укажите пароль»', async () => {
+    const response = await request(app.getHttpServer()).post('/auth/login').send({});
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toEqual({ email: 'Укажите почту', password: 'Укажите пароль' });
+  });
+
+  it('вход обычной формой с чужого сайта отклоняется до маршрута и без cookie', async () => {
+    const address = await registered();
+    const form = await request(app.getHttpServer())
+      .post('/auth/login')
+      .set('Origin', 'http://evil.example')
+      .type('form')
+      .send({ email: address, password: 'пароль-1234' });
+    expect(form.status).toBe(403);
+    expect(form.headers['set-cookie']).toBeUndefined();
+
+    const formSameSite = await request(app.getHttpServer())
+      .post('/auth/login')
+      .type('form')
+      .send({ email: address, password: 'пароль-1234' });
+    expect(formSameSite.status).toBe(415);
+    expect(formSameSite.headers['set-cookie']).toBeUndefined();
+
+    const crossSite = await request(app.getHttpServer())
+      .post('/auth/login')
+      .set('Sec-Fetch-Site', 'cross-site')
+      .send({ email: address, password: 'пароль-1234' });
+    expect(crossSite.status).toBe(403);
+    expect(crossSite.headers['set-cookie']).toBeUndefined();
   });
 
   it('GET /me без входа — 401', async () => {
