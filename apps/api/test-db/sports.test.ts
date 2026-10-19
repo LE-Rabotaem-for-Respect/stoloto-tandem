@@ -5,7 +5,8 @@ import { SportsRepository } from '../src/modules/sports/sports.repository';
 import { SportsService } from '../src/modules/sports/sports.service';
 import { createUser, prisma } from './db';
 
-const service = new SportsService(new SportsRepository(prisma as unknown as PrismaService));
+const repository = new SportsRepository(prisma as unknown as PrismaService);
+const service = new SportsService(repository);
 
 // Уникальное слово на прогон: база общая для файлов, и чужие направления не должны мешать
 const tag = `тест${randomUUID().slice(0, 8)}`;
@@ -101,6 +102,30 @@ describe('новое направление', () => {
       { id: expect.any(String), name: `Петанк ${tag}`, category: 'team', isCustom: true },
     ]);
     expect(result.exactMatch).toBe(true);
+  });
+
+  it('скрытое направление с тем же именем используется повторно', async () => {
+    const found = await service.findOrCreate({ name: `скрытый  ${tag}` }, authorId);
+    expect(found).toMatchObject({ name: `Скрытый ${tag}`, status: 'hidden' });
+    expect(await prisma.sport.count({ where: { normalizedName: `скрытый ${tag}` } })).toBe(1);
+  });
+
+  it('вставка уже существующего имени возвращает запись, не падая и не прерывая транзакцию', async () => {
+    const record = {
+      name: `Сквош ${tag}`,
+      normalizedName: `сквош ${tag}`,
+      category: 'other' as const,
+      createdById: authorId,
+    };
+    const first = await repository.createCustom(record);
+    const [second, count] = await prisma.$transaction(async (tx) => {
+      const txRepository = new SportsRepository(tx as unknown as PrismaService);
+      const again = await txRepository.createCustom({ ...record, name: `СКВОШ ${tag}` });
+      return [again, await tx.sport.count({ where: { normalizedName: record.normalizedName } })];
+    });
+    expect(second.id).toBe(first.id);
+    expect(second.name).toBe(`Сквош ${tag}`);
+    expect(count).toBe(1);
   });
 
   it('одновременное создание одного названия не даёт дублей', async () => {

@@ -57,7 +57,18 @@ export class SportsRepository {
     });
   }
 
-  createCustom(record: NewSportRecord): Promise<Sport> {
-    return this.prisma.sport.create({ data: { ...record, isCustom: true } });
+  /**
+   * Новое пользовательское направление. Если то же имя одновременно добавил другой
+   * запрос, возвращается его запись: вставка идёт с ON CONFLICT DO NOTHING, поэтому
+   * не падает на уникальности и не прерывает транзакцию, в которой её вызвали.
+   */
+  async createCustom(record: NewSportRecord): Promise<Sport> {
+    await this.prisma.sport.createMany({
+      data: { ...record, isCustom: true },
+      skipDuplicates: true,
+    });
+    return this.prisma.sport.findUniqueOrThrow({
+      where: { normalizedName: record.normalizedName },
+    });
   }
 }

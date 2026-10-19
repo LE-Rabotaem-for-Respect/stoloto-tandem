@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { DEFAULT_SPORT_CATEGORY, normalizeSportName } from '@tandem/domain';
 import type { SportCategory } from '@tandem/domain';
 import { ApiError } from '../../core/errors';
-import { Prisma } from '../../generated/prisma/client';
 import type { Sport } from '../../generated/prisma/client';
 import { SportsRepository } from './sports.repository';
 
@@ -26,9 +25,6 @@ export interface NewSport {
 
 const DEFAULT_LIMIT = 10;
 
-const isUniqueViolation = (error: unknown) =>
-  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
-
 @Injectable()
 export class SportsService {
   constructor(private readonly sports: SportsRepository) {}
@@ -46,7 +42,8 @@ export class SportsService {
   /**
    * Направление по названию из формы: уже известное (по нормализованному имени
    * или алиасу) либо новое пользовательское, сразу доступное в поиске.
-   * Поэтому «Падел» и «падел » не создают дубль.
+   * Поэтому «Падел» и «падел » не создают дубль. Скрытое направление с тем же
+   * именем используется повторно: такое мероприятие показывается в группе «Другое» (ТЗ 2.3).
    */
   async findOrCreate(input: NewSport, createdById: string): Promise<Sport> {
     const name = input.name.trim().replace(/\s+/g, ' ');
@@ -58,21 +55,11 @@ export class SportsService {
     const existing = await this.sports.findByName(normalizedName);
     if (existing) return existing;
 
-    const record = {
+    return this.sports.createCustom({
       name,
       normalizedName,
       category: input.category ?? DEFAULT_SPORT_CATEGORY,
       createdById,
-    };
-    try {
-      return await this.sports.createCustom(record);
-    } catch (error) {
-      // То же название мог одновременно добавить другой пользователь — берём его запись
-      if (isUniqueViolation(error)) {
-        const created = await this.sports.findByName(normalizedName);
-        if (created) return created;
-      }
-      throw error;
-    }
+    });
   }
 }

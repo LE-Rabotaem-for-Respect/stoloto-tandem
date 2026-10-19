@@ -8,7 +8,7 @@ import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/configure-app';
 import { ClockStateSource } from '../src/core/clock';
 import { ApiError } from '../src/core/errors';
-import { Prisma, SportCategory } from '../src/generated/prisma/client';
+import { SportCategory } from '../src/generated/prisma/client';
 import type { Sport } from '../src/generated/prisma/client';
 import { SportsRepository } from '../src/modules/sports/sports.repository';
 import type { NewSportRecord, SportSearchRow } from '../src/modules/sports/sports.repository';
@@ -30,7 +30,6 @@ function sport(overrides: Partial<Sport> & Pick<Sport, 'name' | 'normalizedName'
 class FakeSportsRepository {
   sports: Sport[] = [];
   searches: { query: string; limit: number }[] = [];
-  failNextCreateWithUnique = false;
 
   async search(query: string, limit: number): Promise<SportSearchRow[]> {
     this.searches.push({ query, limit });
@@ -58,17 +57,11 @@ class FakeSportsRepository {
     );
   }
 
+  // Как ON CONFLICT DO NOTHING в базе: при совпадении имени возвращается существующая запись
   async createCustom(record: NewSportRecord) {
+    const existing = this.sports.find((s) => s.normalizedName === record.normalizedName);
+    if (existing) return existing;
     const created = sport({ ...record, isCustom: true });
-    if (this.failNextCreateWithUnique) {
-      // Другой запрос успел создать то же направление
-      this.failNextCreateWithUnique = false;
-      this.sports.push(created);
-      throw new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: 'test',
-      });
-    }
     this.sports.push(created);
     return created;
   }
@@ -148,11 +141,12 @@ describe('SportsService', () => {
       expect(created.category).toBe('winter');
     });
 
-    it('при одновременном создании возвращает уже созданную запись', async () => {
-      repository.failNextCreateWithUnique = true;
-      const created = await service.findOrCreate({ name: 'Петанк' }, 'user-1');
-      expect(created.normalizedName).toBe('петанк');
-      expect(repository.sports.filter((s) => s.normalizedName === 'петанк')).toHaveLength(1);
+    it('скрытое направление с тем же именем используется повторно', async () => {
+      await expect(service.findOrCreate({ name: 'ёрш' }, 'user-1')).resolves.toMatchObject({
+        id: 'id-ерш',
+        status: 'hidden',
+      });
+      expect(repository.sports).toHaveLength(3);
     });
 
     it('отклоняет название короче двух символов после нормализации', async () => {
