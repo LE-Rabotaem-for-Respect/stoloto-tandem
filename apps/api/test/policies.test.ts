@@ -65,6 +65,15 @@ describe('policies по таблице ТЗ 4.4', () => {
     expect(canViewEvent(admin, unpublished, null)).toEqual(yes);
   });
 
+  it('удалённое модератором — так же, как снятое', () => {
+    const deleted = { ...userEvent, status: 'deleted' as const };
+    expect(canViewEvent(guest, deleted, null)).toEqual(no('event_not_available'));
+    expect(canViewEvent(user, deleted, 'cancelled')).toEqual(no('event_not_available'));
+    expect(canViewEvent(user, deleted, 'confirmed')).toEqual(yes);
+    expect(canViewEvent(author, deleted, null)).toEqual(yes);
+    expect(canViewEvent(admin, deleted, null)).toEqual(yes);
+  });
+
   describe('записаться, подать заявку, встать в лист ожидания', () => {
     it('гость — после входа', () => {
       expect(canJoin(guest, userEvent, now)).toEqual(loginFirst);

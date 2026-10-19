@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { Body, Controller, Get, Module, Post } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Module, Post } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { ERROR_CODES, participationMachine } from '@tandem/domain';
@@ -151,11 +151,12 @@ describe('core/errors: единый формат ошибок { code, message, f
   });
 
   it('слишком большое тело — too_large, а не непредвиденная ошибка', async () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const logged = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     const response = await http()
       .post('/probe/dto')
       .send({ title: 'x'.repeat(200_000), limit: 1 });
-    spy.mockRestore();
+    expect(logged).not.toHaveBeenCalled();
+    logged.mockRestore();
     expect(response.status).toBe(413);
     expect(response.body).toEqual({ code: 'too_large', message: 'Слишком большой запрос' });
     expect(response.headers['x-server-time']).toBe(serverTime);
@@ -184,9 +185,10 @@ describe('core/errors: единый формат ошибок { code, message, f
   });
 
   it('непредвиденная ошибка — internal без подробностей', async () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const logged = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     const response = await http().get('/probe/crash');
-    spy.mockRestore();
+    expect(logged).toHaveBeenCalledOnce();
+    logged.mockRestore();
     expect(response.status).toBe(500);
     expect(response.body).toEqual({
       code: 'internal',
