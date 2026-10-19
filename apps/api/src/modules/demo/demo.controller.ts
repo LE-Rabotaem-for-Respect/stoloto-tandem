@@ -14,14 +14,14 @@ export class ShiftClockDto {
   addSeconds!: number;
 }
 
-// Гостю открыто: «Сбросить демо-данные» есть на экране входа (ТЗ 4.6)
 @Controller('demo')
-@Public()
 @UseGuards(DemoModeGuard)
 export class DemoController {
   constructor(private readonly demo: DemoService) {}
 
+  // Гостю открыто: «Сбросить демо-данные» есть на экране входа (ТЗ 4.6)
   @Post('reset')
+  @Public()
   @HttpCode(200)
   async reset() {
     const lastResetAt = await this.demo.reset();
@@ -29,6 +29,7 @@ export class DemoController {
   }
 
   @Post('clock')
+  @Public()
   @HttpCode(200)
   async clock(@Body() dto: ShiftClockDto) {
     const now = await this.demo.shiftClock(dto.addSeconds);
