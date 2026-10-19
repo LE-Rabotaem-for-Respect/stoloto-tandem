@@ -1,5 +1,6 @@
 import { demoAccountEmail, normalizeSportName } from '@tandem/domain';
 import type { Prisma } from '../../generated/prisma/client';
+import { seedActivity } from './seed-activity';
 import { SEED_ACCOUNTS, SEED_SPORTS } from './seed-data';
 
 const DAY_MS = 86_400_000;
@@ -91,11 +92,12 @@ export async function seedDemo(tx: Prisma.TransactionClient, now: Date, password
   }
 
   const adminId = userIds.get('admin');
+  const orgIds = new Map<string, string>();
   for (const account of SEED_ACCOUNTS) {
     const org = account.organization;
     if (!org) continue;
     const decided = org.decidedDaysAgo !== undefined;
-    await tx.organization.create({
+    const created = await tx.organization.create({
       data: {
         ownerUserId: userIds.get(account.key) as string,
         name: org.name,
@@ -113,5 +115,8 @@ export async function seedDemo(tx: Prisma.TransactionClient, now: Date, password
         sports: { create: org.sports.map((name) => ({ sportId: sportId(name) })) },
       },
     });
+    orgIds.set(account.key, created.id);
   }
+
+  await seedActivity(tx, now, passwordHash, { userIds, orgIds, sportId });
 }

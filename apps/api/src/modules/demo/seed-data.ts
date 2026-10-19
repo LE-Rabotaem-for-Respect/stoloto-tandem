@@ -179,3 +179,6 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
     registeredDaysAgo: 180,
   },
 ];
+
+export { SEED_BACKGROUND_PEOPLE, SEED_CUSTOM_SPORT, SEED_EVENTS } from './seed-events';
+export type { SeedEvent, SeedMessage, SeedPersonKey, SeedWhen } from './seed-events';

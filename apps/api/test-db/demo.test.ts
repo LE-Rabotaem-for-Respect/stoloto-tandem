@@ -75,14 +75,14 @@ afterAll(async () => {
 });
 
 describe('POST /demo/reset — минимальный сид', () => {
-  it('создаёт 8 демо-аккаунтов с паролем demo и организации в статусах ТЗ 4.6', async () => {
+  it('создаёт демо-аккаунты с паролем demo и организации в статусах ТЗ 4.6', async () => {
     app = await startApp(true);
     const response = await request(app.getHttpServer()).post('/demo/reset');
     expect(response.status).toBe(200);
 
     const users = await prisma.user.findMany({ include: { organization: true } });
-    expect(users.map((user) => user.email).sort()).toEqual(
-      DEMO_ACCOUNT_KEYS.map(demoAccountEmail).sort(),
+    expect(users.map((user) => user.email)).toEqual(
+      expect.arrayContaining(DEMO_ACCOUNT_KEYS.map(demoAccountEmail)),
     );
     const byEmail = new Map(users.map((user) => [user.email, user]));
     const anna = byEmail.get('anna@demo');
@@ -100,10 +100,10 @@ describe('POST /demo/reset — минимальный сид', () => {
     expect(yoga?.status).toBe('rejected');
     expect(yoga?.decisionReason).toMatch(/[А-Яа-я]/);
 
-    const sports = await prisma.sport.findMany();
-    expect(sports.length).toBeGreaterThanOrEqual(23);
-    expect(new Set(sports.map((sport) => sport.category)).size).toBe(8);
-    expect(sports.every((sport) => !sport.isCustom && sport.status === 'active')).toBe(true);
+    const catalog = await prisma.sport.findMany({ where: { isCustom: false } });
+    expect(catalog.length).toBeGreaterThanOrEqual(23);
+    expect(new Set(catalog.map((sport) => sport.category)).size).toBe(8);
+    expect(catalog.every((sport) => sport.status === 'active')).toBe(true);
     expect(await prisma.userSport.count({ where: { userId: anna?.id } })).toBe(2);
   });
 
@@ -133,7 +133,7 @@ describe('POST /demo/reset — минимальный сид', () => {
     });
     await prisma.organization.updateMany({ data: { status: 'approved' } });
     await prisma.sport.create({
-      data: { name: 'Петанк', normalizedName: 'петанк', isCustom: true },
+      data: { name: 'Кёрлинг', normalizedName: 'керлинг', isCustom: true },
     });
 
     await request(app.getHttpServer()).post('/demo/reset');
@@ -257,7 +257,7 @@ describe('команда seed для нового стенда', () => {
   it('в демо-режиме заполняет пустую базу', async () => {
     await truncate();
     expect(await runSeed({ demoMode: true, standId: null })).toBe('seeded');
-    expect(await prisma.user.count()).toBe(DEMO_ACCOUNT_KEYS.length);
+    expect(await prisma.user.count()).toBe(DEMO_ACCOUNT_KEYS.length + 10);
   });
 
   it('не трогает базу, где уже есть данные', async () => {
