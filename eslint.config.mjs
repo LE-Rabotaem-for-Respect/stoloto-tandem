@@ -79,6 +79,13 @@ export default tseslint.config(
                 'Подписка на события — через OnDomainEvent из core/event-bus: он пишет ошибки обработчика без данных вызова.',
             },
           ],
+          patterns: [
+            {
+              group: ['@nestjs/event-emitter/*'],
+              message:
+                'Внутренние модули @nestjs/event-emitter не импортируются: подписка — через OnDomainEvent.',
+            },
+          ],
         },
       ],
     },

@@ -17,6 +17,12 @@ describe('правило ESLint о подписке на события', () => 
     expect(await importErrors(onEvent, 'apps/api/src/modules/notifications/x.ts')).toBe(1);
   });
 
+  it('запрещает глубокий импорт из библиотеки в обход правила', async () => {
+    const deep =
+      "import { OnEvent } from '@nestjs/event-emitter/dist/decorators/on-event.decorator';\nexport { OnEvent };\n";
+    expect(await importErrors(deep, 'apps/api/src/modules/notifications/x.ts')).toBe(1);
+  });
+
   it('разрешает его в core/event-bus и другие импорты из библиотеки', async () => {
     expect(await importErrors(onEvent, 'apps/api/src/core/event-bus/event-bus.ts')).toBe(0);
     expect(
