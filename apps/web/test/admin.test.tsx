@@ -133,7 +133,9 @@ describe('админка', () => {
     expect(calls.map(({ call }) => call)).toContain('GET /api/admin/organizations?status=pending');
 
     await userEvent.click(screen.getByRole('button', { name: 'Одобрить' }));
-    expect(await screen.findByText('Допущена к публикации')).toBeTruthy();
+    expect(
+      await screen.findByText('Допущена к публикации', { selector: '.admin-status' }),
+    ).toBeTruthy();
     expect(calls.find(({ call }) => call.startsWith('POST'))?.body).toEqual({
       decision: 'approve',
     });
@@ -154,7 +156,7 @@ describe('админка', () => {
     await userEvent.clear(reason);
     await userEvent.type(reason, 'Не указаны контакты');
     await userEvent.click(screen.getByRole('button', { name: 'Отклонить с этой причиной' }));
-    expect(await screen.findByText('Отклонена')).toBeTruthy();
+    expect(await screen.findByText('Отклонена', { selector: '.admin-status' })).toBeTruthy();
     expect(screen.getByText('Не указаны контакты')).toBeTruthy();
     expect(calls.filter(({ call }) => call.startsWith('POST')).at(-1)?.body).toEqual({
       decision: 'reject',
@@ -180,7 +182,9 @@ describe('админка', () => {
     cleanup();
     fakeAdminApi();
     renderAt('/admin/events?organizationId=o1');
-    expect(await screen.findByText('Снято с публикации')).toBeTruthy();
+    expect(
+      await screen.findByText('Снято с публикации', { selector: '.admin-status' }),
+    ).toBeTruthy();
     expect(screen.getByText('Реклама')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Падел-клуб' }).getAttribute('href')).toBe(
       '/admin/organizations?q=%D0%9F%D0%B0%D0%B4%D0%B5%D0%BB-%D0%BA%D0%BB%D1%83%D0%B1',
