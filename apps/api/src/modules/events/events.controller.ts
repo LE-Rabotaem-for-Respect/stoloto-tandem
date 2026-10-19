@@ -1,9 +1,9 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import type { Actor } from '../../core/policies';
 import { CurrentActor, Public, SignedIn } from '../auth';
-import { CreateEventDto } from './events.dto';
+import { CreateEventDto, EventFeedQuery } from './events.dto';
 import { EventsService } from './events.service';
-import type { EventCard } from './events.service';
+import type { EventCard, EventFeed } from './events.service';
 
 // Создание требует входа (метка на методе — как у каждого изменяющего маршрута). Какой вошедший может
 // создать мероприятие, решает политика в сервисе: администратор и недопущенная
@@ -19,7 +19,15 @@ export class EventsController {
     return this.events.create(actor, dto);
   }
 
-  // Гость видит карточки опубликованных событий (ТЗ 2.6); что ещё ему видно — решает canViewEvent
+  // Ленту и поиск видит и гость (ТЗ 2.6)
+  @Public()
+  @Get()
+  feed(@Query() query: EventFeedQuery): Promise<EventFeed> {
+    return this.events.feed(query);
+  }
+
+  // Гость видит карточки опубликованных событий (ТЗ 2.6); что ещё ему видно — решает canViewEvent.
+  // Ответ зависит от того, кто смотрит («Информация для участников»): кешировать его нельзя
   @Public()
   @Get(':id')
   card(@CurrentActor() actor: Actor, @Param('id') id: string): Promise<EventCard> {

@@ -5,11 +5,15 @@ import { isUUID } from 'class-validator';
 import { Clock } from '../../core/clock';
 import { ApiError } from '../../core/errors';
 import { EventBus, domainEvent } from '../../core/event-bus';
-import { canEditMessage, canPostMessage, canViewEvent, toAction } from '../../core/policies';
-import type { Actor } from '../../core/policies';
+import { canEditMessage, canPostMessage, toAction } from '../../core/policies';
+import type { Actor, PolicyEvent } from '../../core/policies';
+import { EventsService } from '../events/events.service';
 import type { CreateMessageDto, EditMessageDto } from './messages.dto';
 import { MessagesRepository } from './messages.repository';
-import type { DiscussionEvent, MessageRecord } from './messages.repository';
+import type { MessageRecord } from './messages.repository';
+
+/** То, что обсуждению нужно знать о мероприятии. */
+type DiscussionEvent = PolicyEvent & { id: string };
 
 export interface MessageView {
   id: string;
@@ -47,6 +51,7 @@ function isFromOrganizer(event: DiscussionEvent, message: MessageRecord): boolea
 export class MessagesService {
   constructor(
     private readonly messages: MessagesRepository,
+    private readonly events: EventsService,
     private readonly clock: Clock,
     private readonly bus: EventBus,
   ) {}
@@ -160,17 +165,9 @@ export class MessagesService {
     return this.view(actor, event, updated);
   }
 
-  // Обсуждение видят те же, кому видна карточка (ТЗ 2.10); иначе — «Мероприятие недоступно»
+  // Обсуждение видят те же, кому видна карточка: правило одно — в EventsService (ТЗ 2.10)
   private async visibleEvent(actor: Actor, eventId: string): Promise<DiscussionEvent> {
-    const event = isUUID(eventId) ? await this.messages.findEvent(eventId) : null;
-    if (!event) throw new ApiError('event_not_available');
-    const participation =
-      actor.role === 'user'
-        ? await this.messages.viewerParticipation(event.id, actor.userId)
-        : null;
-    const view = canViewEvent(actor, event, participation);
-    if (!view.allowed) throw new ApiError(view.code);
-    return event;
+    return (await this.events.viewable(actor, eventId)).event;
   }
 
   private async ownMessage(actor: Actor, eventId: string, messageId: string) {

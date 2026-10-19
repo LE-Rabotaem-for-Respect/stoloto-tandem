@@ -1,18 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import type { MessageStatus, ParticipationStatus } from '@tandem/domain';
+import type { MessageStatus } from '@tandem/domain';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import type { Prisma } from '../../generated/prisma/client';
-
-const eventSelect = {
-  id: true,
-  organizerUserId: true,
-  organizerOrgId: true,
-  status: true,
-  startsAt: true,
-  endsAt: true,
-} satisfies Prisma.EventSelect;
-
-export type DiscussionEvent = Prisma.EventGetPayload<{ select: typeof eventSelect }>;
 
 // Поля автора перечислены явно: почта и другие поля аккаунта в ответ не уйдут
 const messageSelect = {
@@ -35,19 +24,6 @@ export type MessageRecord = Prisma.MessageGetPayload<{ select: typeof messageSel
 @Injectable()
 export class MessagesRepository {
   constructor(private readonly prisma: PrismaService) {}
-
-  findEvent(id: string): Promise<DiscussionEvent | null> {
-    return this.prisma.event.findUnique({ where: { id }, select: eventSelect });
-  }
-
-  /** Неотменённая запись зрителя: по ней снятое мероприятие видят записавшиеся. */
-  async viewerParticipation(eventId: string, userId: string): Promise<ParticipationStatus | null> {
-    const participation = await this.prisma.participation.findFirst({
-      where: { eventId, userId, status: { not: 'cancelled' } },
-      select: { status: true },
-    });
-    return participation?.status ?? null;
-  }
 
   /** Обсуждение целиком, по времени: новые подгружаются раз в 30 секунд (ТЗ 2.7). */
   list(eventId: string): Promise<MessageRecord[]> {

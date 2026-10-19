@@ -61,6 +61,16 @@ async function snapshot() {
 
 let app: INestApplication | undefined;
 
+// Первый запуск приложения Nest в процессе — самый долгий: прогрев в хуке с запасом,
+// чтобы холодный старт не съедал время первого теста (каждый тест поднимает своё приложение)
+const WARM_UP_TIMEOUT_MS = 60_000;
+
+beforeAll(async () => {
+  // Вне демо-режима приложение при старте в базу не ходит
+  const warm = await startApp(false);
+  await warm.close();
+}, WARM_UP_TIMEOUT_MS);
+
 afterEach(async () => {
   await app?.close();
   app = undefined;

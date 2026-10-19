@@ -265,6 +265,17 @@ describe('GET /events/:id/messages', () => {
     expect((await list(anna, event.id)).status).toBe(200);
   });
 
+  it('обсуждение видят те же, кому видна карточка', async () => {
+    const event = await createEvent({ status: 'unpublished', statusReason: 'Проверка' });
+    await participation(event.id, anna.id, 'confirmed');
+    await participation(event.id, igor.id, 'cancelled');
+    for (const who of [null, anna, igor, organizer, admin, org]) {
+      const card = await as(who, http().get(`/events/${event.id}`));
+      const discussion = await list(who, event.id);
+      expect(discussion.status, who?.id ?? 'гость').toBe(card.status);
+    }
+  });
+
   it('несуществующее мероприятие и неверный id — «Мероприятие недоступно»', async () => {
     for (const id of [randomUUID(), 'not-a-uuid']) {
       const response = await list(null, id);
@@ -351,6 +362,21 @@ describe('PATCH и DELETE своего сообщения', () => {
     const changed = await edit(anna, event.id, message.id, { text: 'Новый текст' });
     expect(changed.status).toBe(409);
     expect(changed.body.code).toBe('invalid_transition');
+
+    const hidden = (await post(anna, event.id, { text: 'Реклама' })).body;
+    await prisma.message.update({
+      where: { id: hidden.id },
+      data: { status: 'hidden_by_moderator', moderationReason: 'Реклама' },
+    });
+    for (const response of [
+      await edit(anna, event.id, hidden.id, { text: 'Уже не реклама' }),
+      await remove(anna, event.id, hidden.id),
+    ]) {
+      expect(response.status).toBe(409);
+      expect(response.body.code).toBe('invalid_transition');
+    }
+    const stored = await prisma.message.findUniqueOrThrow({ where: { id: hidden.id } });
+    expect(stored).toMatchObject({ text: 'Реклама', status: 'hidden_by_moderator' });
   });
 
   it('сообщение другого обсуждения и несуществующее — «Не найдено»', async () => {

@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { configureApp } from '../src/configure-app';
 import { Clock, ClockModule, ClockStateSource, REAL_TIME } from '../src/core/clock';
 import type { ClockState } from '../src/core/clock';
@@ -36,8 +36,21 @@ async function start(config: StandConfig, state: FakeState) {
   return app;
 }
 
+// Первый запуск приложения Nest в процессе — загрузка и сканирование модулей — под нагрузкой
+// параллельных файлов шёл больше 5 с и ронял первый тест по таймауту. Прогрев — в хуке с
+// запасом, а у самих тестов остаётся обычный таймаут: долгий тест по-прежнему заметен.
+const WARM_UP_TIMEOUT_MS = 60_000;
+
 describe('core/clock: Clock — единственный источник «сейчас»', () => {
   let app: INestApplication | undefined;
+
+  beforeAll(async () => {
+    const warm = await start(
+      { demoMode: false, standId: null },
+      new FakeState({ offsetSeconds: 0, lastResetAt: null }),
+    );
+    await warm.close();
+  }, WARM_UP_TIMEOUT_MS);
 
   afterEach(async () => {
     await app?.close();

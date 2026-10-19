@@ -1,5 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { SPORT_CATEGORY_TITLES, displayStatus, eventMachine } from '@tandem/domain';
+import {
+  SPORT_CATEGORY_TITLES,
+  calendarDayRange,
+  displayStatus,
+  eventMachine,
+  normalizeSportName,
+  todayRange,
+  tomorrowRange,
+  weekendRange,
+} from '@tandem/domain';
 import type {
   Action,
   EventDisplayStatus,
@@ -8,6 +17,7 @@ import type {
   EventStatus,
   ParticipationStatus,
   SportCategory,
+  TimeRange,
 } from '@tandem/domain';
 import { isUUID } from 'class-validator';
 import { Clock } from '../../core/clock';
@@ -22,7 +32,7 @@ import {
 } from '../../core/policies';
 import type { Actor } from '../../core/policies';
 import { SportsService } from '../sports/sports.service';
-import type { CreateEventDto } from './events.dto';
+import type { CreateEventDto, EventFeedQuery, FeedDate } from './events.dto';
 import { EventsRepository } from './events.repository';
 import type { EventWithCard } from './events.repository';
 
@@ -51,7 +61,50 @@ export interface EventCard {
   actions: Action[];
 }
 
+/** Строка ленты: только то, что помещается в карточку ленты (ТЗ 2.11). */
+export interface EventFeedItem {
+  id: string;
+  title: string;
+  sport: EventCard['sport'];
+  organizer: EventCard['organizer'];
+  startsAt: Date;
+  endsAt: Date;
+  city: string;
+  area: string;
+  mode: EventMode;
+  level: EventLevel;
+  displayStatus: EventDisplayStatus;
+}
+
+export interface EventFeed {
+  items: EventFeedItem[];
+  /** Сколько всего подходит под фильтры — для пагинации. */
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+const DEFAULT_FEED_LIMIT = 20;
+
+const QUICK_DATES: Record<FeedDate, (now: Date) => TimeRange> = {
+  today: todayRange,
+  tomorrow: tomorrowRange,
+  weekend: weekendRange,
+};
+
 const SPORT_REQUIRED = 'Выберите направление из списка или добавьте новое';
+
+// Мероприятие со скрытым направлением показывается в группе «Другое» (ТЗ 2.3),
+// а скрытое некорректное название не показывается ни в карточке, ни в ленте
+function sportOf(event: EventWithCard): EventCard['sport'] {
+  const hidden = event.sport.status === 'hidden';
+  return {
+    id: event.sport.id,
+    name: hidden ? SPORT_CATEGORY_TITLES.other : event.sport.name,
+    category: hidden ? 'other' : event.sport.category,
+    isCustom: event.sport.isCustom,
+  };
+}
 
 // Поля организатора перечислены явно: лишнее поле из выборки не уйдёт в ответ
 function organizerOf(event: EventWithCard): EventCard['organizer'] {
@@ -138,37 +191,41 @@ export class EventsService {
   }
 
   /**
+   * Мероприятие и запись зрителя, если ему видно мероприятие (ТЗ 2.10); иначе — одинаково
+   * «Мероприятие недоступно». Одно правило для карточки и обсуждения: снятое видят
+   * организатор, администратор и записавшиеся.
+   */
+  async viewable(
+    actor: Actor,
+    id: string,
+  ): Promise<{ event: EventWithCard; participation: ParticipationStatus | null }> {
+    const event = isUUID(id) ? await this.events.findCard(id) : null;
+    if (!event) throw new ApiError('event_not_available');
+    const participation =
+      actor.role === 'user' ? await this.events.viewerParticipation(id, actor.userId) : null;
+    const view = canViewEvent(actor, event, participation);
+    if (!view.allowed) throw new ApiError(view.code);
+    return { event, participation };
+  }
+
+  /**
    * Карточка мероприятия (ТЗ 2.2): статус для показа, организатор, запись текущего
    * пользователя и `actions[]` из тех же политик, что проверяют действия.
    * Недоступное этому пользователю и несуществующее — одинаково «Мероприятие недоступно».
    */
   async card(actor: Actor, id: string): Promise<EventCard> {
-    const event = isUUID(id) ? await this.events.findCard(id) : null;
-    if (!event) throw new ApiError('event_not_available');
-
-    const participation =
-      actor.role === 'user' ? await this.events.viewerParticipation(id, actor.userId) : null;
-    const view = canViewEvent(actor, event, participation);
-    if (!view.allowed) throw new ApiError(view.code);
+    const { event, participation } = await this.viewable(actor, id);
 
     const now = this.clock.now();
     const confirmedCount = await this.events.confirmedCount(id);
     const hasSeats = event.capacity === null || confirmedCount < event.capacity;
     const seesInfo = canSeeParticipantInfo(actor, event, participation).allowed;
-    const hidden = event.sport.status === 'hidden';
 
     return {
       id: event.id,
       title: event.title,
       description: event.description,
-      sport: {
-        id: event.sport.id,
-        // Мероприятие со скрытым направлением показывается в группе «Другое» (ТЗ 2.3),
-        // а скрытое некорректное название не показывается и в самой карточке
-        name: hidden ? SPORT_CATEGORY_TITLES.other : event.sport.name,
-        category: hidden ? 'other' : event.sport.category,
-        isCustom: event.sport.isCustom,
-      },
+      sport: sportOf(event),
       organizer: organizerOf(event),
       startsAt: event.startsAt,
       endsAt: event.endsAt,
@@ -186,5 +243,71 @@ export class EventsService {
       participantInfo: seesInfo ? event.participantInfo : null,
       actions: eventActions(actor, { ...event, hasSeats }, participation, now),
     };
+  }
+
+  /**
+   * Лента и поиск (ТЗ 2.8): только опубликованные и не завершённые, по дате начала.
+   * Даты «Сегодня», «Завтра», «Выходные» и диапазон считаются по Красноярску;
+   * уровень «Новичок» находит и события «Любой».
+   */
+  async feed(query: EventFeedQuery): Promise<EventFeed> {
+    const now = this.clock.now();
+    const range = this.startsRange(query, now);
+    const limit = query.limit ?? DEFAULT_FEED_LIMIT;
+    const offset = query.offset ?? 0;
+    const text = query.q || undefined;
+
+    const { events, total } = await this.events.feed(
+      {
+        now,
+        text,
+        sportText: text && normalizeSportName(text),
+        sportId: query.sport,
+        category: query.category,
+        startsFrom: range?.from,
+        startsBefore: range?.to,
+        city: query.city || undefined,
+        area: query.area || undefined,
+        levels: query.level && (query.level === 'any' ? ['any'] : [query.level, 'any']),
+        mode: query.mode,
+      },
+      { offset, limit },
+    );
+    const confirmed = await this.events.confirmedCounts(events.map((event) => event.id));
+
+    return {
+      items: events.map((event) => ({
+        id: event.id,
+        title: event.title,
+        sport: sportOf(event),
+        organizer: organizerOf(event),
+        startsAt: event.startsAt,
+        endsAt: event.endsAt,
+        city: event.city,
+        area: event.area,
+        mode: event.mode,
+        level: event.level,
+        displayStatus: displayStatus(event, now, confirmed.get(event.id) ?? 0),
+      })),
+      total,
+      limit,
+      offset,
+    };
+  }
+
+  private startsRange(query: EventFeedQuery, now: Date): Partial<TimeRange> | undefined {
+    const fields: ErrorFields = {};
+    if (query.date && (query.from || query.to)) {
+      fields.date = 'Выберите что-то одно: быстрый выбор даты или диапазон';
+    }
+    const from = query.from ? calendarDayRange(query.from) : undefined;
+    const to = query.to ? calendarDayRange(query.to) : undefined;
+    if (from === null) fields.from = 'Такой даты нет';
+    if (to === null) fields.to = 'Такой даты нет';
+    if (from && to && to.to <= from.from) fields.to = 'Дата «по» — не раньше даты «с»';
+    if (Object.keys(fields).length > 0) throw new ApiError('validation_failed', fields);
+
+    if (query.date) return QUICK_DATES[query.date](now);
+    return { from: from?.from, to: to?.to };
   }
 }

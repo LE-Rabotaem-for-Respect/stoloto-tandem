@@ -24,7 +24,9 @@ docker compose up --build
 - API — http://localhost:3000/health (через приложение — http://localhost:8080/api/health)
 
 Порты меняются переменными `WEB_PORT` и `API_PORT`, например
-`WEB_PORT=8081 docker compose up --build`.
+`WEB_PORT=8081 docker compose up --build`. Web публикуется на всех адресах
+компьютера; `WEB_BIND=127.0.0.1` оставляет его видимым только с этого компьютера
+(так стенд поднимает CI). Api всегда публикуется только на `127.0.0.1`.
 
 Другие переменные окружения api:
 
