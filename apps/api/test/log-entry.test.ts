@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { TransitionError, participationMachine } from '@tandem/domain';
 import { describe, expect, it } from 'vitest';
 import { ApiError, logEntry } from '../src/core/errors';
@@ -56,6 +57,26 @@ describe('logEntry: запись об ошибке для журнала по б
     expect(entry).not.toContain(email);
   });
 
+  it('ошибка Node с кодом в заголовке stack — имя, код и кадры', () => {
+    // Настоящая ошибка Node; под vitest её stack пересобран без кода, поэтому заголовок
+    // ставим таким, каким его пишет сам Node: «TypeError [ERR_INVALID_ARG_TYPE]: …»
+    const error = thrown(() => readFileSync(undefined as never)) as Error & { code: string };
+    expect(error.code).toBe('ERR_INVALID_ARG_TYPE');
+    const frames = '    at Object.openSync (node:fs:622:5)\n    at run (/app/x.js:1:1)';
+    error.stack = `TypeError [ERR_INVALID_ARG_TYPE]: ${error.message}\n${frames}`;
+    const entry = logEntry(error);
+    expect(entry).toBe(`TypeError ERR_INVALID_ARG_TYPE\n${frames}`);
+    expect(entry).not.toContain('Received');
+  });
+
+  it('код в заголовке stack не совпал с кодом ошибки — кадры не пишутся', () => {
+    for (const code of [undefined, 'ERR_OTHER', `${email}`]) {
+      const error = Object.assign(new Error('ok'), { code });
+      error.stack = `Error [ERR_X]: ok${String.fromCharCode(10)}    at run (/app/x.js:1:1)`;
+      expect(logEntry(error)).toMatch(/\(кадры стека не записаны\)$/);
+    }
+  });
+
   it('код и имя с посторонними символами в журнал не идут', () => {
     const error = Object.assign(new Error('x'), { code: email });
     error.name = `Ошибка ${email}`;
@@ -112,7 +133,8 @@ describe('logEntry: запись об ошибке для журнала по б
       expect(logEntry(error)).not.toContain(email);
     });
 
-    it('сообщение укоротили до перевода строки, подделка без пробела и без @', () => {
+    // Предел: та же подделка целиком в ASCII прошла бы — по одному stack её не отличить от кадра
+    it('сообщение укоротили до перевода строки, подделка с кириллицей без пробела и без @', () => {
       const phone = '79991234567';
       const error = new Error(`Привет${newline}    at /Анна_Иванова_+${phone}:1:1`);
       expect(error.stack).toContain(phone);
@@ -205,6 +227,14 @@ describe('logEntry: запись об ошибке для журнала по б
         `    at /x${escape}[2K${escape}[1G[Nest] 1 ERROR login ok:1:1`,
         'login ok',
       ],
+      // Без пробелов: строку отбрасывает сам управляющий символ, а не пробел
+      ['ANSI без пробелов', `    at /x${escape}[2K${escape}[1G:1:1`, '[2K'],
+      [
+        'OSC с BEL меняет заголовок окна',
+        `    at /x${escape}]0;title${String.fromCharCode(7)}:1:1`,
+        'title',
+      ],
+      ['управляющий символ без скобок', `    at /x${escape}y.js:1:1`, 'y.js'],
       ['невидимый символ в пути', `    at /x${String.fromCharCode(0x200b)}y.js:1:1`, 'y.js'],
       ['разные разделители в пути C:', '    at f (C:\\x/@y.js:1:1)', 'y.js'],
     ])('кадр-подделка: %s', (_, line, secret) => {

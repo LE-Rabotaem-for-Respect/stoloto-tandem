@@ -30,15 +30,32 @@ const anyFrameLike = /\n +at /;
 /** Строка вместо кадров, когда `stack` не совпал с сообщением */
 const FRAMES_SKIPPED = '(кадры стека не записаны)';
 
+/** Строковый код ошибки, если он похож на идентификатор (`P2002`, `ERR_INVALID_ARG_TYPE`) */
+function safeCodeOf(rawCode: unknown): string | undefined {
+  return typeof rawCode === 'string' && safeCode.test(rawCode) ? rawCode : undefined;
+}
+
+/** Имя в заголовке `stack`: «Имя» или, как у ошибок Node, «Имя [КОД]» с кодом самой ошибки */
+function isHeaderName(head: string, code: string | undefined): boolean {
+  if (safeName.test(head)) return true;
+  const bracket = head.indexOf(' [');
+  return (
+    code !== undefined &&
+    bracket > 0 &&
+    safeName.test(head.slice(0, bracket)) &&
+    head.slice(bracket) === ` [${code}]`
+  );
+}
+
 /** Длина заголовка «имя: сообщение» (или «имя» при пустом сообщении) в начале `stack`, иначе -1. */
-function headerLength(stack: string, message: unknown): number {
+function headerLength(stack: string, message: unknown, code: string | undefined): number {
   if (typeof message !== 'string') return -1;
   if (!message) {
     const firstLine = stack.split('\n', 1)[0] ?? '';
-    return safeName.test(firstLine) ? firstLine.length : -1;
+    return isHeaderName(firstLine, code) ? firstLine.length : -1;
   }
   const colon = stack.indexOf(': ');
-  if (colon < 0 || !safeName.test(stack.slice(0, colon))) return -1;
+  if (colon < 0 || !isHeaderName(stack.slice(0, colon), code)) return -1;
   return stack.startsWith(message, colon + 2) ? colon + 2 + message.length : -1;
 }
 
@@ -49,10 +66,14 @@ function headerLength(stack: string, message: unknown): number {
  * отбрасывается и склеенное «Caused by». Если заголовок не совпал (сообщение или стек
  * изменили после создания ошибки, в том числе укоротили или очистили), где кончается
  * сообщение, уже не узнать — кадры не пишутся, вместо них пометка.
+ *
+ * Предел: если сообщение укоротили ровно до перевода строки, его следующие строки стоят
+ * сразу за заголовком, и строка из ASCII в форме кадра (`    at /Anna_+7999…:1:1`) пройдёт.
+ * Белый список отсекает лишь то, что не похоже на путь (кириллицу, `@`, пробелы, управляющие).
  */
-function stackFrames(error: Error): string[] {
-  const stack = typeof error.stack === 'string' ? error.stack : '';
-  const length = headerLength(stack, error.message);
+function stackFrames(rawStack: unknown, message: unknown, code: string | undefined): string[] {
+  const stack = typeof rawStack === 'string' ? rawStack : '';
+  const length = headerLength(stack, message, code);
   const rest = length < 0 ? '' : stack.slice(length);
   if (length < 0 || (rest && !rest.startsWith('\n'))) {
     return anyFrameLike.test(stack) ? [FRAMES_SKIPPED] : [];
@@ -67,13 +88,17 @@ function stackFrames(error: Error): string[] {
 }
 
 function describeError(error: Error): string {
-  // Читаем один раз: геттер мог бы отдать на проверку одно, а в журнал — другое
+  // Каждое поле читаем один раз: геттер мог бы отдать на проверку одно, а в журнал — другое
   const rawName: unknown = error.name;
+  const message: unknown = error.message;
+  const rawStack: unknown = error.stack;
   const name = typeof rawName === 'string' && safeName.test(rawName) ? rawName : 'Error';
-  const rawCode: unknown = 'code' in error ? error.code : undefined;
-  const code = typeof rawCode === 'string' && safeCode.test(rawCode) ? ` ${rawCode}` : '';
-  const head = hasOwnMessage(error) ? `${name}${code}: ${error.message}` : `${name}${code}`;
-  return [head, ...stackFrames(error)].join('\n');
+  const code = safeCodeOf('code' in error ? error.code : undefined);
+  const codePart = code === undefined ? '' : ` ${code}`;
+  const head = hasOwnMessage(error)
+    ? `${name}${codePart}: ${String(message)}`
+    : `${name}${codePart}`;
+  return [head, ...stackFrames(rawStack, message, code)].join('\n');
 }
 
 /**
