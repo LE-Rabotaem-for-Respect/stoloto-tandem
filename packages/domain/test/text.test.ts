@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MULTI_LINE_TEXT, SINGLE_LINE_TEXT, normalizeLineBreaks } from '../src';
+import {
+  MULTI_LINE_TEXT,
+  SINGLE_LINE_TEXT,
+  VISIBLE_TEXT,
+  cleanSingleLine,
+  normalizeLineBreaks,
+} from '../src';
 
 const char = (...codePoints: number[]) => String.fromCodePoint(...codePoints);
 const LF = char(10);
@@ -61,5 +67,58 @@ describe('SINGLE_LINE_TEXT и MULTI_LINE_TEXT', () => {
 describe('normalizeLineBreaks', () => {
   it('переводы строк Windows и старых Mac становятся одним переводом строки', () => {
     expect(normalizeLineBreaks(`а${CR}${LF}б${CR}в${LF}г`)).toBe(`а${LF}б${LF}в${LF}г`);
+  });
+});
+
+describe('разрешённые невидимые — только на своём месте', () => {
+  it.each([
+    ['бегунья: соединитель между эмодзи', char(0x1f3c3, 0x200d, 0x2640, 0xfe0f)],
+    ['семья из трёх', char(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f466)],
+    ['тон кожи и соединитель', char(0x1f3c3, 0x1f3fd, 0x200d, 0x2642, 0xfe0f)],
+    ['keycap', `1${char(0xfe0f, 0x20e3)} место`],
+    ['сердце с селектором', `Йога ${char(0x2764, 0xfe0f)}`],
+    ['мягкий перенос между буквами', `Пробеж${char(0xad)}ка`],
+  ])('пропускают: %s', (_, text) => {
+    expect(SINGLE_LINE_TEXT.test(text)).toBe(true);
+    expect(MULTI_LINE_TEXT.test(text)).toBe(true);
+  });
+
+  it.each([
+    ['соединитель внутри слова', `Фут${char(0x200d)}бол`],
+    ['соединитель в начале', `${char(0x200d)}Футбол`],
+    ['соединитель после эмодзи без второго', `${char(0x1f3c3, 0x200d)} бег`],
+    ['селектор после буквы', `Фут${char(0xfe0f)}бол`],
+    ['селектор после селектора', `${char(0x2764, 0xfe0f, 0xfe0f)}`],
+    ['мягкий перенос в начале слова', `${char(0xad)}Футбол`],
+    ['мягкий перенос после пробела', `Футбол ${char(0xad)}`],
+    ['пустой символ Брайля U+2800', char(0x2800)],
+    ['неназначенный U+0378', `Фут${char(0x378)}бол`],
+    ['частный U+E000', `Фут${char(0xe000)}бол`],
+    ['несимвол U+FFFE', `Фут${char(0xfffe)}бол`],
+    ['несимвол U+10FFFF', `Фут${char(0x10ffff)}бол`],
+    ['одиночная суррогатная половина', 'Фут\ud800бол'],
+  ])('отклоняют: %s', (_, text) => {
+    expect(SINGLE_LINE_TEXT.test(text)).toBe(false);
+    expect(MULTI_LINE_TEXT.test(text)).toBe(false);
+  });
+});
+
+describe('VISIBLE_TEXT: в однострочном поле есть буква или цифра', () => {
+  it('пустые на вид строки не проходят', () => {
+    for (const text of [char(0xad).repeat(5), '.....', '— — —', `${char(0x1f3c3)}`]) {
+      expect(VISIBLE_TEXT.test(text), JSON.stringify(text)).toBe(false);
+    }
+  });
+
+  it('с буквой или цифрой — проходят', () => {
+    for (const text of ['Футбол', '№ 12', `${char(0x1f3c3)} Бег`, 'Café']) {
+      expect(VISIBLE_TEXT.test(text)).toBe(true);
+    }
+  });
+});
+
+describe('cleanSingleLine', () => {
+  it('мягкий перенос в однострочном тексте убирается: название находится поиском', () => {
+    expect(cleanSingleLine(`  Фут${char(0xad)}бол  `)).toBe('Футбол');
   });
 });

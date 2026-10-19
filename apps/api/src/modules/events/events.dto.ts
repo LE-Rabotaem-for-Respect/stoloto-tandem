@@ -4,6 +4,8 @@ import {
   MULTI_LINE_TEXT,
   SINGLE_LINE_TEXT,
   SPORT_CATEGORIES,
+  VISIBLE_TEXT,
+  cleanSingleLine,
   normalizeLineBreaks,
 } from '@tandem/domain';
 import type { EventLevel, EventMode, SportCategory } from '@tandem/domain';
@@ -27,8 +29,11 @@ import {
 } from 'class-validator';
 import { NewSportDto } from '../sports/sports.dto';
 
-const trim = () =>
-  Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
+// Однострочный текст: пробелы по краям и мягкие переносы — прочь (правило — в @tandem/domain)
+const cleanLine = () =>
+  Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? cleanSingleLine(value) : value,
+  );
 
 // Время приходит строкой ISO 8601 с поясом; «2026-10-21» без времени — не дата начала
 const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
@@ -51,6 +56,8 @@ const isoDate = () =>
 const HIDDEN_CHARS = 'В тексте есть недопустимые символы';
 const singleLine = () => Matches(SINGLE_LINE_TEXT, { message: HIDDEN_CHARS });
 const multiLine = () => Matches(MULTI_LINE_TEXT, { message: HIDDEN_CHARS });
+// Строка из точек, тире или одних эмодзи на карточке выглядит пустой
+const visible = () => Matches(VISIBLE_TEXT, { message: 'Нужна хотя бы одна буква или цифра' });
 
 // Многострочный текст: переводы строк Windows (\r\n) — к \n, пробелы по краям — прочь
 const trimText = () =>
@@ -64,10 +71,11 @@ const trimText = () =>
  * Из условий участия в P0 — только уровень.
  */
 export class CreateEventDto {
-  @trim()
+  @cleanLine()
   @IsString({ message: 'Укажите название' })
   @Length(5, 80, { message: 'Название — от 5 до 80 символов' })
   @singleLine()
+  @visible()
   title!: string;
 
   @trimText()
@@ -96,22 +104,25 @@ export class CreateEventDto {
   @IsDate({ message: 'Укажите дату и время окончания' })
   endsAt!: Date;
 
-  @trim()
+  @cleanLine()
   @IsString({ message: 'Укажите город' })
   @Length(2, 80, { message: 'Город — от 2 до 80 символов' })
   @singleLine()
+  @visible()
   city!: string;
 
-  @trim()
+  @cleanLine()
   @IsString({ message: 'Укажите район или ориентир' })
   @Length(2, 120, { message: 'Район или ориентир — от 2 до 120 символов' })
   @singleLine()
+  @visible()
   area!: string;
 
-  @trim()
+  @cleanLine()
   @IsString({ message: 'Укажите адрес или опишите место' })
   @Length(3, 300, { message: 'Адрес или описание места — от 3 до 300 символов' })
   @singleLine()
+  @visible()
   placeText!: string;
 
   @IsOptional()
@@ -143,7 +154,7 @@ const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** Лента и поиск (ТЗ 2.8, 4.5). Все фильтры необязательны и складываются через «и». */
 export class EventFeedQuery {
   @IsOptional()
-  @trim()
+  @cleanLine()
   @IsString({ message: 'Запрос — строка' })
   @MaxLength(100, { message: 'Запрос — не длиннее 100 символов' })
   @singleLine()
@@ -170,14 +181,14 @@ export class EventFeedQuery {
   to?: string;
 
   @IsOptional()
-  @trim()
+  @cleanLine()
   @IsString({ message: 'Город — строка' })
   @MaxLength(80, { message: 'Город — не длиннее 80 символов' })
   @singleLine()
   city?: string;
 
   @IsOptional()
-  @trim()
+  @cleanLine()
   @IsString({ message: 'Район — строка' })
   @MaxLength(120, { message: 'Район — не длиннее 120 символов' })
   @singleLine()
