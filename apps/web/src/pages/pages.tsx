@@ -8,6 +8,7 @@ import {
   safeNext,
   useMe,
 } from '../features/auth';
+import { EventCardScreen } from '../features/event-card';
 
 function useReturnAfterSignIn() {
   const [params] = useSearchParams();
@@ -82,9 +83,7 @@ export const FeedPage = () => (
   <Section title="Найти занятие" text="Здесь будет лента мероприятий с поиском и фильтрами." />
 );
 
-export const EventPage = () => (
-  <Section title="Мероприятие" text="Здесь будет карточка мероприятия." />
-);
+export const EventPage = () => <EventCardScreen />;
 
 export const MyParticipationsPage = () => (
   <RequireAuth>
