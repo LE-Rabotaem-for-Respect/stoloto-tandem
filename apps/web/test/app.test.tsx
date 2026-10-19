@@ -422,7 +422,9 @@ describe('действие гостя', () => {
       </Routes>,
     );
 
-    await userEvent.click((await screen.findAllByRole('button', { name: 'Записаться' }))[0]!);
+    const [firstJoin] = await screen.findAllByRole('button', { name: 'Записаться' });
+    if (!firstJoin) throw new Error('кнопки «Записаться» нет');
+    await userEvent.click(firstJoin);
     await userEvent.type(await screen.findByLabelText('Почта'), 'anna@demo');
     await userEvent.type(screen.getByLabelText('Пароль'), 'demo');
     await userEvent.click(screen.getByRole('button', { name: 'Войти' }));
