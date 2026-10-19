@@ -65,6 +65,11 @@ export class SportsRepository {
     return candidates.sort((a, b) => rank(a) - rank(b))[0] ?? null;
   }
 
+  /** Сколько из этих направлений есть в каталоге и не скрыты. */
+  countActive(ids: readonly string[]): Promise<number> {
+    return this.prisma.sport.count({ where: { id: { in: [...ids] }, status: 'active' } });
+  }
+
   findActiveById(id: string, tx?: Db): Promise<Sport | null> {
     return (tx ?? this.prisma).sport.findFirst({ where: { id, status: 'active' } });
   }

@@ -6,6 +6,7 @@ import { AuthModule } from './modules/auth';
 import { DemoModule } from './modules/demo';
 import { EventsModule } from './modules/events/events.module';
 import { HealthModule } from './modules/health/health.module';
+import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { SportsModule } from './modules/sports/sports.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { SportsModule } from './modules/sports/sports.module';
     EventBusModule,
     AuthModule,
     DemoModule,
+    OrganizationsModule,
     HealthModule,
     SportsModule,
     EventsModule,
