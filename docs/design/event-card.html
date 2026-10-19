@@ -97,15 +97,15 @@
       display: block;
       width: 100%;
       height: auto;
-      aspect-ratio: 2 / 1;
+      aspect-ratio: 16 / 9;
       background: var(--cover-endurance);
+      color: var(--color-ink);
       border-bottom: var(--border-width) solid var(--color-line);
     }
 
-    .cover .tone { stroke: var(--cover-endurance-tone); stroke-width: 3; fill: none; }
-    .cover .fill { fill: var(--cover-endurance-tone); fill-opacity: var(--cover-fill-opacity); stroke: var(--cover-endurance-tone); stroke-width: 3; }
-    .cover .soft { fill: var(--color-surface); fill-opacity: var(--cover-fill-opacity); stroke: var(--cover-endurance-tone); stroke-width: 3; }
-    .cover .sun { fill: var(--color-marker); fill-opacity: var(--cover-fill-opacity); stroke: var(--cover-endurance-tone); stroke-width: 3; }
+    .cover--outline { display: none; }
+    [data-theme="contrast"] .cover--color { display: none; }
+    [data-theme="contrast"] .cover--outline { display: block; }
 
     .card-body > * { min-width: 0; }
 
@@ -377,22 +377,6 @@
 
     .more-body p { margin: 0; }
 
-    .things {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-3) var(--space-4);
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-
-    .things li {
-      display: grid;
-      justify-items: center;
-      gap: var(--space-1);
-      font-size: var(--fs-caption);
-    }
-
     /* Статусы записи и степпер — витрина под карточкой */
     .gallery {
       display: grid;
@@ -458,19 +442,17 @@
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <!-- Пиктограммы Lucide (lucide.dev, лицензия ISC) -->
-    <symbol id="i-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></symbol>
-    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
-    <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></symbol>
-    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
-    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
-    <symbol id="i-queue" viewBox="0 0 24 24"><path d="M10 12h11"/><path d="M10 18h11"/><path d="M10 6h11"/><path d="M4 10h2"/><path d="M4 6h1v4"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></symbol>
-    <symbol id="i-door" viewBox="0 0 24 24"><path d="M11 20H2"/><path d="M11 4.562v16.157a1 1 0 0 0 1.242.97L19 20V5.562a2 2 0 0 0-1.515-1.94l-4-1A2 2 0 0 0 11 4.561z"/><path d="M11 4H8a2 2 0 0 0-2 2v14"/><path d="M14 12h.01"/><path d="M22 20h-3"/></symbol>
-    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/></symbol>
-    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
-    <symbol id="i-shirt" viewBox="0 0 24 24"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></symbol>
-    <symbol id="i-water" viewBox="0 0 24 24"><path d="M5.116 4.104A1 1 0 0 1 6.11 3h11.78a1 1 0 0 1 .994 1.105L17.19 20.21A2 2 0 0 1 15.2 22H8.8a2 2 0 0 1-2-1.79z"/><path d="M6 12a5 5 0 0 1 6 0 5 5 0 0 0 6 0"/></symbol>
-    <symbol id="i-shoes" viewBox="0 0 24 24"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></symbol>
+    <!-- Пиктограммы из apps/web/src/shared/illustrations/icons -->
+    <symbol id="i-location" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+    <symbol id="i-join" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7M19 8v6M16 11h6"/></symbol>
+    <symbol id="i-mode-free" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></symbol>
+    <symbol id="i-pending" viewBox="0 0 24 24"><path d="M6 3h12M6 21h12M8 3v3l4 6-4 6v3M16 3v3l-4 6 4 6v3"/></symbol>
+    <symbol id="i-confirmed" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></symbol>
+    <symbol id="i-waitlist" viewBox="0 0 24 24"><circle cx="6" cy="9" r="2"/><circle cx="12" cy="9" r="2"/><circle cx="18" cy="9" r="2"/><path d="M3 17c0-2 1.5-3 3-3s3 1 3 3M9 17c0-2 1.5-3 3-3s3 1 3 3M15 17c0-2 1.5-3 3-3s3 1 3 3"/></symbol>
+    <symbol id="i-rejected" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></symbol>
+    <symbol id="i-cancelled" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
+    <symbol id="i-approve" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
   </svg>
 
   <main class="page">
@@ -480,14 +462,13 @@
     <div class="frames">
       <template id="card">
         <article class="event-card" aria-labelledby="">
-          <svg class="cover" viewBox="0 0 320 160" aria-hidden="true" focusable="false">
-            <!-- Выносливость: берег, река, бегущая тропа и солнце -->
-            <circle class="sun" cx="262" cy="42" r="20"/>
-            <path class="soft" d="M-4 112 Q 60 92 120 104 T 240 98 T 324 104 V 164 H -4 Z"/>
-            <path class="tone" d="M-4 128 Q 40 120 80 128 T 160 128 T 240 128 T 324 128"/>
-            <path class="tone" d="M-4 144 Q 40 136 80 144 T 160 144 T 240 144 T 324 144"/>
-            <path class="fill" d="M60 104 C 90 70 140 64 196 78 C 214 82 226 92 232 100 Z"/>
-            <path class="tone" stroke-dasharray="2 10" stroke-linecap="round" d="M28 98 C 80 50 170 40 250 74"/>
+          <img class="cover cover--color" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='320' height='180' fill='%23FFE7D6'/%3E%3Ccircle cx='236' cy='56' r='40' fill='%23FFC69E'/%3E%3Cpath d='M28 158H64M84 158H120M140 158H176M196 158H232M252 158H292' fill='none' stroke='%234A2511' stroke-width='4'/%3E%3Crect x='86' y='124' width='156' height='18' rx='9' fill='%234A2511'/%3E%3Cpath d='M96 124V82Q96 70 108 70H138L150 92L196 100Q236 106 240 124Z' fill='%23FFFFFF' stroke='%234A2511' stroke-width='5'/%3E%3Cpath d='M124 84L138 78M132 96L146 90M142 106L156 100' fill='none' stroke='%234A2511' stroke-width='4'/%3E%3Cpath d='M54 96H74M44 112H72' fill='none' stroke='%234A2511' stroke-width='5'/%3E%3C/svg%3E" alt="Выносливость">
+          <svg class="cover cover--outline" viewBox="0 0 320 180" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Выносливость">
+            <path d="M28 158H64M84 158H120M140 158H176M196 158H232M252 158H292" fill="none" stroke="currentColor" stroke-width="4"/>
+            <rect x="86" y="124" width="156" height="18" rx="9" fill="none" stroke="currentColor" stroke-width="5"/>
+            <path d="M96 124V82Q96 70 108 70H138L150 92L196 100Q236 106 240 124Z" fill="none" stroke="currentColor" stroke-width="5"/>
+            <path d="M124 84L138 78M132 96L146 90M142 106L156 100" fill="none" stroke="currentColor" stroke-width="4"/>
+            <path d="M54 96H74M44 112H72" fill="none" stroke="currentColor" stroke-width="5"/>
           </svg>
           <div class="card-body">
             <p class="sport">Бег</p>
@@ -506,7 +487,7 @@
             </div>
 
             <p class="place">
-              <svg class="icon" aria-hidden="true"><use href="#i-map-pin"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="#i-location"/></svg>
               <span>Остров Татышев, у центрального входа</span>
             </p>
 
@@ -523,14 +504,14 @@
               <div class="seats-line">
                 <span class="seats-text">Осталось 3 из 10</span>
                 <span class="mode-badge">
-                  <svg class="icon" aria-hidden="true"><use href="#i-door"/></svg>
+                  <svg class="icon" aria-hidden="true"><use href="#i-mode-free"/></svg>
                   Свободно
                 </span>
               </div>
             </div>
 
             <div class="status status--ok">
-              <svg class="icon" aria-hidden="true"><use href="#i-flag"/></svg>
+              <svg class="icon" aria-hidden="true"><use href="#i-join"/></svg>
               <span class="status-text">Набор открыт</span>
             </div>
 
@@ -546,26 +527,22 @@
           <details class="more">
             <summary>Условия <svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
             <div class="more-body">
-              <ul class="things" aria-label="Что взять с собой">
-                <li><svg class="icon" aria-hidden="true"><use href="#i-shirt"/></svg>Форма</li>
-                <li><svg class="icon" aria-hidden="true"><use href="#i-water"/></svg>Вода</li>
-                <li><svg class="icon" aria-hidden="true"><use href="#i-shoes"/></svg>Обувь</li>
-              </ul>
+              <p>Что взять: форма, вода, беговая обувь.</p>
             </div>
           </details>
         </article>
 
         <section class="gallery" aria-label="Статусы записи">
           <h3>Статус записи</h3>
-          <div class="status status--wait"><svg class="icon" aria-hidden="true"><use href="#i-hourglass"/></svg><span class="status-text">Заявка на рассмотрении</span></div>
-          <div class="status status--ok"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="status-text">Вы участник</span></div>
-          <div class="status status--queue"><svg class="icon" aria-hidden="true"><use href="#i-queue"/></svg><span class="status-text">Вы в листе ожидания, ваша позиция: 2</span></div>
-          <div class="status status--bad"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg><span class="status-text">Заявка отклонена</span></div>
-          <div class="status status--off"><svg class="icon" aria-hidden="true"><use href="#i-undo"/></svg><span class="status-text">Вы отменили запись</span></div>
+          <div class="status status--wait"><svg class="icon" aria-hidden="true"><use href="#i-pending"/></svg><span class="status-text">Заявка на рассмотрении</span></div>
+          <div class="status status--ok"><svg class="icon" aria-hidden="true"><use href="#i-confirmed"/></svg><span class="status-text">Вы участник</span></div>
+          <div class="status status--queue"><svg class="icon" aria-hidden="true"><use href="#i-waitlist"/></svg><span class="status-text">Вы в листе ожидания, ваша позиция: 2</span></div>
+          <div class="status status--bad"><svg class="icon" aria-hidden="true"><use href="#i-rejected"/></svg><span class="status-text">Заявка отклонена</span></div>
+          <div class="status status--off"><svg class="icon" aria-hidden="true"><use href="#i-cancelled"/></svg><span class="status-text">Вы отменили запись</span></div>
 
           <ol class="stepper" aria-label="Ход заявки: шаг 2 из 3, решение организатора">
-            <li data-state="done"><span class="step-dot"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span>Заявка</li>
-            <li data-state="current" aria-current="step"><span class="step-dot"><svg class="icon" aria-hidden="true"><use href="#i-hourglass"/></svg></span>Решение</li>
+            <li data-state="done"><span class="step-dot"><svg class="icon" aria-hidden="true"><use href="#i-approve"/></svg></span>Заявка</li>
+            <li data-state="current" aria-current="step"><span class="step-dot"><svg class="icon" aria-hidden="true"><use href="#i-pending"/></svg></span>Решение</li>
             <li><span class="step-dot"></span>Вы участник</li>
           </ol>
         </section>

@@ -37,25 +37,23 @@
   --status-off-fg: #4a5a66;
   --status-off-bg: #ebeef0;
 
-  /* Обложки групп направлений: фон и основной тон иллюстрации */
-  --cover-team: #d8ecd9;
-  --cover-team-tone: #2f7d3e;
-  --cover-endurance: #d6eaf0;
-  --cover-endurance-tone: #0b5c6b;
-  --cover-mind: #e6e1f3;
-  --cover-mind-tone: #5a4596;
-  --cover-combat: #f6dcd6;
-  --cover-combat-tone: #a3412c;
-  --cover-fitness: #fbe9c4;
-  --cover-fitness-tone: #9a6a00;
-  --cover-water: #d3e6f8;
-  --cover-water-tone: #1f5f9e;
-  --cover-winter: #e4edf4;
-  --cover-winter-tone: #3d6a8c;
-  --cover-other: #e7e9e4;
-  --cover-other-tone: #55605a;
-
-  --cover-fill-opacity: 1;
+  /* Группы направлений: фон обложки и цвет линии рисунка (docs/design.md) */
+  --cover-team: #ddf0e2;
+  --cover-team-tone: #1d3b2a;
+  --cover-endurance: #ffe7d6;
+  --cover-endurance-tone: #4a2511;
+  --cover-mind: #e6e3f7;
+  --cover-mind-tone: #2a2350;
+  --cover-combat: #fbe0e0;
+  --cover-combat-tone: #5a1a1a;
+  --cover-fitness: #fff3c9;
+  --cover-fitness-tone: #4a3a07;
+  --cover-water: #d8eef8;
+  --cover-water-tone: #0f3a52;
+  --cover-winter: #e7f0f7;
+  --cover-winter-tone: #1e3448;
+  --cover-other: #eceff3;
+  --cover-other-tone: #283240;
   --border-width: 1px;
   --shadow-card: 0 1px 0 var(--color-line);
 }
@@ -88,7 +86,7 @@
   --status-off-fg: #d0d0d0;
   --status-off-bg: #000000;
 
-  /* Контурные обложки: без заливок и полупрозрачности */
+  /* Обложки в этой теме — контурные версии (covers/outline) */
   --cover-team: #000000;
   --cover-team-tone: #ffffff;
   --cover-endurance: #000000;
@@ -106,7 +104,6 @@
   --cover-other: #000000;
   --cover-other-tone: #ffffff;
 
-  --cover-fill-opacity: 0;
   --border-width: 2px;
   --shadow-card: none;
 }
