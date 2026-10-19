@@ -26,6 +26,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -44,6 +46,8 @@ jobs:
       PG_CONTAINER: ci-pg-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -72,21 +76,34 @@ jobs:
     runs-on: ${{ vars.CI_DOCKER_RUNNER || vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     env:
-      # Свои порты и имя проекта: на компьютере участника может работать его собственный compose
-      COMPOSE_PROJECT_NAME: ci-${{ github.run_id }}
+      # Свои порты и имя проекта: не мешать другому заданию и стенду участника. Имя
+      # начинается с имени репозитория — по нему уборка находит только свои остатки
+      COMPOSE_PROJECT_NAME: stoloto-tandem-ci-compose-${{ github.run_id }}
       WEB_PORT: 18080
       API_PORT: 13000
+      # Стенд CI виден только с этого компьютера: в демо-режиме вход без пароля и сброс
+      WEB_BIND: 127.0.0.1
+      # Окружение стенда задаёт задание, а не переменные окружения runner'а участника
+      DEMO_MODE: 'true'
+      SESSION_SECRET: ''
+      STAND_ID: ''
+      POSTGRES_PASSWORD: tandem
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Docker доступен
         run: docker info --format 'Docker {{.ServerVersion}}, {{.OSType}}'
+      - name: Остатки прошлых прогонов
+        # Если runner оборвался посреди задания, проект прошлого прогона держит порты, тома и образы
+        run: .github/scripts/compose-cleanup.sh stoloto-tandem-ci-compose-
       - name: Запуск docker compose
         run: docker compose up --build --detach --wait --wait-timeout 300
       - name: Проверка web и api
         run: |
-          curl --fail --silent --show-error "http://localhost:$API_PORT/health"
-          curl --fail --silent --show-error "http://localhost:$WEB_PORT/api/health"
-          curl --fail --silent --show-error "http://localhost:$WEB_PORT/" | grep -q '<div id="root">'
+          curl --fail --silent --show-error "http://127.0.0.1:$API_PORT/health"
+          curl --fail --silent --show-error "http://127.0.0.1:$WEB_PORT/api/health"
+          curl --fail --silent --show-error "http://127.0.0.1:$WEB_PORT/" | grep -q '<div id="root">'
       - name: Миграции применены при старте api
         run: |
           applied=$(docker compose exec -T db psql -U tandem -d tandem -tAc \
@@ -94,6 +111,61 @@ jobs:
           expected=$(find apps/api/prisma/migrations -name migration.sql | wc -l)
           echo "применено $applied из $expected"
           test "$applied" -eq "$expected"
+      - name: Логи сервисов
+        if: failure()
+        run: docker compose logs
+      - name: Остановка
+        if: always()
+        run: docker compose down --volumes --rmi local
+
+  e2e:
+    # Сквозные тесты Playwright на поднятом Docker Compose; нужен Docker, как и заданию compose
+    runs-on: ${{ vars.CI_DOCKER_RUNNER || vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    env:
+      # Свои порты и имя проекта: не мешать другому заданию и стенду участника. Имя
+      # начинается с имени репозитория — по нему уборка находит только свои остатки
+      COMPOSE_PROJECT_NAME: stoloto-tandem-ci-e2e-${{ github.run_id }}
+      WEB_PORT: 18180
+      API_PORT: 13100
+      # Стенд CI виден только с этого компьютера: в демо-режиме вход без пароля и сброс
+      WEB_BIND: 127.0.0.1
+      # Окружение стенда задаёт задание, а не переменные окружения runner'а участника
+      DEMO_MODE: 'true'
+      SESSION_SECRET: ''
+      STAND_ID: ''
+      POSTGRES_PASSWORD: tandem
+      BASE_URL: http://127.0.0.1:18180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Браузер для Playwright
+        # На Linux нужны и системные библиотеки браузера; на Windows их ставить не нужно
+        run: npx playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium
+      - name: Остатки прошлых прогонов
+        # Если runner оборвался посреди задания, проект прошлого прогона держит порты, тома и образы
+        run: .github/scripts/compose-cleanup.sh stoloto-tandem-ci-e2e-
+      - name: Запуск docker compose
+        run: docker compose up --build --detach --wait --wait-timeout 300
+      - name: Сквозные тесты
+        run: npm run e2e
+      - name: Отчёт, трейсы и скриншоты упавших тестов
+        if: failure()
+        uses: actions/upload-artifact@v4
+        # Хранилище артефактов может быть недоступно: это не должно скрыть итог тестов
+        continue-on-error: true
+        with:
+          name: e2e-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
       - name: Логи сервисов
         if: failure()
         run: docker compose logs

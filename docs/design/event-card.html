@@ -115,15 +115,40 @@
         overflow: hidden;
       }
 
+      /* Шапка до 768 px — две строки (ТЗ 2.6): название и переключатели тем, под ними
+         «под кем вход» и «Сменить аккаунт». Имя — в одну строку с многоточием */
       .app-bar {
         flex: none;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0 var(--space-2);
+        padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+        background: var(--color-surface);
+        border-bottom: var(--border-width) solid var(--color-line);
+      }
+
+      .brand {
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        font-family: var(--font-display);
+        font-weight: 700;
+        line-height: var(--tap-min);
+      }
+
+      .switches {
+        display: flex;
+        gap: var(--space-1);
+      }
+
+      .account-line {
+        grid-column: 1 / -1;
         display: flex;
         align-items: center;
         gap: var(--space-2);
-        height: calc(3.5rem * var(--text-scale));
-        padding: 0 var(--space-2) 0 var(--space-4);
-        background: var(--color-surface);
-        border-bottom: var(--border-width) solid var(--color-line);
+        border-top: var(--border-width) solid var(--color-line);
       }
 
       .who {
@@ -134,6 +159,18 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+      }
+
+      .link-btn {
+        flex: none;
+        min-height: var(--tap-min);
+        padding: 0 var(--space-2);
+        border: 0;
+        background: none;
+        color: var(--color-primary);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
       }
 
       .who b {
@@ -181,15 +218,18 @@
         border-top: var(--border-width) solid var(--color-line);
       }
 
+      /* Подписи — до двух строк («Мои записи», «Уведомления»), высота панели — в пределах
+         docs/design.md: 72 px в обычной теме и контрасте, 80 px в «Крупном тексте» */
       .tab-bar a {
         display: grid;
         justify-items: center;
         align-content: center;
         gap: 2px;
         min-height: 64px;
-        padding: var(--space-1) 0;
+        padding: var(--space-1) 2px;
         color: var(--color-ink-muted);
-        font-size: 0.75rem;
+        font-size: var(--fs-nav);
+        hyphens: manual;
         line-height: 1.2;
         text-decoration: none;
         text-align: center;
@@ -238,7 +278,7 @@
       .cover {
         display: block;
         width: 100%;
-        aspect-ratio: 3 / 1;
+        aspect-ratio: 5 / 1;
         overflow: hidden;
         background: var(--cover-endurance);
         color: var(--color-ink);
@@ -269,7 +309,7 @@
 
       .card-body {
         display: grid;
-        gap: var(--space-3);
+        gap: var(--space-2);
         padding: var(--space-3) var(--space-4) var(--space-4);
       }
 
@@ -555,15 +595,31 @@
         display: grid;
       }
 
-      /* «Крупный текст»: первый экран прокручивается, кнопка закреплена над нижней панелью */
-      [data-text='large'] .card-action {
+      /* Панель действия до 768 px во всех темах: статус записи и главная кнопка
+         закреплены над нижней панелью — видны без прокрутки при шапке любой высоты */
+      .action-bar {
         position: sticky;
         bottom: calc(var(--space-3) * -1);
         z-index: 1;
+        display: grid;
+        gap: var(--space-1);
         margin: 0 calc(var(--space-4) * -1) calc(var(--space-4) * -1);
-        padding: var(--space-3) var(--space-4);
+        padding: var(--space-2) var(--space-4);
         background: var(--color-surface);
         border-top: var(--border-width) solid var(--color-line);
+      }
+
+      /* Две строки на всю ширину: статус (одна строка — короткий текст для панели,
+         docs/design.md) и кнопка. Высота не зависит от длины текстов кнопки */
+      .action-bar .status {
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        font-size: var(--fs-caption);
+      }
+
+      .action-bar .btn-primary {
+        width: 100%;
+        padding: var(--space-2) var(--space-4);
       }
 
       .btn-primary {
@@ -803,20 +859,28 @@
       <h1>Карточка события в трёх темах</h1>
       <p>
         Экран телефона 360×700 — видимая область браузера на телефоне 360×800: шапка, первый экран
-        карточки и нижняя панель. Без прокрутки видны направление, дата, место, уровень, места,
-        статус и главная кнопка. В «Крупном тексте» карточка прокручивается, а кнопка закреплена над
-        панелью. Правила — в <a href="../design.md">docs/design.md</a>.
+        карточки и нижняя панель. Без прокрутки видны направление, дата, место, уровень и места, а
+        статус и главная кнопка закреплены над нижней панелью во всех темах. В «Крупном тексте»
+        карточка прокручивается. Правила — в <a href="../design.md">docs/design.md</a>.
       </p>
 
       <template id="phone">
         <header class="app-bar">
-          <span class="who">Вход: <b>Анна</b></span>
-          <button class="icon-btn" type="button" data-toggle="large" aria-pressed="false">
-            А+<span class="visually-hidden"> Крупный текст</span>
-          </button>
-          <button class="icon-btn" type="button" data-toggle="contrast" aria-pressed="false">
-            <svg class="icon" aria-hidden="true"><use href="#i-contrast" /></svg>Контраст
-          </button>
+          <span class="brand">Спорт вместе</span>
+          <span class="switches">
+            <button class="icon-btn" type="button" data-toggle="large" aria-pressed="false">
+              А+<span class="visually-hidden"> Крупный текст</span>
+            </button>
+            <button class="icon-btn" type="button" data-toggle="contrast" aria-pressed="false">
+              <svg class="icon" aria-hidden="true"><use href="#i-contrast" /></svg>Контраст
+            </button>
+          </span>
+          <span class="account-line">
+            <span class="who" title="Шахматный клуб «Ладья»"
+              ><span class="visually-hidden">Вы вошли как </span><b>Шахматный клуб «Ладья»</b></span
+            >
+            <button class="link-btn" type="button">Сменить аккаунт</button>
+          </span>
         </header>
 
         <div class="screen">
@@ -919,13 +983,14 @@
                 <span class="seats-text">Осталось 3 из 10</span>
               </div>
 
-              <div class="status status--ok">
-                <svg class="icon" aria-hidden="true"><use href="#i-join" /></svg>
-                <span class="status-text">Набор открыт</span>
-              </div>
-
-              <div class="card-action">
-                <button class="btn-primary" type="button">Записаться</button>
+              <div class="action-bar">
+                <div class="status status--ok">
+                  <svg class="icon" aria-hidden="true"><use href="#i-join" /></svg>
+                  <span class="status-text">Набор открыт</span>
+                </div>
+                <div class="card-action">
+                  <button class="btn-primary" type="button">Записаться</button>
+                </div>
               </div>
             </div>
 
@@ -962,10 +1027,10 @@
             ><svg class="icon" aria-hidden="true"><use href="#i-create" /></svg>Создать</a
           >
           <a href="#"
-            ><svg class="icon" aria-hidden="true"><use href="#i-notify" /></svg>Уведомления</a
+            ><svg class="icon" aria-hidden="true"><use href="#i-notify" /></svg>Уведом&shy;ления</a
           >
           <a href="#"
-            ><svg class="icon" aria-hidden="true"><use href="#i-profile" /></svg>Профиль</a
+            ><svg class="icon" aria-hidden="true"><use href="#i-profile" /></svg>Про&shy;филь</a
           >
         </nav>
       </template>
