@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-=======
-import { Body, Controller, Get, Header, Param, Post } from '@nestjs/common';
->>>>>>> adf13ad (Мероприятия: newSport только объект, эмодзи в текстах, активная запись зрителя, без кеша приватных ответов)
+import { Body, Controller, Get, Header, Param, Post, Query } from '@nestjs/common';
 import type { Actor } from '../../core/policies';
 import { CurrentActor, Public, SignedIn } from '../auth';
 import { CreateEventDto, EventFeedQuery } from './events.dto';
@@ -23,7 +19,6 @@ export class EventsController {
     return this.events.create(actor, dto);
   }
 
-<<<<<<< HEAD
   // Ленту и поиск видит и гость (ТЗ 2.6)
   @Public()
   @Get()
@@ -31,11 +26,8 @@ export class EventsController {
     return this.events.feed(query);
   }
 
-  // Гость видит карточки опубликованных событий (ТЗ 2.6); что ещё ему видно — решает canViewEvent
-=======
   // Гость видит карточки опубликованных событий (ТЗ 2.6); что ещё ему видно — решает canViewEvent.
   // Ответ зависит от того, кто смотрит («Информация для участников»): кешировать его нельзя
->>>>>>> adf13ad (Мероприятия: newSport только объект, эмодзи в текстах, активная запись зрителя, без кеша приватных ответов)
   @Public()
   @Get(':id')
   @Header('Cache-Control', 'private, no-store')
