@@ -112,7 +112,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       name: 'Шахматный клуб «Ладья»',
       description:
         'Шахматный клуб для взрослых и детей: блиц-турниры, разборы партий, занятия для семей',
-      contacts: '+7 391 200-10-10, ladya@example.ru',
+      contacts: '+7 391 000-00-01, ladya@example.ru',
       website: 'https://example.ru/ladya',
       representativeName: 'Сергей Владимирович Котов',
       representativeRole: 'Руководитель клуба',
@@ -130,7 +130,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
     organization: {
       name: 'Падел-клуб Енисей',
       description: 'Корты для падела на набережной, тренировки и игры для новичков',
-      contacts: '+7 391 200-20-20',
+      contacts: '+7 391 000-00-02',
       representativeName: 'Марина Лебедева',
       representativeRole: 'Администратор клуба',
       status: 'pending',
