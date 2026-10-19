@@ -1,4 +1,9 @@
-import { SPORT_CATEGORIES, SPORT_NAME_PATTERN, cleanSportName } from '@tandem/domain';
+import {
+  SPORT_CATEGORIES,
+  SPORT_NAME_MAX_LENGTH,
+  SPORT_NAME_PATTERN,
+  cleanSportName,
+} from '@tandem/domain';
 import type { SportCategory } from '@tandem/domain';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -13,9 +18,7 @@ import {
   Min,
 } from 'class-validator';
 
-export const SPORT_NAME_MAX_LENGTH = 50;
-
-export const SPORT_NAME_RULE = `Название направления — от 2 до ${SPORT_NAME_MAX_LENGTH} символов: буквы, цифры, пробелы и знаки . , ' ( ) × / + -; над буквой — не больше одного значка`;
+export const SPORT_NAME_RULE = `Название направления — от 2 до ${SPORT_NAME_MAX_LENGTH} символов: буквы, цифры, пробелы и знаки . , ' ( ) × / + -; над буквой — не больше одного значка; в одном слове — буквы одного алфавита`;
 
 // Управляющие и невидимые символы (форматирующие, вроде U+200B и U+202E)
 const NO_HIDDEN_CHARS = /^[^\p{Cc}\p{Cf}]*$/u;

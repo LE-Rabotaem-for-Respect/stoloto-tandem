@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { cleanSportName, isValidSportName, normalizeSportName } from '../src';
+import {
+  SPORT_NAME_MAX_LENGTH,
+  cleanSportName,
+  isValidSportName,
+  normalizeSportName,
+} from '../src';
 
 describe('normalizeSportName', () => {
   it('обрезает пробелы по краям', () => {
@@ -55,6 +60,12 @@ describe('isValidSportName', () => {
     "Rock'n'roll",
     'Pétanque',
     'Тхэквондо (ВТФ)',
+    'BMX-трек',
+    'Фрисби Ultimate',
+    'Регби 7 (Sevens)',
+    'Бег 5K',
+    // «Широкие» цифры NFKC приводит к обычным
+    'Футбол ７×７',
     // Ударение над кириллицей не составляется в одну букву и остаётся одним знаком
     `Па${String.fromCodePoint(0x301)}дел`,
   ])('«%s» — допустимо', (name) => {
@@ -72,9 +83,27 @@ describe('isValidSportName', () => {
     ['селектор варианта U+FE0F', `Скрытый${String.fromCodePoint(0xfe0f)}`],
     ['два комбинируемых знака подряд', `Па${String.fromCodePoint(0x300, 0x301)}дел`],
     ['«залго»: 30 знаков зачёркивания', `Скрытый${String.fromCodePoint(0x336).repeat(30)}`],
+    ['латинская C в кириллическом слове', 'Cкрытый'],
+    ['латинская a в кириллическом слове', 'Пaдел'],
+    ['кириллическая о в латинском слове', 'Bоccia'],
+    ['греческая омикрон в кириллическом слове', 'Футбοл'],
+    ['киданьский заполнитель U+16FE4', `Скры${String.fromCodePoint(0x16fe4)}тый`],
+    ['цифра телугу U+0C66 вместо «о»', `Футб${String.fromCodePoint(0xc66)}л`],
+    ['цифра деванагари U+0966 вместо «о»', `Футб${String.fromCodePoint(0x966)}л`],
     ['знак в начале', '-Падел'],
     ['угловые скобки', '<b>Падел</b>'],
   ])('%s — недопустимо', (_, name) => {
     expect(isValidSportName(name)).toBe(false);
+  });
+
+  it(`не длиннее ${SPORT_NAME_MAX_LENGTH} символов`, () => {
+    expect(isValidSportName('Ф'.repeat(SPORT_NAME_MAX_LENGTH))).toBe(true);
+    expect(isValidSportName('Ф'.repeat(SPORT_NAME_MAX_LENGTH + 1))).toBe(false);
+  });
+
+  it('длинная строка отвергается сразу, без медленных проверок', () => {
+    const started = performance.now();
+    expect(isValidSportName('Скрытый'.repeat(3000))).toBe(false);
+    expect(performance.now() - started).toBeLessThan(200);
   });
 });

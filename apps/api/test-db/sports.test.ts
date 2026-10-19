@@ -8,8 +8,9 @@ import { createUser, prisma } from './db';
 const repository = new SportsRepository(prisma as unknown as PrismaService);
 const service = new SportsService(repository);
 
-// Уникальное слово на прогон: база общая для файлов, и чужие направления не должны мешать
-const tag = `тест${randomUUID().slice(0, 8)}`;
+// Уникальное слово на прогон: база общая для файлов, и чужие направления не должны мешать.
+// Кириллица и латинские буквы хвоста — через дефис: в одном слове алфавиты не смешиваются.
+const tag = `тест-${randomUUID().slice(0, 8)}`;
 
 let authorId: string;
 
@@ -128,6 +129,17 @@ describe('новое направление', () => {
     const before = await prisma.sport.count();
     for (const cp of [0x34f, 0x3164, 0xfe0f]) {
       const name = `Скры${String.fromCodePoint(cp)}тый ${tag}`;
+      await expect(service.findOrCreate({ name }, authorId)).rejects.toMatchObject({
+        code: 'validation_failed',
+      });
+    }
+    expect(await prisma.sport.count()).toBe(before);
+  });
+
+  it('похожие буквы другого алфавита не создают двойника скрытого направления', async () => {
+    const before = await prisma.sport.count();
+    // Латинские C и p вместо кириллических С и р: на вид — то же «Скрытый»
+    for (const name of [`Cкрытый ${tag}`, `Скpытый ${tag}`]) {
       await expect(service.findOrCreate({ name }, authorId)).rejects.toMatchObject({
         code: 'validation_failed',
       });
