@@ -258,6 +258,26 @@ describe('демо-вход', () => {
     expect(response.status).toBe(404);
   });
 
+  it('без DEMO_MODE 404 и с неверным телом: маршрут не выдаёт себя ошибкой полей', async () => {
+    for (const body of [{ account: 'x' }, {}, { account: 'anna', extra: 1 }]) {
+      const response = await request(app.getHttpServer()).post('/auth/demo-login').send(body);
+      expect(response.status).toBe(404);
+      expect(response.body.code).toBe('not_found');
+    }
+  });
+
+  it('сессия демо-аккаунта не действует на стенде без DEMO_MODE', async () => {
+    const quick = await request(demoApp.getHttpServer())
+      .post('/auth/demo-login')
+      .send({ account: 'anna' });
+    const cookie = sessionCookie(quick);
+
+    expect((await request(demoApp.getHttpServer()).get('/me').set('Cookie', cookie)).status).toBe(
+      200,
+    );
+    expect((await request(app.getHttpServer()).get('/me').set('Cookie', cookie)).status).toBe(401);
+  });
+
   it('без DEMO_MODE демо-аккаунт не входит и с верным паролем', async () => {
     const response = await request(app.getHttpServer())
       .post('/auth/login')
