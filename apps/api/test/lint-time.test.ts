@@ -1,14 +1,8 @@
-import { ESLint } from 'eslint';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { projectEslint } from './lint';
 
-const root = resolve(__dirname, '../../..');
-const eslint = new ESLint({ cwd: root });
-
-async function timeErrors(code: string, file: string) {
-  const [result] = await eslint.lintText(code, { filePath: resolve(root, file) });
-  return (result?.messages ?? []).filter((m) => m.ruleId === 'no-restricted-syntax').length;
-}
+const ruleMessages = projectEslint();
+const timeErrors = (code: string, file: string) => ruleMessages('no-restricted-syntax', code, file);
 
 describe('правило ESLint о текущем времени', () => {
   it.each(['apps/api/src/x.ts', 'apps/web/src/x.ts', 'packages/domain/src/x.ts'])(
