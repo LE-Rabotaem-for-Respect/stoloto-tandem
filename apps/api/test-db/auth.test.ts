@@ -13,7 +13,12 @@ import { databaseUrl, prisma } from './db';
 
 const COOKIE = 'tandem_session';
 const many = { attempts: 10_000, windowMs: 60_000 };
-const UNLIMITED = { loginPerIp: many, loginPerEmail: many, registerPerIp: many, registerPerEmail: many };
+const UNLIMITED = {
+  loginPerIp: many,
+  loginPerEmail: many,
+  registerPerIp: many,
+  registerPerEmail: many,
+};
 
 async function startApp(demoMode: boolean): Promise<INestApplication> {
   process.env.DATABASE_URL = databaseUrl;
