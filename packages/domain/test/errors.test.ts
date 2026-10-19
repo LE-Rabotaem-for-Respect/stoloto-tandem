@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ACTION_CODES,
   ERROR_CODES,
+  ERROR_HTTP_STATUS,
   ERROR_MESSAGES,
   TRANSITION_ERROR_CODES,
   errorMessage,
@@ -21,6 +22,26 @@ describe('errors: закрытый список кодов ошибок API', ()
     for (const code of ERROR_CODES) {
       expect(ERROR_MESSAGES[code], code).toMatch(/^[А-ЯЁ][^a-zA-Z]*$/);
     }
+  });
+
+  it('у каждого кода — HTTP-статус из допустимых', () => {
+    expect(Object.keys(ERROR_HTTP_STATUS).sort()).toEqual([...ERROR_CODES].sort());
+    for (const code of ERROR_CODES) {
+      expect([400, 401, 403, 404, 409, 413, 500, 503], code).toContain(ERROR_HTTP_STATUS[code]);
+    }
+  });
+
+  it('статусы ключевых ошибок, на которые опираются сценарии проверки', () => {
+    expect(ERROR_HTTP_STATUS).toMatchObject({
+      validation_failed: 400,
+      unauthorized: 401,
+      forbidden: 403,
+      not_found: 404,
+      event_not_available: 404,
+      // docs/scenarios.md, сценарий 6: запись на снятое мероприятие
+      event_not_joinable: 409,
+      internal: 500,
+    });
   });
 
   it('errorMessage возвращает текст кода', () => {
