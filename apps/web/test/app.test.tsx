@@ -89,6 +89,7 @@ describe('каркас приложения', () => {
     fakeApi();
     renderApp('/');
     expect(screen.getByRole('heading', { name: 'Найти занятие' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Тандем' }).getAttribute('href')).toBe('/');
     const nav = screen.getByRole('navigation', { name: 'Основные разделы' });
     expect(
       within(nav)

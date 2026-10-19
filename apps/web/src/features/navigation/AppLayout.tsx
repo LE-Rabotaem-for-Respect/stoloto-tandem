@@ -98,7 +98,7 @@ export function AppLayout() {
       <div className="app-top">
         <header className="app-header">
           <Link className="brand" to="/">
-            Спорт вместе
+            Тандем
           </Link>
           <ThemeSwitches />
           <Account />
