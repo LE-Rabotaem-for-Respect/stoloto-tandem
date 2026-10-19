@@ -33,7 +33,8 @@ export function useNotifications() {
 export function useMarkAllRead() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: () => apiRequest<{ unread: number }>('/notifications/read', { method: 'POST', body: {} }),
+    mutationFn: () =>
+      apiRequest<{ unread: number }>('/notifications/read', { method: 'POST', body: {} }),
     onSuccess: ({ unread }) => {
       client.setQueryData<NotificationList>(KEY, (list) => list && { ...list, unread });
     },
