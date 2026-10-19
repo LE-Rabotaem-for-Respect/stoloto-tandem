@@ -18,7 +18,7 @@ import {
   Min,
 } from 'class-validator';
 
-export const SPORT_NAME_RULE = `Название направления — от 2 до ${SPORT_NAME_MAX_LENGTH} символов: буквы, цифры, пробелы и знаки . , ' ( ) × / + -`;
+export const SPORT_NAME_RULE = `Название направления — от 2 до ${SPORT_NAME_MAX_LENGTH} символов: буквы, цифры, пробелы и знаки . , ' ( ) × / + -; в одном слове — буквы одного алфавита`;
 
 // Управляющие и невидимые символы (форматирующие, вроде U+200B и U+202E)
 const NO_HIDDEN_CHARS = /^[^\p{Cc}\p{Cf}]*$/u;
