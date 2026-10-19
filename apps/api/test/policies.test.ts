@@ -51,11 +51,16 @@ describe('policies по таблице ТЗ 4.4', () => {
     }
   });
 
-  it('снятое с публикации видят организатор, участник и администратор', () => {
+  it('снятое с публикации видят организатор, записавшиеся и администратор', () => {
     const unpublished = { ...userEvent, status: 'unpublished' as const };
     expect(canViewEvent(guest, unpublished, null)).toEqual(no('event_not_available'));
     expect(canViewEvent(user, unpublished, null)).toEqual(no('event_not_available'));
-    expect(canViewEvent(user, unpublished, 'confirmed')).toEqual(yes);
+    for (const status of ['pending', 'confirmed', 'waitlist'] as const) {
+      expect(canViewEvent(user, unpublished, status), status).toEqual(yes);
+    }
+    for (const status of ['rejected', 'cancelled'] as const) {
+      expect(canViewEvent(user, unpublished, status), status).toEqual(no('event_not_available'));
+    }
     expect(canViewEvent(author, unpublished, null)).toEqual(yes);
     expect(canViewEvent(admin, unpublished, null)).toEqual(yes);
   });
@@ -73,10 +78,13 @@ describe('policies по таблице ТЗ 4.4', () => {
       expect(canJoin(admin, userEvent, now)).toEqual(no('users_only'));
     });
     it('только на опубликованное и не завершённое', () => {
-      const cancelled = { ...userEvent, status: 'cancelled' as const };
       const finished = { ...userEvent, endsAt: new Date('2026-10-19T04:59:59Z') };
       const ongoing = { ...userEvent, startsAt: new Date('2026-10-19T04:00:00Z') };
-      expect(canJoin(user, cancelled, now)).toEqual(no('event_not_joinable'));
+      for (const status of ['cancelled', 'unpublished', 'deleted'] as const) {
+        expect(canJoin(user, { ...userEvent, status }, now), status).toEqual(
+          no('event_not_joinable'),
+        );
+      }
       expect(canJoin(user, finished, now)).toEqual(no('event_not_joinable'));
       expect(canJoin(user, ongoing, now)).toEqual(yes);
     });

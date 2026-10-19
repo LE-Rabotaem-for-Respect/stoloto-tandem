@@ -6,6 +6,7 @@ const GENERAL_ERROR_CODES = [
   'forbidden',
   'not_found',
   'conflict',
+  'too_large',
   'busy',
   'internal',
 ] as const;
@@ -41,6 +42,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   forbidden: 'Недостаточно прав для этого действия',
   not_found: 'Не найдено',
   conflict: 'Такая запись уже есть',
+  too_large: 'Слишком большой запрос',
   busy: 'Сервер занят, попробуйте ещё раз',
   internal: 'Что-то пошло не так. Попробуйте ещё раз',
   event_not_available: 'Мероприятие недоступно',

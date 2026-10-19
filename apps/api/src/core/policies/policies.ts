@@ -36,14 +36,20 @@ export function isEventOrganizer(actor: Actor, event: PolicyEvent): boolean {
   return false;
 }
 
-/** Опубликованное и отменённое видят все; снятое и удалённое — причастные и администратор. */
+const signedUp: readonly ParticipationStatus[] = ['pending', 'confirmed', 'waitlist'];
+
+/**
+ * Опубликованное и отменённое видят все; снятое и удалённое — организатор,
+ * записавшиеся (ТЗ 2.10: им виден баннер о снятии) и администратор.
+ */
 export function canViewEvent(
   actor: Actor,
   event: PolicyEvent,
   participation: ViewerParticipation,
 ): Decision {
   if (event.status === 'published' || event.status === 'cancelled') return allow;
-  if (actor.role === 'admin' || isEventOrganizer(actor, event) || participation) return allow;
+  if (actor.role === 'admin' || isEventOrganizer(actor, event)) return allow;
+  if (participation && signedUp.includes(participation)) return allow;
   return deny('event_not_available');
 }
 

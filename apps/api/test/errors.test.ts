@@ -7,8 +7,12 @@ import { IsInt, IsNotEmpty, IsString, Min } from 'class-validator';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { configureApp } from '../src/configure-app';
+import { ClockModule, ClockStateSource, REAL_TIME } from '../src/core/clock';
+import { STAND_CONFIG } from '../src/core/config';
 import { ApiError, ERROR_HTTP_STATUS } from '../src/core/errors';
 import { Prisma } from '../src/generated/prisma/client';
+
+const serverTime = '2026-10-19T05:00:00.000Z';
 
 class CreateThingDto {
   @IsString({ message: 'Укажите название' })
@@ -69,7 +73,14 @@ describe('core/errors: единый формат ошибок { code, message, f
   const http = () => request(app.getHttpServer());
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [ProbeModule] }).compile();
+    const moduleRef = await Test.createTestingModule({ imports: [ProbeModule, ClockModule] })
+      .overrideProvider(STAND_CONFIG)
+      .useValue({ demoMode: false, standId: null })
+      .overrideProvider(ClockStateSource)
+      .useValue({ read: async () => ({ offsetSeconds: 0, lastResetAt: null }) })
+      .overrideProvider(REAL_TIME)
+      .useValue(() => Date.parse(serverTime))
+      .compile();
     app = moduleRef.createNestApplication({ logger: false });
     configureApp(app);
     await app.init();
@@ -136,6 +147,18 @@ describe('core/errors: единый формат ошибок { code, message, f
       .send('{"title":');
     expect(response.status).toBe(400);
     expect(response.body.code).toBe('validation_failed');
+    expect(response.headers['x-server-time']).toBe(serverTime);
+  });
+
+  it('слишком большое тело — too_large, а не непредвиденная ошибка', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const response = await http()
+      .post('/probe/dto')
+      .send({ title: 'x'.repeat(200_000), limit: 1 });
+    spy.mockRestore();
+    expect(response.status).toBe(413);
+    expect(response.body).toEqual({ code: 'too_large', message: 'Слишком большой запрос' });
+    expect(response.headers['x-server-time']).toBe(serverTime);
   });
 
   it('нарушение уникальности в базе (P2002) — conflict с полем', async () => {
@@ -170,13 +193,14 @@ describe('core/errors: единый формат ошибок { code, message, f
       message: 'Что-то пошло не так. Попробуйте ещё раз',
     });
     expect(JSON.stringify(response.body)).not.toContain('секретная');
+    expect(response.headers['x-server-time']).toBe(serverTime);
   });
 });
 
 describe('core/errors: таблица HTTP-кодов', () => {
   it('у каждого кода — допустимый HTTP-код', () => {
     for (const code of ERROR_CODES) {
-      expect([400, 401, 403, 404, 409, 500, 503], code).toContain(ERROR_HTTP_STATUS[code]);
+      expect([400, 401, 403, 404, 409, 413, 500, 503], code).toContain(ERROR_HTTP_STATUS[code]);
     }
   });
 });

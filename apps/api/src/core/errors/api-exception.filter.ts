@@ -23,7 +23,17 @@ const httpStatusCodes: Partial<Record<number, ErrorCode>> = {
   [HttpStatus.FORBIDDEN]: 'forbidden',
   [HttpStatus.NOT_FOUND]: 'not_found',
   [HttpStatus.CONFLICT]: 'conflict',
+  [HttpStatus.PAYLOAD_TOO_LARGE]: 'too_large',
 };
+
+// HttpException Nest или ошибка разбора тела (http-errors у body-parser): у обеих есть HTTP-код
+function clientErrorStatus(exception: unknown): number | undefined {
+  if (exception instanceof HttpException) return exception.getStatus();
+  if (exception instanceof Error && 'status' in exception && typeof exception.status === 'number') {
+    return exception.status;
+  }
+  return undefined;
+}
 
 function uniqueFields(meta: Record<string, unknown> | undefined): ErrorFields | undefined {
   const target = meta?.target;
@@ -61,12 +71,10 @@ export class ApiExceptionFilter implements ExceptionFilter {
         return { code: 'not_found', message: errorMessage('not_found') };
       if (exception.code === 'P2028') return { code: 'busy', message: errorMessage('busy') };
     }
-    if (exception instanceof HttpException) {
-      const status = exception.getStatus();
-      if (status < 500) {
-        const code = httpStatusCodes[status] ?? 'validation_failed';
-        return { code, message: errorMessage(code) };
-      }
+    const status = clientErrorStatus(exception);
+    if (status !== undefined && status >= 400 && status < 500) {
+      const code = httpStatusCodes[status] ?? 'validation_failed';
+      return { code, message: errorMessage(code) };
     }
     this.logger.error(
       exception instanceof Error ? (exception.stack ?? exception.message) : exception,

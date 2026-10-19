@@ -3,7 +3,7 @@ import type { ErrorCode } from '@tandem/domain';
 /**
  * HTTP-код каждой ошибки: 400 — неверные данные, 401 — нужен вход,
  * 403 — нет прав, 404 — нет объекта, 409 — конфликт с состоянием,
- * 503 — база занята, 500 — непредвиденное.
+ * 413 — слишком большое тело, 503 — база занята, 500 — непредвиденное.
  */
 export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   validation_failed: 400,
@@ -11,6 +11,7 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   forbidden: 403,
   not_found: 404,
   conflict: 409,
+  too_large: 413,
   busy: 503,
   internal: 500,
   event_not_available: 404,
