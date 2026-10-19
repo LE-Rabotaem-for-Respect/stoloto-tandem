@@ -16,4 +16,6 @@ fi
 
 # Перед запуском применяются миграции; при ошибке api не стартует
 /app/node_modules/.bin/prisma migrate deploy
+# Новый демо-стенд с пустой базой сразу готов к быстрому входу; базу с данными сид не трогает
+node dist/seed.js
 exec node dist/main.js
