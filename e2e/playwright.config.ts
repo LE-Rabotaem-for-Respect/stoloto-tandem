@@ -11,6 +11,8 @@ export default defineConfig({
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: process.env.BASE_URL ?? 'http://localhost:8080',
+    // Пояс пользователей платформы (DECISION-002): даты в сценариях не зависят от пояса runner'а
+    timezoneId: 'Asia/Krasnoyarsk',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
