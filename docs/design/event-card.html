@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Образец карточки события в трёх темах</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #dfe6e5;
+      color: #14212b;
+      font-family: var(--font-text);
+      line-height: var(--lh-text);
+    }
+
+    .page {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+
+    .page > h1 {
+      font-family: var(--font-display);
+      font-size: 1.75rem;
+      line-height: var(--lh-tight);
+      margin: 0 0 8px;
+    }
+
+    .page > p {
+      max-width: 70ch;
+      margin: 0 0 24px;
+    }
+
+    .frames {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 32px 24px;
+      align-items: flex-start;
+    }
+
+    /* Рамка темы: ширина 360 px — самая узкая из проверяемых в ТЗ (2.8) */
+    .theme-frame {
+      width: 360px;
+      max-width: 100%;
+      background: var(--color-paper);
+      color: var(--color-ink);
+      font-family: var(--font-text);
+      font-size: var(--fs-body);
+      line-height: var(--lh-text);
+      padding: var(--space-4);
+      border-radius: var(--radius-card);
+    }
+
+    .frame-name {
+      font-size: var(--fs-caption);
+      color: var(--color-ink-muted);
+      margin: 0 0 var(--space-3);
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    /* Пиктограммы: сетка 24, линия 2, цвет — currentColor */
+    .icon {
+      width: 1.25em;
+      height: 1.25em;
+      flex: none;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Карточка события */
+    .event-card {
+      background: var(--color-surface);
+      border: var(--border-width) solid var(--color-line);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+    }
+
+    .cover {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 2 / 1;
+      background: var(--cover-endurance);
+      border-bottom: var(--border-width) solid var(--color-line);
+    }
+
+    .cover .tone { stroke: var(--cover-endurance-tone); stroke-width: 3; fill: none; }
+    .cover .fill { fill: var(--cover-endurance-tone); fill-opacity: var(--cover-fill-opacity); stroke: var(--cover-endurance-tone); stroke-width: 3; }
+    .cover .soft { fill: var(--color-surface); fill-opacity: var(--cover-fill-opacity); stroke: var(--cover-endurance-tone); stroke-width: 3; }
+    .cover .sun { fill: var(--color-marker); fill-opacity: var(--cover-fill-opacity); stroke: var(--cover-endurance-tone); stroke-width: 3; }
+
+    .card-body > * { min-width: 0; }
+
+    .card-body {
+      display: grid;
+      gap: var(--space-4);
+      padding: var(--space-4);
+    }
+
+    .sport {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin: 0 0 calc(var(--space-2) * -1);
+      font-size: var(--fs-caption);
+      font-weight: 600;
+      color: var(--cover-endurance-tone);
+    }
+
+    [data-theme="contrast"] .sport { color: var(--color-ink); }
+
+    .event-title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: var(--fs-title);
+      line-height: var(--lh-tight);
+      overflow-wrap: anywhere;
+    }
+
+    /* Листок даты */
+    .when {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    .date-leaf {
+      flex: none;
+      display: grid;
+      justify-items: center;
+      width: calc(4.5rem * var(--text-scale));
+      border: 2px solid var(--color-ink);
+      border-radius: var(--radius-control);
+      background: var(--color-surface);
+      overflow: hidden;
+      text-align: center;
+    }
+
+    .leaf-month {
+      position: relative;
+      width: 100%;
+      padding: var(--space-2) 0 var(--space-1);
+      background: var(--color-marker);
+      color: var(--color-on-marker);
+      font-size: var(--fs-caption);
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    /* Пробивки отрывного календаря */
+    .leaf-month::before,
+    .leaf-month::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-ink);
+    }
+
+    .leaf-month::before { left: 22%; }
+    .leaf-month::after { right: 22%; }
+
+    .leaf-day {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: var(--fs-display);
+      line-height: 1.1;
+      padding-top: var(--space-1);
+    }
+
+    .leaf-weekday {
+      font-size: var(--fs-caption);
+      color: var(--color-ink-muted);
+      padding-bottom: var(--space-2);
+      line-height: 1;
+    }
+
+    .when-text {
+      display: grid;
+      gap: var(--space-1);
+    }
+
+    .when-time,
+    .when-relative {
+      white-space: nowrap;
+    }
+
+    .when-time {
+      font-size: var(--fs-lead);
+      font-weight: 600;
+    }
+
+    .when-relative {
+      color: var(--color-ink-muted);
+    }
+
+    .place {
+      display: flex;
+      gap: var(--space-2);
+      margin: 0;
+    }
+
+    .place .icon { margin-top: 0.1em; color: var(--color-primary); }
+    [data-theme="contrast"] .place .icon { color: var(--color-ink); }
+
+    /* Шкала уровня: три растущих деления и подпись выбранного уровня */
+    .level {
+      display: flex;
+      align-items: flex-end;
+      gap: var(--space-3);
+    }
+
+    .level-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: var(--space-1);
+    }
+
+    .level-bars i {
+      width: calc(0.75rem * var(--text-scale));
+      border: 2px solid var(--color-line-strong);
+      border-radius: 3px;
+      background: var(--color-surface);
+    }
+
+    .level-bars i:nth-child(1) { height: calc(0.875rem * var(--text-scale)); }
+    .level-bars i:nth-child(2) { height: calc(1.25rem * var(--text-scale)); }
+    .level-bars i:nth-child(3) { height: calc(1.625rem * var(--text-scale)); }
+
+    .level-bars i[data-on] {
+      border-color: var(--color-ink);
+      background: var(--color-marker);
+    }
+
+    .level-name {
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    /* Места */
+    .seats {
+      display: grid;
+      gap: var(--space-2);
+    }
+
+    .seat-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-1);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .seat-row li {
+      width: calc(1.125rem * var(--text-scale));
+      height: calc(1.125rem * var(--text-scale));
+      border-radius: 50%;
+      border: 2px solid var(--color-primary);
+      background: var(--color-primary);
+    }
+
+    .seat-row li[data-free] {
+      background: var(--color-surface);
+    }
+
+    .seats-line {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: var(--space-2) var(--space-4);
+    }
+
+    .seats-text { font-weight: 600; }
+
+    /* Статус: текст + иконка + цвет */
+    .status {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-control);
+      border: var(--border-width) solid currentColor;
+      font-weight: 600;
+    }
+
+    .status--ok { color: var(--status-ok-fg); background: var(--status-ok-bg); }
+    .status--wait { color: var(--status-wait-fg); background: var(--status-wait-bg); }
+    .status--queue { color: var(--status-queue-fg); background: var(--status-queue-bg); }
+    .status--bad { color: var(--status-bad-fg); background: var(--status-bad-bg); }
+    .status--warn { color: var(--status-warn-fg); background: var(--status-warn-bg); }
+    .status--off { color: var(--status-off-fg); background: var(--status-off-bg); }
+
+    .status-text { flex: 1; }
+
+    .mode-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-1);
+      font-size: var(--fs-caption);
+      font-weight: 600;
+      color: var(--color-ink);
+      white-space: nowrap;
+    }
+
+    /* Главная кнопка */
+    .btn-primary {
+      min-height: var(--tap-min);
+      padding: var(--space-3) var(--space-5);
+      border: 2px solid var(--color-primary);
+      border-radius: var(--radius-control);
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color var(--motion-fast) ease-out;
+    }
+
+    .btn-primary:hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
+
+    :focus-visible {
+      outline: var(--focus-ring);
+      outline-offset: var(--focus-offset);
+    }
+
+    /* Раскрывающиеся блоки */
+    .more {
+      border-top: var(--border-width) solid var(--color-line);
+    }
+
+    .more summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: var(--tap-min);
+      padding: var(--space-2) var(--space-4);
+      font-weight: 600;
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .more summary::-webkit-details-marker { display: none; }
+    .more summary .icon { transition: transform var(--motion-base) ease-out; }
+    .more[open] summary .icon { transform: rotate(180deg); }
+    .more summary:focus-visible { outline-offset: -3px; }
+
+    .more-body {
+      padding: 0 var(--space-4) var(--space-4);
+    }
+
+    .more-body p { margin: 0; }
+
+    .things {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-3) var(--space-4);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .things li {
+      display: grid;
+      justify-items: center;
+      gap: var(--space-1);
+      font-size: var(--fs-caption);
+    }
+
+    /* Статусы записи и степпер — витрина под карточкой */
+    .gallery {
+      display: grid;
+      gap: var(--space-3);
+      margin-top: var(--space-5);
+    }
+
+    .gallery h3 {
+      margin: 0;
+      font-size: var(--fs-body);
+    }
+
+    .stepper {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: none;
+    }
+
+    .stepper li {
+      position: relative;
+      display: grid;
+      justify-items: center;
+      gap: var(--space-1);
+      font-size: var(--fs-caption);
+      text-align: center;
+      color: var(--color-ink-muted);
+    }
+
+    /* Линия между шагами */
+    .stepper li + li::before {
+      content: "";
+      position: absolute;
+      top: calc(1.125rem * var(--text-scale));
+      right: 50%;
+      width: 100%;
+      height: 2px;
+      background: var(--color-line-strong);
+      z-index: 0;
+    }
+
+    .stepper li[data-state="done"] + li::before { background: var(--status-ok-fg); }
+
+    .step-dot {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      width: calc(2.25rem * var(--text-scale));
+      height: calc(2.25rem * var(--text-scale));
+      border-radius: 50%;
+      border: 2px solid var(--color-line-strong);
+      background: var(--color-surface);
+    }
+
+    .stepper li[data-state="done"] { color: var(--status-ok-fg); }
+    .stepper li[data-state="done"] .step-dot { border-color: var(--status-ok-fg); background: var(--status-ok-bg); }
+    .stepper li[data-state="current"] { color: var(--status-wait-fg); font-weight: 700; }
+    .stepper li[data-state="current"] .step-dot { border-color: var(--status-wait-fg); background: var(--status-wait-bg); border-width: 3px; }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <!-- Пиктограммы Lucide (lucide.dev, лицензия ISC) -->
+    <symbol id="i-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
+    <symbol id="i-queue" viewBox="0 0 24 24"><path d="M10 12h11"/><path d="M10 18h11"/><path d="M10 6h11"/><path d="M4 10h2"/><path d="M4 6h1v4"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></symbol>
+    <symbol id="i-door" viewBox="0 0 24 24"><path d="M11 20H2"/><path d="M11 4.562v16.157a1 1 0 0 0 1.242.97L19 20V5.562a2 2 0 0 0-1.515-1.94l-4-1A2 2 0 0 0 11 4.561z"/><path d="M11 4H8a2 2 0 0 0-2 2v14"/><path d="M14 12h.01"/><path d="M22 20h-3"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-shirt" viewBox="0 0 24 24"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></symbol>
+    <symbol id="i-water" viewBox="0 0 24 24"><path d="M5.116 4.104A1 1 0 0 1 6.11 3h11.78a1 1 0 0 1 .994 1.105L17.19 20.21A2 2 0 0 1 15.2 22H8.8a2 2 0 0 1-2-1.79z"/><path d="M6 12a5 5 0 0 1 6 0 5 5 0 0 0 6 0"/></symbol>
+    <symbol id="i-shoes" viewBox="0 0 24 24"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></symbol>
+  </svg>
+
+  <main class="page">
+    <h1>Карточка события в трёх темах</h1>
+    <p>Первый экран карточки на ширине 360&nbsp;px: обложка, название, листок даты, место, уровень, места, статус и одна главная кнопка. Описание и условия раскрываются по нажатию. Правила — в <a href="../design.md">docs/design.md</a>.</p>
+
+    <div class="frames">
+      <template id="card">
+        <article class="event-card" aria-labelledby="">
+          <svg class="cover" viewBox="0 0 320 160" aria-hidden="true" focusable="false">
+            <!-- Выносливость: берег, река, бегущая тропа и солнце -->
+            <circle class="sun" cx="262" cy="42" r="20"/>
+            <path class="soft" d="M-4 112 Q 60 92 120 104 T 240 98 T 324 104 V 164 H -4 Z"/>
+            <path class="tone" d="M-4 128 Q 40 120 80 128 T 160 128 T 240 128 T 324 128"/>
+            <path class="tone" d="M-4 144 Q 40 136 80 144 T 160 144 T 240 144 T 324 144"/>
+            <path class="fill" d="M60 104 C 90 70 140 64 196 78 C 214 82 226 92 232 100 Z"/>
+            <path class="tone" stroke-dasharray="2 10" stroke-linecap="round" d="M28 98 C 80 50 170 40 250 74"/>
+          </svg>
+          <div class="card-body">
+            <p class="sport">Бег</p>
+            <h2 class="event-title">Пробежка 5&nbsp;км на Татышеве</h2>
+
+            <div class="when">
+              <time class="date-leaf" datetime="2026-10-21T07:30+07:00" aria-label="Среда, 21 октября">
+                <span class="leaf-month" aria-hidden="true">окт</span>
+                <span class="leaf-day" aria-hidden="true">21</span>
+                <span class="leaf-weekday" aria-hidden="true">ср</span>
+              </time>
+              <div class="when-text">
+                <span class="when-time">07:30–08:30</span>
+                <span class="when-relative">через 2 дня</span>
+              </div>
+            </div>
+
+            <p class="place">
+              <svg class="icon" aria-hidden="true"><use href="#i-map-pin"/></svg>
+              <span>Остров Татышев, у центрального входа</span>
+            </p>
+
+            <div class="level">
+              <span class="level-bars" aria-hidden="true"><i></i><i data-on></i><i></i></span>
+              <span class="level-name"><span class="visually-hidden">Уровень: </span>Любитель</span>
+            </div>
+
+            <div class="seats">
+              <ul class="seat-row" aria-hidden="true">
+                <li></li><li></li><li></li><li></li><li></li><li></li><li></li>
+                <li data-free></li><li data-free></li><li data-free></li>
+              </ul>
+              <div class="seats-line">
+                <span class="seats-text">Осталось 3 из 10</span>
+                <span class="mode-badge">
+                  <svg class="icon" aria-hidden="true"><use href="#i-door"/></svg>
+                  Свободно
+                </span>
+              </div>
+            </div>
+
+            <div class="status status--ok">
+              <svg class="icon" aria-hidden="true"><use href="#i-flag"/></svg>
+              <span class="status-text">Набор открыт</span>
+            </div>
+
+            <button class="btn-primary" type="button">Записаться</button>
+          </div>
+
+          <details class="more">
+            <summary>Об активности <svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+            <div class="more-body">
+              <p>Лёгкий темп, 5&nbsp;км по кругу острова. Ждём всех, кто бегает хотя бы раз в неделю. Организатор — Игорь.</p>
+            </div>
+          </details>
+          <details class="more">
+            <summary>Условия <svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+            <div class="more-body">
+              <ul class="things" aria-label="Что взять с собой">
+                <li><svg class="icon" aria-hidden="true"><use href="#i-shirt"/></svg>Форма</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-water"/></svg>Вода</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-shoes"/></svg>Обувь</li>
+              </ul>
+            </div>
+          </details>
+        </article>
+
+        <section class="gallery" aria-label="Статусы записи">
+          <h3>Статус записи</h3>
+          <div class="status status--wait"><svg class="icon" aria-hidden="true"><use href="#i-hourglass"/></svg><span class="status-text">Заявка на рассмотрении</span></div>
+          <div class="status status--ok"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span class="status-text">Вы участник</span></div>
+          <div class="status status--queue"><svg class="icon" aria-hidden="true"><use href="#i-queue"/></svg><span class="status-text">Вы в листе ожидания, ваша позиция: 2</span></div>
+          <div class="status status--bad"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg><span class="status-text">Заявка отклонена</span></div>
+          <div class="status status--off"><svg class="icon" aria-hidden="true"><use href="#i-undo"/></svg><span class="status-text">Вы отменили запись</span></div>
+
+          <ol class="stepper" aria-label="Ход заявки: шаг 2 из 3, решение организатора">
+            <li data-state="done"><span class="step-dot"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span>Заявка</li>
+            <li data-state="current" aria-current="step"><span class="step-dot"><svg class="icon" aria-hidden="true"><use href="#i-hourglass"/></svg></span>Решение</li>
+            <li><span class="step-dot"></span>Вы участник</li>
+          </ol>
+        </section>
+      </template>
+
+      <section class="theme-frame" data-theme="default" data-text="normal">
+        <p class="frame-name">Обычная тема</p>
+      </section>
+      <section class="theme-frame" data-theme="default" data-text="large">
+        <p class="frame-name">Крупный текст (+25&nbsp;%)</p>
+      </section>
+      <section class="theme-frame" data-theme="contrast" data-text="normal">
+        <p class="frame-name">Высокий контраст</p>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    // Одна разметка карточки — три темы
+    const tpl = document.getElementById('card');
+    document.querySelectorAll('.theme-frame').forEach((frame, i) => {
+      const copy = tpl.content.cloneNode(true);
+      const title = copy.querySelector('.event-title');
+      title.id = 'card-title-' + i;
+      copy.querySelector('.event-card').setAttribute('aria-labelledby', title.id);
+      frame.append(copy);
+    });
+  </script>
+</body>
+</html>
