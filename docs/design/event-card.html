@@ -25,12 +25,15 @@
       padding: 24px 16px 48px;
     }
 
-    .page > h1 {
+    .page h1,
+    .page > h2 {
       font-family: var(--font-display);
-      font-size: 1.75rem;
       line-height: var(--lh-tight);
       margin: 0 0 8px;
     }
+
+    .page h1 { font-size: 1.75rem; }
+    .page > h2 { font-size: 1.25rem; margin-top: 40px; }
 
     .page > p {
       max-width: 70ch;
@@ -44,24 +47,110 @@
       align-items: flex-start;
     }
 
-    /* Рамка темы: ширина 360 px — самая узкая из проверяемых в ТЗ (2.8) */
-    .theme-frame {
+    .frame {
       width: 360px;
       max-width: 100%;
-      background: var(--color-paper);
-      color: var(--color-ink);
-      font-family: var(--font-text);
-      font-size: var(--fs-body);
-      line-height: var(--lh-text);
-      padding: var(--space-4);
-      border-radius: var(--radius-card);
     }
 
     .frame-name {
+      font-size: 0.9375rem;
+      color: #4a5a66;
+      margin: 0 0 8px;
+    }
+
+    /* Экран телефона: 360×700 CSS px — шапка, прокручиваемая область, нижняя панель (2.8) */
+    .phone {
+      display: flex;
+      flex-direction: column;
+      height: 700px;
+      background: var(--color-paper);
+      color: var(--color-ink);
+      font-family: var(--font-text);
+      line-height: var(--lh-text);
+      border: 1px solid #b9c4c8;
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .app-bar {
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      height: calc(3.5rem * var(--text-scale));
+      padding: 0 var(--space-2) 0 var(--space-4);
+      background: var(--color-surface);
+      border-bottom: var(--border-width) solid var(--color-line);
+    }
+
+    .who {
+      flex: 1;
+      min-width: 0;
       font-size: var(--fs-caption);
       color: var(--color-ink-muted);
-      margin: 0 0 var(--space-3);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+
+    .who b { color: var(--color-ink); }
+
+    .icon-btn {
+      display: grid;
+      place-items: center;
+      min-width: 44px;
+      height: 44px;
+      padding: 0 var(--space-2);
+      border: var(--border-width) solid var(--color-line-strong);
+      border-radius: var(--radius-control);
+      background: var(--color-surface);
+      color: var(--color-ink);
+      font: inherit;
+      font-size: var(--fs-caption);
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .icon-btn[aria-pressed="true"] {
+      border-color: var(--color-ink);
+      background: var(--color-marker);
+      color: var(--color-on-marker);
+    }
+
+    .screen {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--space-3);
+    }
+
+    .tab-bar {
+      flex: none;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      background: var(--color-surface);
+      border-top: var(--border-width) solid var(--color-line);
+    }
+
+    .tab-bar a {
+      display: grid;
+      justify-items: center;
+      align-content: center;
+      gap: 2px;
+      min-height: 64px;
+      padding: var(--space-1) 0;
+      color: var(--color-ink-muted);
+      font-size: 0.75rem;
+      line-height: 1.2;
+      text-decoration: none;
+      text-align: center;
+    }
+
+    .tab-bar a[aria-current="page"] {
+      color: var(--color-primary);
+      font-weight: 700;
+    }
+
+    [data-theme="contrast"] .tab-bar a[aria-current="page"] { color: var(--color-marker); }
 
     .visually-hidden {
       position: absolute;
@@ -84,23 +173,32 @@
       stroke-linejoin: round;
     }
 
-    /* Карточка события */
+    /* Карточка события. overflow: clip, а не hidden — иначе не работает закреплённая кнопка */
     .event-card {
       background: var(--color-surface);
       border: var(--border-width) solid var(--color-line);
       border-radius: var(--radius-card);
       box-shadow: var(--shadow-card);
-      overflow: hidden;
+      overflow: clip;
     }
 
+    /* Обложка — полоса 3:1, рисунок 16:9 вписан целиком, по бокам фон группы */
     .cover {
       display: block;
       width: 100%;
-      height: auto;
-      aspect-ratio: 16 / 9;
+      aspect-ratio: 3 / 1;
+      overflow: hidden;
       background: var(--cover-endurance);
       color: var(--color-ink);
       border-bottom: var(--border-width) solid var(--color-line);
+    }
+
+    .cover img,
+    .cover svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
     }
 
     .cover--outline { display: none; }
@@ -111,17 +209,29 @@
 
     .card-body {
       display: grid;
-      gap: var(--space-4);
-      padding: var(--space-4);
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4) var(--space-4);
+    }
+
+    .heading {
+      display: grid;
+      gap: var(--space-1);
+    }
+
+    /* Направление слева, режим записи справа */
+    .heading-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-1) var(--space-3);
     }
 
     .sport {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
-      margin: 0 0 calc(var(--space-2) * -1);
+      margin: 0;
       font-size: var(--fs-caption);
       font-weight: 600;
+      line-height: 1.2;
       color: var(--cover-endurance-tone);
     }
 
@@ -196,10 +306,15 @@
       line-height: 1;
     }
 
+    /* В «Крупном тексте» колонка времени и уровня переносится под листок, если не помещается */
+    [data-text="large"] .when { flex-wrap: wrap; }
+
     .when-text {
       display: grid;
       gap: var(--space-1);
     }
+
+    .when-text .level { margin-top: var(--space-1); }
 
     .when-time,
     .when-relative {
@@ -259,10 +374,23 @@
       line-height: 1;
     }
 
+    .mode-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-1);
+      font-size: var(--fs-caption);
+      font-weight: 600;
+      line-height: 1;
+      color: var(--color-ink);
+      white-space: nowrap;
+    }
+
     /* Места */
     .seats {
-      display: grid;
-      gap: var(--space-2);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-2) var(--space-3);
     }
 
     .seat-row {
@@ -287,13 +415,6 @@
       background: var(--color-surface);
     }
 
-    .seats-line {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      gap: var(--space-2) var(--space-4);
-    }
-
     .seats-text { font-weight: 600; }
 
     /* Статус: текст + иконка + цвет */
@@ -307,6 +428,9 @@
       font-weight: 600;
     }
 
+    /* Плашка в карточке — компактная: отступы 8×12 */
+    .card-body .status { padding: var(--space-2) var(--space-3); }
+
     .status--ok { color: var(--status-ok-fg); background: var(--status-ok-bg); }
     .status--wait { color: var(--status-wait-fg); background: var(--status-wait-bg); }
     .status--queue { color: var(--status-queue-fg); background: var(--status-queue-bg); }
@@ -319,17 +443,22 @@
     /* Иконка по первой строке текста: (1.45em − 1.25em) / 2 */
     .status .icon { margin-top: 0.1em; }
 
-    .mode-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-1);
-      font-size: var(--fs-caption);
-      font-weight: 600;
-      color: var(--color-ink);
-      white-space: nowrap;
+    /* Главная кнопка */
+    .card-action {
+      display: grid;
     }
 
-    /* Главная кнопка */
+    /* «Крупный текст»: первый экран прокручивается, кнопка закреплена над нижней панелью */
+    [data-text="large"] .card-action {
+      position: sticky;
+      bottom: 0;
+      z-index: 1;
+      margin: 0 calc(var(--space-4) * -1) calc(var(--space-4) * -1);
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-surface);
+      border-top: var(--border-width) solid var(--color-line);
+    }
+
     .btn-primary {
       min-height: var(--tap-min);
       padding: var(--space-3) var(--space-5);
@@ -377,16 +506,16 @@
 
     .more-body p { margin: 0; }
 
-    /* Статусы записи и степпер — витрина под карточкой */
-    .gallery {
+    /* Витрина статусов записи и степпера */
+    .panel {
       display: grid;
       gap: var(--space-3);
-      margin-top: var(--space-5);
-    }
-
-    .gallery h3 {
-      margin: 0;
-      font-size: var(--fs-body);
+      padding: var(--space-4);
+      border-radius: var(--radius-card);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      font-family: var(--font-text);
+      line-height: var(--lh-text);
     }
 
     .stepper {
@@ -395,7 +524,6 @@
       margin: 0;
       padding: 0;
       list-style: none;
-      counter-reset: none;
     }
 
     .stepper li {
@@ -442,7 +570,7 @@
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <!-- Пиктограммы из apps/web/src/shared/illustrations/icons -->
+    <!-- Пиктограммы из apps/web/src/shared/illustrations/icons; стрелка и профиль нарисованы по тем же правилам -->
     <symbol id="i-location" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
     <symbol id="i-join" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7M19 8v6M16 11h6"/></symbol>
     <symbol id="i-mode-free" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></symbol>
@@ -452,27 +580,50 @@
     <symbol id="i-rejected" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></symbol>
     <symbol id="i-cancelled" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
     <symbol id="i-approve" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+    <symbol id="i-create" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/></symbol>
+    <symbol id="i-notify" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/></symbol>
+    <symbol id="i-profile" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></symbol>
+    <symbol id="i-contrast" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></symbol>
     <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
   </svg>
 
   <main class="page">
     <h1>Карточка события в трёх темах</h1>
-    <p>Первый экран карточки на ширине 360&nbsp;px: обложка, название, листок даты, место, уровень, места, статус и одна главная кнопка. Описание и условия раскрываются по нажатию. Правила — в <a href="../design.md">docs/design.md</a>.</p>
+    <p>Экран телефона 360×700 — видимая область браузера на телефоне 360×800: шапка, первый экран карточки и нижняя панель. Без прокрутки видны направление, дата, место, уровень, места, статус и главная кнопка. В «Крупном тексте» карточка прокручивается, а кнопка закреплена над панелью. Правила — в <a href="../design.md">docs/design.md</a>.</p>
 
-    <div class="frames">
-      <template id="card">
-        <article class="event-card" aria-labelledby="">
-          <img class="cover cover--color" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='320' height='180' fill='%23FFE7D6'/%3E%3Ccircle cx='236' cy='56' r='40' fill='%23FFC69E'/%3E%3Cpath d='M28 158H64M84 158H120M140 158H176M196 158H232M252 158H292' fill='none' stroke='%234A2511' stroke-width='4'/%3E%3Crect x='86' y='124' width='156' height='18' rx='9' fill='%234A2511'/%3E%3Cpath d='M96 124V82Q96 70 108 70H138L150 92L196 100Q236 106 240 124Z' fill='%23FFFFFF' stroke='%234A2511' stroke-width='5'/%3E%3Cpath d='M124 84L138 78M132 96L146 90M142 106L156 100' fill='none' stroke='%234A2511' stroke-width='4'/%3E%3Cpath d='M54 96H74M44 112H72' fill='none' stroke='%234A2511' stroke-width='5'/%3E%3C/svg%3E" alt="Выносливость">
-          <svg class="cover cover--outline" viewBox="0 0 320 180" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Выносливость">
-            <path d="M28 158H64M84 158H120M140 158H176M196 158H232M252 158H292" fill="none" stroke="currentColor" stroke-width="4"/>
-            <rect x="86" y="124" width="156" height="18" rx="9" fill="none" stroke="currentColor" stroke-width="5"/>
-            <path d="M96 124V82Q96 70 108 70H138L150 92L196 100Q236 106 240 124Z" fill="none" stroke="currentColor" stroke-width="5"/>
-            <path d="M124 84L138 78M132 96L146 90M142 106L156 100" fill="none" stroke="currentColor" stroke-width="4"/>
-            <path d="M54 96H74M44 112H72" fill="none" stroke="currentColor" stroke-width="5"/>
-          </svg>
+    <template id="phone">
+      <header class="app-bar">
+        <span class="who">Вход: <b>Анна</b></span>
+        <button class="icon-btn" type="button" data-toggle="large" aria-pressed="false">А+<span class="visually-hidden"> Крупный текст</span></button>
+        <button class="icon-btn" type="button" data-toggle="contrast" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-contrast"/></svg><span class="visually-hidden">Высокий контраст</span></button>
+      </header>
+
+      <div class="screen">
+        <article class="event-card">
+          <div class="cover">
+            <img class="cover--color" alt="Выносливость" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='320' height='180' fill='%23FFE7D6'/%3E%3Ccircle cx='236' cy='56' r='40' fill='%23FFC69E'/%3E%3Cpath d='M28 158H64M84 158H120M140 158H176M196 158H232M252 158H292' fill='none' stroke='%234A2511' stroke-width='4'/%3E%3Crect x='86' y='124' width='156' height='18' rx='9' fill='%234A2511'/%3E%3Cpath d='M96 124V82Q96 70 108 70H138L150 92L196 100Q236 106 240 124Z' fill='%23FFFFFF' stroke='%234A2511' stroke-width='5'/%3E%3Cpath d='M124 84L138 78M132 96L146 90M142 106L156 100' fill='none' stroke='%234A2511' stroke-width='4'/%3E%3Cpath d='M54 96H74M44 112H72' fill='none' stroke='%234A2511' stroke-width='5'/%3E%3C/svg%3E">
+            <svg class="cover--outline" viewBox="0 0 320 180" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Выносливость">
+              <path d="M28 158H64M84 158H120M140 158H176M196 158H232M252 158H292" fill="none" stroke="currentColor" stroke-width="4"/>
+              <rect x="86" y="124" width="156" height="18" rx="9" fill="none" stroke="currentColor" stroke-width="5"/>
+              <path d="M96 124V82Q96 70 108 70H138L150 92L196 100Q236 106 240 124Z" fill="none" stroke="currentColor" stroke-width="5"/>
+              <path d="M124 84L138 78M132 96L146 90M142 106L156 100" fill="none" stroke="currentColor" stroke-width="4"/>
+              <path d="M54 96H74M44 112H72" fill="none" stroke="currentColor" stroke-width="5"/>
+            </svg>
+          </div>
+
           <div class="card-body">
-            <p class="sport">Бег</p>
-            <h2 class="event-title">Пробежка 5&nbsp;км на Татышеве</h2>
+            <div class="heading">
+              <div class="heading-line">
+                <p class="sport">Бег</p>
+                <span class="mode-badge">
+                  <svg class="icon" aria-hidden="true"><use href="#i-mode-free"/></svg>
+                  Свободно
+                </span>
+              </div>
+              <h2 class="event-title">Пробежка 5&nbsp;км на Татышеве</h2>
+            </div>
 
             <div class="when">
               <time class="date-leaf" datetime="2026-10-21T07:30+07:00" aria-label="Среда, 21 октября">
@@ -483,6 +634,10 @@
               <div class="when-text">
                 <span class="when-time">07:30–08:30</span>
                 <span class="when-relative">через 2 дня</span>
+                <div class="level">
+                  <span class="level-bars" aria-hidden="true"><i></i><i data-on></i><i></i></span>
+                  <span class="level-name"><span class="visually-hidden">Уровень: </span>Любитель</span>
+                </div>
               </div>
             </div>
 
@@ -491,23 +646,12 @@
               <span>Остров Татышев, у центрального входа</span>
             </p>
 
-            <div class="level">
-              <span class="level-bars" aria-hidden="true"><i></i><i data-on></i><i></i></span>
-              <span class="level-name"><span class="visually-hidden">Уровень: </span>Любитель</span>
-            </div>
-
             <div class="seats">
               <ul class="seat-row" aria-hidden="true">
                 <li></li><li></li><li></li><li></li><li></li><li></li><li></li>
                 <li data-free></li><li data-free></li><li data-free></li>
               </ul>
-              <div class="seats-line">
-                <span class="seats-text">Осталось 3 из 10</span>
-                <span class="mode-badge">
-                  <svg class="icon" aria-hidden="true"><use href="#i-mode-free"/></svg>
-                  Свободно
-                </span>
-              </div>
+              <span class="seats-text">Осталось 3 из 10</span>
             </div>
 
             <div class="status status--ok">
@@ -515,7 +659,9 @@
               <span class="status-text">Набор открыт</span>
             </div>
 
-            <button class="btn-primary" type="button">Записаться</button>
+            <div class="card-action">
+              <button class="btn-primary" type="button">Записаться</button>
+            </div>
           </div>
 
           <details class="more">
@@ -531,45 +677,69 @@
             </div>
           </details>
         </article>
+      </div>
 
-        <section class="gallery" aria-label="Статусы записи">
-          <h3>Статус записи</h3>
-          <div class="status status--wait"><svg class="icon" aria-hidden="true"><use href="#i-pending"/></svg><span class="status-text">Заявка на рассмотрении</span></div>
-          <div class="status status--ok"><svg class="icon" aria-hidden="true"><use href="#i-confirmed"/></svg><span class="status-text">Вы участник</span></div>
-          <div class="status status--queue"><svg class="icon" aria-hidden="true"><use href="#i-waitlist"/></svg><span class="status-text">Вы в листе ожидания, ваша позиция: 2</span></div>
-          <div class="status status--bad"><svg class="icon" aria-hidden="true"><use href="#i-rejected"/></svg><span class="status-text">Заявка отклонена</span></div>
-          <div class="status status--off"><svg class="icon" aria-hidden="true"><use href="#i-cancelled"/></svg><span class="status-text">Вы отменили запись</span></div>
+      <nav class="tab-bar" aria-label="Основная навигация">
+        <a href="#" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>Найти</a>
+        <a href="#"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg>Мои записи</a>
+        <a href="#"><svg class="icon" aria-hidden="true"><use href="#i-create"/></svg>Создать</a>
+        <a href="#"><svg class="icon" aria-hidden="true"><use href="#i-notify"/></svg>Уведомления</a>
+        <a href="#"><svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg>Профиль</a>
+      </nav>
+    </template>
 
-          <ol class="stepper" aria-label="Ход заявки: шаг 2 из 3, решение организатора">
-            <li data-state="done"><span class="step-dot"><svg class="icon" aria-hidden="true"><use href="#i-approve"/></svg></span>Заявка</li>
-            <li data-state="current" aria-current="step"><span class="step-dot"><svg class="icon" aria-hidden="true"><use href="#i-pending"/></svg></span>Решение</li>
-            <li><span class="step-dot"></span>Вы участник</li>
-          </ol>
-        </section>
-      </template>
+    <template id="gallery">
+      <div class="status status--wait"><svg class="icon" aria-hidden="true"><use href="#i-pending"/></svg><span class="status-text">Заявка на рассмотрении</span></div>
+      <div class="status status--ok"><svg class="icon" aria-hidden="true"><use href="#i-confirmed"/></svg><span class="status-text">Вы участник</span></div>
+      <div class="status status--queue"><svg class="icon" aria-hidden="true"><use href="#i-waitlist"/></svg><span class="status-text">Вы в листе ожидания, ваша позиция: 2</span></div>
+      <div class="status status--bad"><svg class="icon" aria-hidden="true"><use href="#i-rejected"/></svg><span class="status-text">Заявка отклонена</span></div>
+      <div class="status status--off"><svg class="icon" aria-hidden="true"><use href="#i-cancelled"/></svg><span class="status-text">Вы отменили запись</span></div>
 
-      <section class="theme-frame" data-theme="default" data-text="normal">
+      <ol class="stepper" aria-label="Ход заявки: шаг 2 из 3, решение организатора">
+        <li data-state="done"><span class="step-dot"><svg class="icon" aria-hidden="true"><use href="#i-approve"/></svg></span>Заявка</li>
+        <li data-state="current" aria-current="step"><span class="step-dot"><svg class="icon" aria-hidden="true"><use href="#i-pending"/></svg></span>Решение</li>
+        <li><span class="step-dot"></span>Вы участник</li>
+      </ol>
+    </template>
+
+    <div class="frames">
+      <section class="frame">
         <p class="frame-name">Обычная тема</p>
+        <div class="phone" data-theme="default" data-text="normal"></div>
       </section>
-      <section class="theme-frame" data-theme="default" data-text="large">
+      <section class="frame">
         <p class="frame-name">Крупный текст (+25&nbsp;%)</p>
+        <div class="phone" data-theme="default" data-text="large"></div>
       </section>
-      <section class="theme-frame" data-theme="contrast" data-text="normal">
+      <section class="frame">
         <p class="frame-name">Высокий контраст</p>
+        <div class="phone" data-theme="contrast" data-text="normal"></div>
       </section>
+    </div>
+
+    <h2>Статус записи и степпер заявки</h2>
+    <div class="frames">
+      <section class="frame panel" data-theme="default" data-text="normal" aria-label="Обычная тема"></section>
+      <section class="frame panel" data-theme="default" data-text="large" aria-label="Крупный текст"></section>
+      <section class="frame panel" data-theme="contrast" data-text="normal" aria-label="Высокий контраст"></section>
     </div>
   </main>
 
   <script>
-    // Одна разметка карточки — три темы
-    const tpl = document.getElementById('card');
-    document.querySelectorAll('.theme-frame').forEach((frame, i) => {
-      const copy = tpl.content.cloneNode(true);
+    // Одна разметка — три темы
+    const phone = document.getElementById('phone');
+    document.querySelectorAll('.phone').forEach((frame, i) => {
+      const copy = phone.content.cloneNode(true);
       const title = copy.querySelector('.event-title');
       title.id = 'card-title-' + i;
       copy.querySelector('.event-card').setAttribute('aria-labelledby', title.id);
+      copy.querySelector('[data-toggle="large"]').setAttribute('aria-pressed', frame.dataset.text === 'large');
+      copy.querySelector('[data-toggle="contrast"]').setAttribute('aria-pressed', frame.dataset.theme === 'contrast');
       frame.append(copy);
     });
+
+    const gallery = document.getElementById('gallery');
+    document.querySelectorAll('.panel').forEach((panel) => panel.append(gallery.content.cloneNode(true)));
   </script>
 </body>
 </html>
