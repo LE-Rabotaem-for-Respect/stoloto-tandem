@@ -1,14 +1,9 @@
-import { ESLint } from 'eslint';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { projectEslint } from './lint';
 
-const root = resolve(__dirname, '../../..');
-const eslint = new ESLint({ cwd: root });
-
-async function importErrors(code: string, file: string) {
-  const [result] = await eslint.lintText(code, { filePath: resolve(root, file) });
-  return (result?.messages ?? []).filter((m) => m.ruleId === 'no-restricted-imports').length;
-}
+const ruleMessages = projectEslint();
+const importErrors = (code: string, file: string) =>
+  ruleMessages('no-restricted-imports', code, file);
 
 const onEvent = "import { OnEvent } from '@nestjs/event-emitter';\nexport { OnEvent };\n";
 
