@@ -39,6 +39,7 @@ export {
 export type { DemoAccountKey } from './accounts';
 export {
   TIME_ZONE,
+  calendarDayRange,
   dayRange,
   endOfDay,
   isToday,

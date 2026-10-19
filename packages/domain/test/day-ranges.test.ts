@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  calendarDayRange,
   dayRange,
   endOfDay,
   isToday,
@@ -110,4 +111,24 @@ describe('weekendRange', () => {
     // 2026-10-23 18:00 UTC — суббота 01:00 в Красноярске
     expect(weekendRange(at('2026-10-23T18:00:00Z'))).toEqual(weekend);
   });
+});
+
+describe('calendarDayRange: сутки календарной даты по Красноярску', () => {
+  it('2026-10-21 — с 17:00 UTC 20-го до 17:00 UTC 21-го', () => {
+    expect(calendarDayRange('2026-10-21')).toEqual({
+      from: new Date('2026-10-20T17:00:00Z'),
+      to: new Date('2026-10-21T17:00:00Z'),
+    });
+  });
+
+  it('последний день месяца переходит в следующий месяц', () => {
+    expect(calendarDayRange('2026-10-31')?.to).toEqual(new Date('2026-10-31T17:00:00Z'));
+  });
+
+  it.each(['2030-02-30', '2026-13-01', '2026-10-1', '21.10.2026', ''])(
+    '«%s» — не дата',
+    (value) => {
+      expect(calendarDayRange(value)).toBeNull();
+    },
+  );
 });

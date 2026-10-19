@@ -1,16 +1,19 @@
-import { EVENT_LEVELS, EVENT_MODES } from '@tandem/domain';
-import type { EventLevel, EventMode } from '@tandem/domain';
+import { EVENT_LEVELS, EVENT_MODES, SPORT_CATEGORIES } from '@tandem/domain';
+import type { EventLevel, EventMode, SportCategory } from '@tandem/domain';
 import { Transform, Type } from 'class-transformer';
 import {
   IsDate,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
   Length,
   Matches,
+  Max,
   MaxLength,
+  Min,
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
@@ -115,4 +118,75 @@ export class CreateEventDto {
 
   @IsIn(EVENT_LEVELS, { message: 'Выберите уровень' })
   level!: EventLevel;
+}
+
+export const FEED_DATES = ['today', 'tomorrow', 'weekend'] as const;
+export type FeedDate = (typeof FEED_DATES)[number];
+
+const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Лента и поиск (ТЗ 2.8, 4.5). Все фильтры необязательны и складываются через «и». */
+export class EventFeedQuery {
+  @IsOptional()
+  @trim()
+  @IsString({ message: 'Запрос — строка' })
+  @MaxLength(100, { message: 'Запрос — не длиннее 100 символов' })
+  @singleLine()
+  q?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Выберите направление из списка' })
+  sport?: string;
+
+  @IsOptional()
+  @IsIn(SPORT_CATEGORIES, { message: 'Выберите группу из списка' })
+  category?: SportCategory;
+
+  @IsOptional()
+  @IsIn(FEED_DATES, { message: 'Дата: сегодня, завтра или выходные' })
+  date?: FeedDate;
+
+  @IsOptional()
+  @Matches(CALENDAR_DATE, { message: 'Дата «с» — в виде ГГГГ-ММ-ДД' })
+  from?: string;
+
+  @IsOptional()
+  @Matches(CALENDAR_DATE, { message: 'Дата «по» — в виде ГГГГ-ММ-ДД' })
+  to?: string;
+
+  @IsOptional()
+  @trim()
+  @IsString({ message: 'Город — строка' })
+  @MaxLength(80, { message: 'Город — не длиннее 80 символов' })
+  @singleLine()
+  city?: string;
+
+  @IsOptional()
+  @trim()
+  @IsString({ message: 'Район — строка' })
+  @MaxLength(120, { message: 'Район — не длиннее 120 символов' })
+  @singleLine()
+  area?: string;
+
+  @IsOptional()
+  @IsIn(EVENT_LEVELS, { message: 'Выберите уровень' })
+  level?: EventLevel;
+
+  @IsOptional()
+  @IsIn(EVENT_MODES, { message: 'Выберите режим записи' })
+  mode?: EventMode;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Лимит — целое число' })
+  @Min(1, { message: 'Лимит — от 1 до 50' })
+  @Max(50, { message: 'Лимит — от 1 до 50' })
+  limit?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Смещение — целое число' })
+  @Min(0, { message: 'Смещение — от 0 до 10000' })
+  @Max(10_000, { message: 'Смещение — от 0 до 10000' })
+  offset?: number;
 }
