@@ -35,4 +35,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=5s --timeout=3s --start-period=30s --retries=10 \
   CMD wget -qO- http://127.0.0.1:3000/health || exit 1
 # Перед запуском применяются миграции; при ошибке api не стартует
-CMD ["sh", "-c", "npx prisma migrate deploy && exec node dist/main.js"]
+CMD ["sh", "-c", "/app/node_modules/.bin/prisma migrate deploy && exec node dist/main.js"]

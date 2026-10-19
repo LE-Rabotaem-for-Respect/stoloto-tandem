@@ -30,16 +30,22 @@ export default async function setup(project: TestProject) {
 
   const admin = createPrismaClient(serverUrl);
   await admin.$executeRawUnsafe(`CREATE DATABASE "${name}"`);
-
-  execSync('npx prisma migrate deploy', {
-    cwd: resolve(__dirname, '..'),
-    env: { ...process.env, DATABASE_URL: databaseUrl },
-    stdio: 'inherit',
-  });
-  project.provide('databaseUrl', databaseUrl);
-
-  return async () => {
+  const teardown = async () => {
     await admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
     await admin.$disconnect();
   };
+
+  try {
+    execSync('npx prisma migrate deploy', {
+      cwd: resolve(__dirname, '..'),
+      env: { ...process.env, DATABASE_URL: databaseUrl },
+      stdio: 'inherit',
+    });
+  } catch (error) {
+    await teardown();
+    throw error;
+  }
+  project.provide('databaseUrl', databaseUrl);
+
+  return teardown;
 }

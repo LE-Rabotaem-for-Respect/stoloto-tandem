@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-// Тесты на настоящей PostgreSQL: база из TEST_DATABASE_URL пересоздаётся перед прогоном
+// Тесты на настоящей PostgreSQL: на сервере из TEST_DATABASE_URL создаётся временная база
 export default defineConfig({
   test: {
     include: ['test-db/**/*.test.ts'],
