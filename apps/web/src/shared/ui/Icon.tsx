@@ -8,5 +8,7 @@ import type { IconName } from '../illustrations';
  */
 export function Icon({ name }: { name: IconName }) {
   const mask = `url("${iconUrl(name)}")`;
-  return <span className="icon" aria-hidden="true" style={{ maskImage: mask, WebkitMaskImage: mask }} />;
+  return (
+    <span className="icon" aria-hidden="true" style={{ maskImage: mask, WebkitMaskImage: mask }} />
+  );
 }
