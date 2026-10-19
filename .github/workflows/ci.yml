@@ -100,3 +100,45 @@ jobs:
       - name: Остановка
         if: always()
         run: docker compose down --volumes --rmi local
+
+  e2e:
+    # Сквозные тесты Playwright на поднятом Docker Compose; нужен Docker, как и заданию compose
+    runs-on: ${{ vars.CI_DOCKER_RUNNER || vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    env:
+      # Свои порты и имя проекта: не мешать заданию compose и стенду участника
+      COMPOSE_PROJECT_NAME: ci-e2e-${{ github.run_id }}
+      WEB_PORT: 18180
+      API_PORT: 13100
+      BASE_URL: http://localhost:18180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Браузер для Playwright
+        # На Linux нужны и системные библиотеки браузера; на Windows их ставить не нужно
+        run: npx playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium
+      - name: Запуск docker compose
+        run: docker compose up --build --detach --wait --wait-timeout 300
+      - name: Сквозные тесты
+        run: npm run e2e
+      - name: Отчёт, трейсы и скриншоты упавших тестов
+        if: failure()
+        uses: actions/upload-artifact@v4
+        # Хранилище артефактов может быть недоступно: это не должно скрыть итог тестов
+        continue-on-error: true
+        with:
+          name: e2e-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
+      - name: Логи сервисов
+        if: failure()
+        run: docker compose logs
+      - name: Остановка
+        if: always()
+        run: docker compose down --volumes --rmi local
