@@ -67,6 +67,10 @@ export class SportsRepository {
     return candidates.sort((a, b) => rank(a) - rank(b))[0] ?? null;
   }
 
+  findActiveById(id: string, tx?: Db): Promise<Sport | null> {
+    return (tx ?? this.prisma).sport.findFirst({ where: { id, status: 'active' } });
+  }
+
   /**
    * Новое пользовательское направление. Если то же имя одновременно добавил другой
    * запрос, возвращается его запись: вставка идёт с ON CONFLICT DO NOTHING, поэтому

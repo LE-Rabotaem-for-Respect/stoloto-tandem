@@ -49,3 +49,5 @@ export {
   weekendRange,
 } from './time';
 export type { TimeRange } from './time';
+export { EVENT_LEVELS, EVENT_LEVEL_TITLES } from './event-levels';
+export type { EventLevel } from './event-levels';
