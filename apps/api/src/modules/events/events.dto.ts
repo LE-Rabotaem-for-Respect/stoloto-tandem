@@ -16,7 +16,7 @@ import {
 } from 'class-validator';
 import { NewSportDto } from '../sports/sports.dto';
 
-const trim = () =>
+export const trim = () =>
   Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
 
 // Время приходит строкой ISO 8601 с поясом; «2026-10-21» без времени — не дата начала
@@ -40,7 +40,8 @@ const isoDate = () =>
 const HIDDEN_CHARS = 'В тексте есть недопустимые символы';
 const singleLine = () => Matches(/^[^\p{Cc}\p{Cf}]*$/u, { message: HIDDEN_CHARS });
 // В многострочном тексте из управляющих допустимы только перевод строки и табуляция
-const multiLine = () => Matches(/^(?:[^\p{Cc}\p{Cf}]|[\n\r\t])*$/u, { message: HIDDEN_CHARS });
+export const multiLine = () =>
+  Matches(/^(?:[^\p{Cc}\p{Cf}]|[\n\r\t])*$/u, { message: HIDDEN_CHARS });
 
 /**
  * Создание мероприятия (ТЗ 2.2). Организатор не вводится — его задаёт аккаунт.
