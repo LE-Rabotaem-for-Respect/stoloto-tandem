@@ -190,6 +190,24 @@ describe('POST /demo/clock — перемотка демо-часов', () => {
     });
   });
 
+  it('общий сдвиг не больше 10 лет: дальше — ошибка поля, сдвиг не меняется', async () => {
+    app = await startApp(true);
+    const nearLimit = 10 * 365 * 86_400 - 3_600;
+    await prisma.appState.update({ where: { id: true }, data: { clockOffsetSeconds: nearLimit } });
+    const response = await request(app.getHttpServer())
+      .post('/demo/clock')
+      .send({ addSeconds: 86_400 });
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      code: 'validation_failed',
+      fields: { addSeconds: expect.stringMatching(/[А-Яа-я]/) },
+    });
+    expect(await prisma.appState.findUniqueOrThrow({ where: { id: true } })).toMatchObject({
+      clockOffsetSeconds: nearLimit,
+    });
+    await request(app.getHttpServer()).post('/demo/reset');
+  });
+
   it.each([0, -3_600, 1.5, 400 * 86_400, 'час'])('отклоняет сдвиг %s', async (addSeconds) => {
     app = await startApp(true);
     const response = await request(app.getHttpServer()).post('/demo/clock').send({ addSeconds });

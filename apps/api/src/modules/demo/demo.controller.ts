@@ -1,6 +1,6 @@
 import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
 import { IsInt, Max, Min } from 'class-validator';
-import { DemoModeGuard } from './demo-mode.guard';
+import { DemoModeGuard } from '../auth/demo-mode.guard';
 import { DemoService } from './demo.service';
 
 /** Не дальше года вперёд: этого хватает, чтобы «завершить» любое демо-мероприятие. */

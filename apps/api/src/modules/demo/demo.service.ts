@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Clock } from '../../core/clock';
+import { ApiError } from '../../core/errors';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { hashPassword } from '../auth/password';
 import { clearDemoData, seedDemo } from './seed';
+
+/** Предел общего сдвига демо-часов: столбец сдвига в секундах — 32-битное число. */
+const MAX_TOTAL_SHIFT_SECONDS = 10 * 365 * 86_400;
 
 /** Пароль всех демо-аккаунтов (ТЗ 4.6). */
 const DEMO_PASSWORD = 'demo';
@@ -50,10 +54,16 @@ export class DemoService {
 
   /** «Перемотка времени»: сдвиг накапливается и хранится в базе стенда. */
   async shiftClock(addSeconds: number): Promise<Date> {
-    await this.prisma.appState.update({
-      where: { id: true },
+    // Проверка предела и запись — одним запросом, чтобы два нажатия подряд его не обошли
+    const { count } = await this.prisma.appState.updateMany({
+      where: { id: true, clockOffsetSeconds: { lte: MAX_TOTAL_SHIFT_SECONDS - addSeconds } },
       data: { clockOffsetSeconds: { increment: addSeconds } },
     });
+    if (count === 0) {
+      throw new ApiError('validation_failed', {
+        addSeconds: 'Часы уже сдвинуты почти на 10 лет — сбросьте демо-данные',
+      });
+    }
     await this.clock.refresh();
     return this.clock.now();
   }
