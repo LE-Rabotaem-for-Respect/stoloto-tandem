@@ -211,6 +211,7 @@ describe('GET /sports', () => {
 
   beforeAll(async () => {
     process.env.DATABASE_URL ??= 'postgresql://unused@127.0.0.1:1/unused';
+    process.env.SESSION_SECRET ??= 'test-session-secret-for-sports-route-only';
     repository.sports = [sport({ name: 'Скалолазание', normalizedName: 'скалолазание' })];
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(SportsRepository)
