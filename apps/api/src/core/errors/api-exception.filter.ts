@@ -15,6 +15,7 @@ export interface ErrorBody {
 
 /** То немногое от ответа Express, что нужно фильтру. */
 interface JsonResponse {
+  setHeader(name: string, value: string): void;
   status(code: number): { json(body: ErrorBody): void };
 }
 
@@ -94,10 +95,10 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const body = knownErrorBody(exception);
     if (!body) this.logger.error(logEntry(exception));
     const response = body ?? internal();
-    host
-      .switchToHttp()
-      .getResponse<JsonResponse>()
-      .status(ERROR_HTTP_STATUS[response.code])
-      .json(response);
+    const http = host.switchToHttp().getResponse<JsonResponse>();
+    if (exception instanceof ApiError && exception.retryAfterSeconds !== undefined) {
+      http.setHeader('Retry-After', String(exception.retryAfterSeconds));
+    }
+    http.status(ERROR_HTTP_STATUS[response.code]).json(response);
   }
 }

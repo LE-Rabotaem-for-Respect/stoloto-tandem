@@ -7,10 +7,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/configure-app';
 import { STAND_CONFIG } from '../src/core/config';
+import { AUTH_LIMITS } from '../src/modules/auth/attempt-limiter';
 import { hashPassword } from '../src/modules/auth/password';
 import { databaseUrl, prisma } from './db';
 
 const COOKIE = 'tandem_session';
+const many = { attempts: 10_000, windowMs: 60_000 };
+const UNLIMITED = { loginPerIp: many, loginPerEmail: many, registerPerIp: many };
 
 async function startApp(demoMode: boolean): Promise<INestApplication> {
   process.env.DATABASE_URL = databaseUrl;
@@ -18,6 +21,9 @@ async function startApp(demoMode: boolean): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(STAND_CONFIG)
     .useValue({ demoMode, standId: null })
+    // Лимиты попыток проверяет auth-limits.test.ts; здесь все запросы идут с одного адреса
+    .overrideProvider(AUTH_LIMITS)
+    .useValue(UNLIMITED)
     .compile();
   const app = configureApp(moduleRef.createNestApplication());
   await app.init();

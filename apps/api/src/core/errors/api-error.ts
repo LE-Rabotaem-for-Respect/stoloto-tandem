@@ -15,6 +15,8 @@ export class ApiError extends Error {
     readonly code: ErrorCode,
     readonly fields?: ErrorFields,
     message: string = errorMessage(code),
+    /** Через сколько секунд повторить — заголовок `Retry-After` (лимит попыток). */
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
   }
