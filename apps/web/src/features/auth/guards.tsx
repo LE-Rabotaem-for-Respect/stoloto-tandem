@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 import { useMe } from './api';
-import { loginPath } from './return-path';
+import { loginPath, pendingActionFrom } from './return-path';
+import type { PendingAction } from './return-path';
 
 /** Раздел только для вошедших: гостя отправляет на вход и возвращает сюда же. */
 export function RequireAuth({ children }: { children: ReactNode }) {
@@ -24,68 +25,41 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return children;
 }
 
-const PENDING_KEY = 'tandem-pending-action';
-
-interface PendingAction {
-  path: string;
-  intent: string;
-}
-
-function rememberAction(pending: PendingAction) {
-  try {
-    sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
-  } catch {
-    // Хранилище недоступно — после входа человек нажмёт кнопку сам
-  }
-}
-
 /**
- * Забирает отложенное действие, если его оставил клик гостя на этой странице
- * в этой вкладке. Метка одноразовая: вошедший человек на другой странице её
- * просто выбрасывает — брошенный когда-то вход не запустит действие позже.
- */
-function takeAction(path: string, intent: string): boolean {
-  try {
-    const raw = sessionStorage.getItem(PENDING_KEY);
-    if (!raw) return false;
-    const pending = JSON.parse(raw) as Partial<PendingAction>;
-    // Метку для другого действия этой же страницы забирает его собственный хук
-    if (pending.path === path && pending.intent !== intent) return false;
-    sessionStorage.removeItem(PENDING_KEY);
-    return pending.path === path;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Действие, которое гостю сначала предлагает войти (ТЗ 2.6). Клик гостя
- * запоминает действие в этой вкладке и ведёт на вход; вернувшись уже вошедшим,
- * страница выполняет то же действие сама. Адрес страницы действие не запускает:
- * ссылка, присланная вошедшему человеку, ничего не сделает за него.
+ * Действие, которое гостю сначала предлагает войти (ТЗ 2.6). Клик гостя ведёт на
+ * вход и несёт действие в `state` навигации; успешный вход возвращает его сюда,
+ * и страница выполняет его один раз, стирая из истории. Адрес страницы действие
+ * не запускает, а брошенный вход не оставляет ничего, что сработало бы позже.
  */
 export function useAuthAction(intent: string, action: () => void): () => void {
   const me = useMe();
   const location = useLocation();
   const navigate = useNavigate();
   const latest = useRef(action);
+  // Запись истории, чьё действие уже выполнено: StrictMode запускает эффект дважды
+  const done = useRef<string | null>(null);
 
   useEffect(() => {
     latest.current = action;
   });
 
   const signedIn = Boolean(me.data);
-  const { pathname, search } = location;
+  const { pathname, search, hash, key, state } = location;
   useEffect(() => {
-    if (signedIn && takeAction(pathname, intent)) latest.current();
-  }, [signedIn, pathname, intent]);
+    const pending = pendingActionFrom(state);
+    if (!signedIn || pending?.path !== pathname || pending.intent !== intent) return;
+    if (done.current === key) return;
+    done.current = key;
+    void navigate(pathname + search + hash, { replace: true, state: null });
+    latest.current();
+  }, [signedIn, pathname, search, hash, key, state, intent, navigate]);
 
   return () => {
     if (signedIn) {
       action();
       return;
     }
-    rememberAction({ path: pathname, intent });
-    void navigate(loginPath(pathname + search));
+    const pendingAction: PendingAction = { path: pathname, intent };
+    void navigate(loginPath(pathname + search), { state: { pendingAction } });
   };
 }

@@ -1,11 +1,12 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router';
+import { StrictMode } from 'react';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppProviders, AppRoutes, createQueryClient } from '../src/App';
 import { useAuthAction } from '../src/features/auth';
 import { AppLayout } from '../src/features/navigation/AppLayout';
-import { LoginPage } from '../src/pages/pages';
+import { LoginPage, RegisterPage } from '../src/pages/pages';
 
 interface Me {
   id: string;
@@ -201,6 +202,15 @@ describe('каркас приложения', () => {
   });
 });
 
+function BackButton() {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => void navigate(-1)}>
+      Назад
+    </button>
+  );
+}
+
 function JoinButton({ onJoin }: { onJoin(): void }) {
   const join = useAuthAction('join', onJoin);
   return (
@@ -250,26 +260,96 @@ describe('действие гостя', () => {
     expect(onJoin).not.toHaveBeenCalled();
   });
 
-  it('действие, отложенное на другой странице, здесь не выполняется', async () => {
-    fakeApi({ signedIn: anna });
-    sessionStorage.setItem(
-      'tandem-pending-action',
-      JSON.stringify({ path: '/events/2', intent: 'join' }),
-    );
+  it('брошенный вход позже ничего не делает сам', async () => {
+    fakeApi();
     const onJoin = vi.fn();
     renderApp(
       '/events/1',
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="events/:id" element={<JoinButton onJoin={onJoin} />} />
+          <Route
+            path="login"
+            element={
+              <>
+                <BackButton />
+                <LoginPage />
+              </>
+            }
+          />
         </Route>
       </Routes>,
     );
+
+    // Гость нажал «Записаться», на экране входа передумал и вернулся назад
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Назад' }));
+    // Позже вошёл через шапку и вернулся на ту же страницу
+    await userEvent.click(await screen.findByRole('link', { name: 'Войти' }));
+    await userEvent.type(await screen.findByLabelText('Почта'), 'anna@demo');
+    await userEvent.type(screen.getByLabelText('Пароль'), 'demo');
+    await userEvent.click(screen.getByRole('button', { name: 'Войти' }));
+
+    await screen.findByRole('button', { name: 'Записаться' });
     await screen.findByRole('button', { name: 'Сменить аккаунт' });
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(onJoin).not.toHaveBeenCalled();
-    // Брошенная метка выброшена — позже на той странице действие само не запустится
-    expect(sessionStorage.getItem('tandem-pending-action')).toBeNull();
+  });
+
+  it('действие переживает переход со входа на регистрацию и обратно', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp(
+      '/events/1',
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="events/:id" element={<JoinButton onJoin={onJoin} />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
+        </Route>
+      </Routes>,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Зарегистрироваться' }));
+    await screen.findByRole('heading', { name: 'Регистрация' });
+    const main = screen.getByRole('main');
+    await userEvent.click(within(main).getByRole('link', { name: 'Войти' }));
+    await userEvent.type(await screen.findByLabelText('Почта'), 'anna@demo');
+    await userEvent.type(screen.getByLabelText('Пароль'), 'demo');
+    await userEvent.click(screen.getByRole('button', { name: 'Войти' }));
+
+    await screen.findByRole('button', { name: 'Записаться' });
+    await waitFor(() => expect(onJoin).toHaveBeenCalledTimes(1));
+  });
+
+  it('под StrictMode отложенное действие выполняется ровно один раз', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    render(
+      <StrictMode>
+        <AppProviders client={createQueryClient()}>
+          <MemoryRouter initialEntries={['/events/1']}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="events/:id" element={<JoinButton onJoin={onJoin} />} />
+                <Route path="login" element={<LoginPage />} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </AppProviders>
+      </StrictMode>,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    await userEvent.type(await screen.findByLabelText('Почта'), 'anna@demo');
+    await userEvent.type(screen.getByLabelText('Пароль'), 'demo');
+    await userEvent.click(screen.getByRole('button', { name: 'Войти' }));
+
+    await screen.findByRole('button', { name: 'Записаться' });
+    await waitFor(() => expect(onJoin).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).toHaveBeenCalledTimes(1);
   });
 
   it('вошедший выполняет действие сразу', async () => {

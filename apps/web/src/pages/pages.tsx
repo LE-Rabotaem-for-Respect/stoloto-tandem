@@ -1,9 +1,10 @@
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
 import {
   LoginForm,
   QuickLogin,
   RegisterForm,
   RequireAuth,
+  pendingActionFrom,
   safeNext,
   useMe,
 } from '../features/auth';
@@ -11,12 +12,24 @@ import {
 function useReturnAfterSignIn() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const next = safeNext(params.get('next'));
-  return { next, done: () => void navigate(next, { replace: true }) };
+  // Отложенное действие гостя передаётся дальше только успешным входом и только на его страницу
+  const pending = pendingActionFrom(location.state);
+  const carry =
+    pending && new URL(next, window.location.origin).pathname === pending.path
+      ? { pendingAction: pending }
+      : null;
+  return {
+    next,
+    // Переход между входом и регистрацией несёт действие с собой
+    carry,
+    done: () => void navigate(next, { replace: true, state: carry }),
+  };
 }
 
 export function LoginPage() {
-  const { next, done } = useReturnAfterSignIn();
+  const { next, carry, done } = useReturnAfterSignIn();
   const me = useMe();
   // Уже вошедшему форма не нужна — сразу туда, куда он шёл
   if (me.data) return <Navigate to={next} replace />;
@@ -26,7 +39,10 @@ export function LoginPage() {
       <h1>Вход</h1>
       <LoginForm onSignedIn={done} />
       <p>
-        Нет аккаунта? <Link to={registerLink}>Зарегистрироваться</Link>
+        Нет аккаунта?{' '}
+        <Link to={registerLink} state={carry}>
+          Зарегистрироваться
+        </Link>
       </p>
       <QuickLogin onSignedIn={done} />
     </div>
@@ -34,7 +50,7 @@ export function LoginPage() {
 }
 
 export function RegisterPage() {
-  const { next, done } = useReturnAfterSignIn();
+  const { next, carry, done } = useReturnAfterSignIn();
   const me = useMe();
   if (me.data) return <Navigate to={next} replace />;
   const loginLink = next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`;
@@ -43,7 +59,10 @@ export function RegisterPage() {
       <h1>Регистрация</h1>
       <RegisterForm onSignedIn={done} />
       <p>
-        Уже есть аккаунт? <Link to={loginLink}>Войти</Link>
+        Уже есть аккаунт?{' '}
+        <Link to={loginLink} state={carry}>
+          Войти
+        </Link>
       </p>
     </div>
   );
