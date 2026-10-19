@@ -1,6 +1,8 @@
 services:
   db:
     image: postgres:17-alpine
+    # Стенды поднимаются сами после перезагрузки сервера
+    restart: unless-stopped
     environment:
       POSTGRES_DB: tandem
       POSTGRES_USER: tandem
@@ -17,6 +19,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
     environment:
       PORT: 3000
       DATABASE_URL: postgresql://tandem:${POSTGRES_PASSWORD:-tandem}@db:5432/tandem
@@ -40,6 +43,7 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
     depends_on:
       api:
         condition: service_healthy
