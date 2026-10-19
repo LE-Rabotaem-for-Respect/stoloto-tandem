@@ -169,7 +169,6 @@
         background: none;
         color: var(--color-primary);
         font: inherit;
-        font-size: var(--fs-caption);
         font-weight: 600;
         cursor: pointer;
       }
@@ -229,8 +228,8 @@
         min-height: 64px;
         padding: var(--space-1) 2px;
         color: var(--color-ink-muted);
-        font-size: calc(0.8125rem * var(--text-scale));
-        overflow-wrap: anywhere;
+        font-size: var(--fs-nav);
+        hyphens: manual;
         line-height: 1.2;
         text-decoration: none;
         text-align: center;
@@ -866,9 +865,9 @@
       <h1>Карточка события в трёх темах</h1>
       <p>
         Экран телефона 360×700 — видимая область браузера на телефоне 360×800: шапка, первый экран
-        карточки и нижняя панель. Без прокрутки видны направление, дата, место, уровень, места,
-        статус и главная кнопка. В «Крупном тексте» карточка прокручивается, а кнопка закреплена над
-        панелью. Правила — в <a href="../design.md">docs/design.md</a>.
+        карточки и нижняя панель. Без прокрутки видны направление, дата, место, уровень и места, а
+        статус и главная кнопка закреплены над нижней панелью во всех темах. В «Крупном тексте»
+        карточка прокручивается. Правила — в <a href="../design.md">docs/design.md</a>.
       </p>
 
       <template id="phone">
@@ -1032,10 +1031,10 @@
             ><svg class="icon" aria-hidden="true"><use href="#i-create" /></svg>Создать</a
           >
           <a href="#"
-            ><svg class="icon" aria-hidden="true"><use href="#i-notify" /></svg>Уведомления</a
+            ><svg class="icon" aria-hidden="true"><use href="#i-notify" /></svg>Уведом&shy;ления</a
           >
           <a href="#"
-            ><svg class="icon" aria-hidden="true"><use href="#i-profile" /></svg>Профиль</a
+            ><svg class="icon" aria-hidden="true"><use href="#i-profile" /></svg>Про&shy;филь</a
           >
         </nav>
       </template>
