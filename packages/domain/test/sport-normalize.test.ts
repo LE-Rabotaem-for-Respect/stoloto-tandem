@@ -55,6 +55,8 @@ describe('isValidSportName', () => {
     "Rock'n'roll",
     'Pétanque',
     'Тхэквондо (ВТФ)',
+    // Ударение над кириллицей не составляется в одну букву и остаётся одним знаком
+    `Па${String.fromCodePoint(0x301)}дел`,
   ])('«%s» — допустимо', (name) => {
     expect(isValidSportName(name)).toBe(true);
   });
@@ -68,7 +70,8 @@ describe('isValidSportName', () => {
     ['combining grapheme joiner U+034F', `Скры${String.fromCodePoint(0x34f)}тый`],
     ['хангыльский заполнитель U+3164', `Скры${String.fromCodePoint(0x3164)}тый`],
     ['селектор варианта U+FE0F', `Скрытый${String.fromCodePoint(0xfe0f)}`],
-    ['три комбинируемых знака подряд', `Па${String.fromCodePoint(0x300, 0x301, 0x302)}дел`],
+    ['два комбинируемых знака подряд', `Па${String.fromCodePoint(0x300, 0x301)}дел`],
+    ['«залго»: 30 знаков зачёркивания', `Скрытый${String.fromCodePoint(0x336).repeat(30)}`],
     ['знак в начале', '-Падел'],
     ['угловые скобки', '<b>Падел</b>'],
   ])('%s — недопустимо', (_, name) => {
