@@ -147,7 +147,13 @@ describe('метки доступа маршрутов приложения', ()
         'AuthController.logout',
         'AuthController.me',
         'ClockController.get',
+        'EventsController.create',
+        'EventsController.feed',
+        'EventsController.card',
         'HealthController.check',
+        'OrganizationsController.view',
+        'OrganizationsController.update',
+        'OrganizationsController.submit',
         'SportsController.search',
       ]),
     );
