@@ -9,6 +9,8 @@ describe('GET /health', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
+    // Маршрут не обращается к базе, а клиент Prisma подключается только при первом запросе
+    process.env.DATABASE_URL ??= 'postgresql://unused@127.0.0.1:1/unused';
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     await app.init();

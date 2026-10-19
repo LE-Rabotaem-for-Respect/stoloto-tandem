@@ -38,6 +38,27 @@ npm run start -w @tandem/api      # запуск API на http://localhost:3000
 npm run dev -w @tandem/web        # фронтенд на http://localhost:5173, /api проксируется на API
 ```
 
+API нужна PostgreSQL в `DATABASE_URL`. Её можно поднять отдельно:
+
+```sh
+docker run -d --name tandem-pg -p 127.0.0.1:5433:5432 \
+  -e POSTGRES_USER=tandem -e POSTGRES_PASSWORD=tandem -e POSTGRES_DB=tandem postgres:17-alpine
+export DATABASE_URL=postgresql://tandem:tandem@127.0.0.1:5433/tandem
+npm run migrate:deploy -w @tandem/api
+```
+
+## База данных
+
+Схема — `apps/api/prisma/schema.prisma`, миграции — `apps/api/prisma/migrations`.
+В Docker Compose api применяет миграции сам при каждом старте.
+
+- Изменить схему: правка `schema.prisma`, затем
+  `npm run migrate:dev -w @tandem/api -- --name <что изменено>`.
+- CHECK-ограничения (ровно один организатор, нормализованная почта, одна строка
+  настроек стенда) Prisma не описывает: они в ручной миграции `*_constraints`.
+- Частичные уникальные индексы (одна неотменённая запись на пару «событие —
+  пользователь») заданы в схеме через `where`.
+
 ## Проверки
 
 ```sh
@@ -45,6 +66,14 @@ npm run lint        # ESLint и Prettier
 npm run typecheck   # TypeScript в строгом режиме во всех пакетах
 npm test            # unit-тесты Vitest
 npm run build       # сборка всех пакетов
+```
+
+Тесты ограничений базы идут на настоящей PostgreSQL. Каждый прогон создаёт
+на сервере из `TEST_DATABASE_URL` свою временную базу, а после удаляет её.
+Существующие базы тесты не трогают.
+
+```sh
+TEST_DATABASE_URL=postgresql://tandem:tandem@127.0.0.1:5433/tandem npm run test:db
 ```
 
 Сквозные тесты идут против запущенного приложения:
@@ -55,7 +84,7 @@ npx playwright install chromium   # один раз
 npm run e2e                       # адрес меняется переменной BASE_URL
 ```
 
-Те же lint, типы, тесты и сборка выполняются в GitHub Actions на каждый
+Те же lint, типы, тесты, тесты базы и запуск compose выполняются в GitHub Actions на каждый
 PR в `prod` и push в `prod`.
 
 ## Графика

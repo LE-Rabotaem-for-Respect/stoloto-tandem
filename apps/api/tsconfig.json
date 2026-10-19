@@ -8,5 +8,12 @@
     "emitDecoratorMetadata": true,
     "noEmit": true
   },
-  "include": ["src", "test", "vitest.config.mts"]
+  "include": [
+    "src",
+    "test",
+    "test-db",
+    "prisma.config.ts",
+    "vitest.config.mts",
+    "vitest.db.config.mts"
+  ]
 }

@@ -1,0 +1,523 @@
+// Полная схема данных: сущности ТЗ 4.3 и 5.9 плюс служебные таблицы стенда.
+// Таблицы и столбцы — snake_case (@map), чтобы ручной SQL совпадал со схемой.
+// Ограничения, которых нет в Prisma (CHECK), — в миграции constraints.
+// Время бизнес-событий ставит сервис из Clock, поэтому у таких полей нет @default(now()).
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  moduleFormat    = "cjs"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  user
+  org
+  admin
+
+  @@map("user_role")
+}
+
+/// Уровень подготовки человека: в интересах и запросах «Ищу компанию»
+enum SkillLevel {
+  beginner
+  amateur
+  advanced
+
+  @@map("skill_level")
+}
+
+/// Уровень мероприятия: к уровням подготовки добавлен «Любой»
+enum EventLevel {
+  beginner
+  amateur
+  advanced
+  any
+
+  @@map("event_level")
+}
+
+enum SportCategory {
+  team
+  endurance
+  intellectual
+  martial
+  fitness
+  water
+  winter
+  other
+
+  @@map("sport_category")
+}
+
+enum SportStatus {
+  active
+  hidden
+
+  @@map("sport_status")
+}
+
+enum OrganizationStatus {
+  draft
+  pending
+  approved
+  rejected
+  needs_changes
+
+  @@map("organization_status")
+}
+
+enum EventStatus {
+  published
+  cancelled
+  unpublished
+  deleted
+
+  @@map("event_status")
+}
+
+enum EventMode {
+  free
+  approval
+
+  @@map("event_mode")
+}
+
+enum ParticipationStatus {
+  pending
+  confirmed
+  waitlist
+  rejected
+  cancelled
+
+  @@map("participation_status")
+}
+
+enum MessageStatus {
+  visible
+  hidden_by_moderator
+  deleted_by_moderator
+  deleted_by_author
+
+  @@map("message_status")
+}
+
+model User {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  role         UserRole @default(user)
+  name         String
+  /// Хранится нормализованным (обрезка, нижний регистр) — это проверяет CHECK
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  city         String?
+  bio          String?
+  /// Шрифт, контраст, уведомления
+  settings     Json     @default("{}")
+  createdAt    DateTime @map("created_at") @db.Timestamptz
+
+  sports                UserSport[]
+  organization          Organization?        @relation("OrganizationOwner")
+  decidedOrganizations  Organization[]       @relation("OrganizationDecider")
+  createdSports         Sport[]
+  organizedSeries       EventSeries[]
+  organizedEvents       Event[]
+  participations        Participation[]      @relation("ParticipationUser")
+  decidedParticipations Participation[]      @relation("ParticipationDecider")
+  messages              Message[]
+  notifications         Notification[]
+  companyRequests       CompanyRequest[]
+  moderationActions     ModerationLog[]
+  helfigochi            Helfigochi?
+  helfigochiLedger      HelfigochiLedger[]
+  accessories           UserAccessory[]
+  sessions              Session[]
+  calendarToken         CalendarToken?
+  seriesSubscriptions   SeriesSubscription[]
+
+  @@map("users")
+}
+
+/// Интересы пользователя
+model UserSport {
+  userId  String     @map("user_id") @db.Uuid
+  sportId String     @map("sport_id") @db.Uuid
+  level   SkillLevel
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sport Sport @relation(fields: [sportId], references: [id], onDelete: Restrict)
+
+  @@id([userId, sportId])
+  @@map("user_sports")
+}
+
+model Organization {
+  id                 String             @id @default(uuid(7)) @db.Uuid
+  ownerUserId        String             @unique @map("owner_user_id") @db.Uuid
+  name               String
+  description        String
+  city               String
+  /// Видны посторонним только после approved
+  contacts           String
+  website            String?
+  /// Видит только администратор
+  representativeName String             @map("representative_name")
+  representativeRole String             @map("representative_role")
+  status             OrganizationStatus @default(draft)
+  /// Когда профиль последний раз отправлен на проверку — порядок очереди в админке
+  submittedAt        DateTime?          @map("submitted_at") @db.Timestamptz
+  decisionReason     String?            @map("decision_reason")
+  decidedById        String?            @map("decided_by") @db.Uuid
+  decidedAt          DateTime?          @map("decided_at") @db.Timestamptz
+
+  owner     User                @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  decidedBy User?               @relation("OrganizationDecider", fields: [decidedById], references: [id], onDelete: Restrict)
+  sports    OrganizationSport[]
+  series    EventSeries[]
+  events    Event[]
+  messages  Message[]
+
+  @@index([status, submittedAt])
+  @@map("organizations")
+}
+
+model OrganizationSport {
+  organizationId String @map("organization_id") @db.Uuid
+  sportId        String @map("sport_id") @db.Uuid
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sport        Sport        @relation(fields: [sportId], references: [id], onDelete: Restrict)
+
+  @@id([organizationId, sportId])
+  @@map("organization_sports")
+}
+
+/// Каталог направлений (ТЗ 2.3)
+model Sport {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  name           String
+  /// Результат нормализации из packages/domain: обрезка, схлопывание пробелов, нижний регистр, ё → е
+  normalizedName String        @unique @map("normalized_name")
+  /// Нормализованные прежние и альтернативные названия
+  aliases        String[]      @default([])
+  category       SportCategory @default(other)
+  isCustom       Boolean       @default(false) @map("is_custom")
+  createdById    String?       @map("created_by") @db.Uuid
+  status         SportStatus   @default(active)
+
+  createdBy       User?               @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  users           UserSport[]
+  organizations   OrganizationSport[]
+  events          Event[]
+  companyRequests CompanyRequest[]
+  accessories     UserAccessory[]
+
+  @@map("sports")
+}
+
+/// Серия повторяющихся встреч (ТЗ 3.8). Организатор — ровно один из двух (CHECK)
+model EventSeries {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  organizerUserId String?  @map("organizer_user_id") @db.Uuid
+  organizerOrgId  String?  @map("organizer_org_id") @db.Uuid
+  /// Дни недели ISO: 1 — понедельник … 7 — воскресенье
+  weekdays        Int[]
+  until           DateTime @db.Timestamptz
+  createdAt       DateTime @map("created_at") @db.Timestamptz
+
+  organizerUser User?                @relation(fields: [organizerUserId], references: [id], onDelete: Restrict)
+  organizerOrg  Organization?        @relation(fields: [organizerOrgId], references: [id], onDelete: Restrict)
+  events        Event[]
+  subscriptions SeriesSubscription[]
+
+  @@map("event_series")
+}
+
+/// Мероприятие. Хранится только состояние автомата; «Завершено», «Мест нет»,
+/// «Перенесено», «Идёт» вычисляет displayStatus в packages/domain
+model Event {
+  id               String      @id @default(uuid(7)) @db.Uuid
+  /// Организатор — ровно один из двух (CHECK)
+  organizerUserId  String?     @map("organizer_user_id") @db.Uuid
+  organizerOrgId   String?     @map("organizer_org_id") @db.Uuid
+  sportId          String      @map("sport_id") @db.Uuid
+  seriesId         String?     @map("series_id") @db.Uuid
+  title            String
+  description      String
+  startsAt         DateTime    @map("starts_at") @db.Timestamptz
+  endsAt           DateTime    @map("ends_at") @db.Timestamptz
+  city             String
+  area             String
+  placeText        String      @map("place_text")
+  lat              Float?
+  lng              Float?
+  /// Видят только подтверждённые участники, организатор и администратор
+  participantInfo  String      @default("") @map("participant_info")
+  mode             EventMode   @default(free)
+  applyQuestion    String?     @map("apply_question")
+  /// null — без лимита мест
+  capacity         Int?
+  level            EventLevel  @default(any)
+  firstTimersOk    Boolean     @default(false) @map("first_timers_ok")
+  bring            String[]    @default([])
+  requirements     String      @default("")
+  /// Рубли, оплата на месте; 0 — бесплатно
+  price            Int         @default(0)
+  howItGoes        String      @default("") @map("how_it_goes")
+  status           EventStatus @default(published)
+  statusReason     String?     @map("status_reason")
+  statusChangedAt  DateTime    @map("status_changed_at") @db.Timestamptz
+  previousStartsAt DateTime?   @map("previous_starts_at") @db.Timestamptz
+  createdAt        DateTime    @map("created_at") @db.Timestamptz
+
+  organizerUser  User?           @relation(fields: [organizerUserId], references: [id], onDelete: Restrict)
+  organizerOrg   Organization?   @relation(fields: [organizerOrgId], references: [id], onDelete: Restrict)
+  sport          Sport           @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  series         EventSeries?    @relation(fields: [seriesId], references: [id], onDelete: Restrict)
+  participations Participation[]
+  messages       Message[]
+
+  @@index([status, startsAt])
+  @@index([sportId])
+  @@index([seriesId])
+  @@map("events")
+}
+
+/// Запись на мероприятие. Позиция в листе ожидания — порядок (created_at, id)
+model Participation {
+  id             String              @id @default(uuid(7)) @db.Uuid
+  eventId        String              @map("event_id") @db.Uuid
+  userId         String              @map("user_id") @db.Uuid
+  status         ParticipationStatus
+  answer         String?
+  decidedById    String?             @map("decided_by") @db.Uuid
+  decisionReason String?             @map("decision_reason")
+  decidedAt      DateTime?           @map("decided_at") @db.Timestamptz
+  createdAt      DateTime            @map("created_at") @db.Timestamptz
+  updatedAt      DateTime            @map("updated_at") @db.Timestamptz
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  user      User  @relation("ParticipationUser", fields: [userId], references: [id], onDelete: Restrict)
+  decidedBy User? @relation("ParticipationDecider", fields: [decidedById], references: [id], onDelete: Restrict)
+
+  /// Одна неотменённая запись на пару: закрывает и дубль активной записи,
+  /// и повторную заявку после отказа (DECISION-003). Отменённых записей у пары может быть
+  /// несколько, поэтому ключ eventId_userId в where запрещён правилом ESLint
+  @@unique([eventId, userId], map: "participations_event_user_not_cancelled_key", where: raw("status <> 'cancelled'"))
+  @@index([eventId, status, createdAt, id])
+  @@index([userId])
+  @@map("participations")
+}
+
+/// Сообщение обсуждения (ТЗ 2.7); ответы — один уровень через parent_id
+model Message {
+  id               String        @id @default(uuid(7)) @db.Uuid
+  eventId          String        @map("event_id") @db.Uuid
+  authorUserId     String        @map("author_user_id") @db.Uuid
+  asOrganizationId String?       @map("as_organization_id") @db.Uuid
+  parentId         String?       @map("parent_id") @db.Uuid
+  text             String
+  status           MessageStatus @default(visible)
+  moderationReason String?       @map("moderation_reason")
+  isFaq            Boolean       @default(false) @map("is_faq")
+  createdAt        DateTime      @map("created_at") @db.Timestamptz
+  editedAt         DateTime?     @map("edited_at") @db.Timestamptz
+
+  event          Event         @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  author         User          @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+  asOrganization Organization? @relation(fields: [asOrganizationId], references: [id], onDelete: Restrict)
+  parent         Message?      @relation("MessageReplies", fields: [parentId], references: [id], onDelete: Restrict)
+  replies        Message[]     @relation("MessageReplies")
+
+  @@index([eventId, createdAt])
+  @@map("messages")
+}
+
+model Notification {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  /// Закрытый список типов — в packages/domain
+  type      String
+  payload   Json      @default("{}")
+  link      String?
+  readAt    DateTime? @map("read_at") @db.Timestamptz
+  createdAt DateTime  @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+/// Запрос «Ищу компанию» (ТЗ 3.4)
+model CompanyRequest {
+  id          String     @id @default(uuid(7)) @db.Uuid
+  userId      String     @map("user_id") @db.Uuid
+  sportId     String     @map("sport_id") @db.Uuid
+  level       SkillLevel
+  area        String
+  /// Части дня и дни недели
+  timeSlots   Json       @map("time_slots")
+  comment     String     @default("")
+  /// false — не участвует ни в подборе, ни в «Спрос рядом»
+  isPublic    Boolean    @default(true) @map("is_public")
+  activeUntil DateTime   @map("active_until") @db.Timestamptz
+  createdAt   DateTime   @map("created_at") @db.Timestamptz
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  sport Sport @relation(fields: [sportId], references: [id], onDelete: Restrict)
+
+  @@index([sportId, activeUntil])
+  @@map("company_requests")
+}
+
+/// Журнал действий администратора
+model ModerationLog {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  actorUserId String   @map("actor_user_id") @db.Uuid
+  action      String
+  objectType  String   @map("object_type")
+  objectId    String   @map("object_id") @db.Uuid
+  reason      String?
+  createdAt   DateTime @map("created_at") @db.Timestamptz
+
+  actor User @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([objectType, objectId])
+  @@index([createdAt])
+  @@map("moderation_log")
+}
+
+/// Хелфигочи (ТЗ 5.9)
+model Helfigochi {
+  userId              String   @id @map("user_id") @db.Uuid
+  name                String
+  enabled             Boolean  @default(true)
+  vacation            Boolean  @default(false)
+  equippedAccessoryId String?  @map("equipped_accessory_id") @db.Uuid
+  createdAt           DateTime @map("created_at") @db.Timestamptz
+
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  equippedAccessory Accessory? @relation(fields: [equippedAccessoryId], references: [id], onDelete: Restrict)
+
+  @@map("helfigochi")
+}
+
+/// Журнал начислений: одна запись на источник, отзыв — пометкой revoked_at
+model HelfigochiLedger {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  sourceType   String    @map("source_type")
+  sourceId     String    @map("source_id")
+  points       Int
+  description  String
+  /// Когда произошло действие (окончание события, время сообщения) — по нему считается дневной лимит
+  occurredAt   DateTime  @map("occurred_at") @db.Timestamptz
+  createdAt    DateTime  @map("created_at") @db.Timestamptz
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz
+  revokeReason String?   @map("revoke_reason")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, sourceType, sourceId])
+  @@index([userId, occurredAt])
+  @@map("helfigochi_ledger")
+}
+
+model HelfigochiRule {
+  sourceType String  @id @map("source_type")
+  points     Int
+  /// null — без дневного лимита
+  dailyCap   Int?    @map("daily_cap")
+  enabled    Boolean @default(true)
+
+  @@map("helfigochi_rules")
+}
+
+model Accessory {
+  id            String         @id @default(uuid(7)) @db.Uuid
+  code          String         @unique
+  title         String
+  /// null — значок направления для группы «другое»
+  sportCategory SportCategory? @map("sport_category")
+  icon          String
+
+  owners   UserAccessory[]
+  equipped Helfigochi[]
+
+  @@map("accessories")
+}
+
+model UserAccessory {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  accessoryId String   @map("accessory_id") @db.Uuid
+  /// Направление, за которое выдан значок группы «другое»; у аксессуаров групп — null
+  sportId     String?  @map("sport_id") @db.Uuid
+  unlockedAt  DateTime @map("unlocked_at") @db.Timestamptz
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessory Accessory @relation(fields: [accessoryId], references: [id], onDelete: Restrict)
+  sport     Sport?    @relation(fields: [sportId], references: [id], onDelete: Restrict)
+
+  /// Аксессуар группы выдаётся один раз, значок «другое» — один раз на направление.
+  /// Ключ userId_accessoryId не уникален для значков, поэтому в where он запрещён правилом ESLint
+  @@unique([userId, accessoryId], map: "user_accessories_group_key", where: raw("sport_id IS NULL"))
+  @@unique([userId, accessoryId, sportId], map: "user_accessories_sport_key", where: raw("sport_id IS NOT NULL"))
+  @@map("user_accessories")
+}
+
+/// Настройки стенда — ровно одна строка (CHECK)
+model AppState {
+  id                 Boolean   @id @default(true)
+  /// Сдвиг демо-часов; Clock применяет его только при DEMO_MODE=true
+  clockOffsetSeconds Int       @default(0) @map("clock_offset_seconds")
+  lastResetAt        DateTime? @map("last_reset_at") @db.Timestamptz
+  helfigochiEnabled  Boolean   @default(true) @map("helfigochi_enabled")
+
+  @@map("app_state")
+}
+
+/// Сессия входа: в cookie — случайный токен, здесь — только его хеш.
+/// Время сессий — реальное, не демо-часы, поэтому @default(now())
+model Session {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+/// Токен подписки на календарь .ics (ТЗ 3.8)
+model CalendarToken {
+  userId    String    @id @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("calendar_tokens")
+}
+
+/// Запись «на все встречи» серии (ТЗ 3.8)
+model SeriesSubscription {
+  seriesId  String   @map("series_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @map("created_at") @db.Timestamptz
+
+  series EventSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([seriesId, userId])
+  @@map("series_subscriptions")
+}
