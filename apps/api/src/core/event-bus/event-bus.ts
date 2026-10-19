@@ -34,8 +34,9 @@ type Handler = ((...args: unknown[]) => unknown) & { [guarded]?: true };
 
 /**
  * Обработчик в своём try/catch: ошибку пишет общий `logEntry` без данных
- * вызова Prisma. С `suppressErrors` библиотека сама пишет в журнал текст
- * ошибки целиком, поэтому он выключен.
+ * вызова. С `suppressErrors` библиотека сама пишет в журнал текст ошибки
+ * целиком, поэтому он выключен. `logEntry` не бросает: исключение из catch
+ * стало бы необработанным отказом и остановило бы процесс api.
  */
 function guard(name: string, handler: Handler): Handler {
   if (handler[guarded]) return handler;

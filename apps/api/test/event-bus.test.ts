@@ -73,6 +73,21 @@ class Handlers {
   posted(event: DomainEvent<'MessagePosted'>) {
     this.received.push(event);
   }
+
+  @OnDomainEvent('EventCreated')
+  throwsNull() {
+    throw null;
+  }
+
+  @OnDomainEvent('EventCreated')
+  throwsBareObject() {
+    throw Object.create(null);
+  }
+
+  @OnDomainEvent('EventCreated')
+  created(event: DomainEvent<'EventCreated'>) {
+    this.received.push(event);
+  }
 }
 
 describe('core/event-bus: перечень доменных событий', () => {
@@ -155,8 +170,32 @@ describe('core/event-bus: публикация и обработчики', () =>
     expect(logged).toHaveBeenCalledTimes(1);
     const written = String(logged.mock.calls[0]?.[0]);
     expect(written).toContain('Handlers.failing');
-    expect(written).toContain('обработчик уведомлений упал');
-    expect(written).toMatch(/\n\s+at /);
+    expect(written).toMatch(/: Error\n\s+at /);
+    // Текст обычной ошибки может содержать данные пользователя — в журнал он не идёт
+    expect(written).not.toContain('обработчик уведомлений упал');
+  });
+
+  it('обработчик бросил null или объект без прототипа — запись в журнале, процесс жив', async () => {
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
+    const created = domainEvent('EventCreated', {
+      eventId: 'e-1',
+      actorId: 'u-1',
+      occurredAt,
+    });
+    bus.publish(created);
+    await nextTick();
+    await nextTick();
+    process.off('unhandledRejection', unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(handlers.received).toEqual([created]);
+    const written = logged.mock.calls.map((call) => String(call[0]));
+    expect(written).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Handlers.throwsNull упал: Брошено не Error, а null'),
+        expect.stringContaining('Handlers.throwsBareObject упал: Брошено не Error, а object'),
+      ]),
+    );
   });
 
   it('ошибка Prisma в обработчике — в журнале без аргументов вызова, действие выполнено', async () => {
