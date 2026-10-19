@@ -1,0 +1,238 @@
+/* Места, лист ожидания, условия и перенос (docs/design.md, «Места», «Листок даты»; P1). */
+
+/* Места: кружки или полоса и подпись в одной строке, подпись переносится под них */
+.seats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.seats-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.seats-dots i {
+  width: calc(1.125rem * var(--text-scale));
+  height: calc(1.125rem * var(--text-scale));
+  border: 2px solid var(--color-line-strong);
+  border-radius: 50%;
+  background: var(--color-surface);
+}
+
+.seats-dots i[data-taken] {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.seats-bar {
+  flex: 1 1 10rem;
+  max-width: 20rem;
+  height: calc(1.125rem * var(--text-scale));
+  border: 2px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.seats-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-primary);
+}
+
+.seats-label,
+.queue-label {
+  font-weight: 600;
+}
+
+/* Мест нет — тон очереди, как у статуса «лист ожидания» */
+.seats--full .seats-label {
+  padding: 0 var(--space-2);
+  border: var(--border-width) solid var(--status-queue-fg);
+  border-radius: var(--radius-control);
+  background: var(--status-queue-bg);
+  color: var(--status-queue-fg);
+}
+
+/* Лист ожидания: фигурки, как в пиктограмме status-waitlist */
+.queue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.queue-people {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+
+/* Голова и плечи одной фигурки */
+.queue-people i {
+  position: relative;
+  width: calc(1rem * var(--text-scale));
+  height: calc(1.5rem * var(--text-scale));
+  color: var(--color-line-strong);
+}
+
+.queue-people i::before,
+.queue-people i::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 2px solid currentColor;
+}
+
+.queue-people i::before {
+  top: 0;
+  width: 55%;
+  height: 37%;
+  border-radius: 50%;
+}
+
+.queue-people i::after {
+  bottom: 0;
+  width: 100%;
+  height: 45%;
+  border-radius: 50% 50% 2px 2px;
+}
+
+.queue-people i[data-me] {
+  color: var(--status-queue-fg);
+}
+
+.queue-people i[data-me]::before,
+.queue-people i[data-me]::after {
+  background: currentColor;
+}
+
+/* Пропуск в очереди перед своей позицией */
+.queue-people i[data-gap] {
+  margin-left: var(--space-3);
+}
+
+/* Бейджи условий: «Можно впервые», стоимость */
+.condition-badge {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: var(--border-width) solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+}
+
+.condition-note {
+  color: var(--color-ink-muted);
+  font-weight: 400;
+}
+
+/* «Что взять с собой» */
+.bring-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bring-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Без пиктограммы — с маркером, чтобы строка не выглядела оборванной */
+.bring-item-text::before {
+  content: '•';
+  color: var(--color-ink-muted);
+}
+
+/* «Как всё пройдёт»: вертикальный таймлайн с номерами шагов */
+.timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.timeline-step {
+  position: relative;
+  min-height: calc(2rem * var(--text-scale));
+  padding: 0 0 var(--space-4) calc(2.75rem * var(--text-scale));
+  counter-increment: step;
+}
+
+.timeline-step::before {
+  content: counter(step);
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: calc(2rem * var(--text-scale));
+  height: calc(2rem * var(--text-scale));
+  border: 2px solid var(--color-ink);
+  border-radius: 50%;
+  background: var(--color-marker);
+  color: var(--color-on-marker);
+  font-weight: 700;
+}
+
+/* Линия между шагами */
+.timeline-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: calc(2rem * var(--text-scale));
+  bottom: 0;
+  left: calc(1rem * var(--text-scale) - 1px);
+  border-left: 2px solid var(--color-line-strong);
+}
+
+/* Перенос: старый листок перечёркнут и приглушён */
+.reschedule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.date-leaf-off {
+  position: relative;
+  border-color: var(--color-line-strong);
+  color: var(--color-ink-muted);
+}
+
+.date-leaf-off .leaf-month {
+  background: var(--color-line);
+  color: var(--color-ink-muted);
+}
+
+.date-leaf-off::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -10%;
+  width: 120%;
+  border-top: 2px solid var(--color-ink);
+  transform: rotate(-20deg);
+}
+
+.reschedule-arrow {
+  font-size: var(--fs-lead);
+  font-weight: 700;
+}
+
+.reschedule-label {
+  font-weight: 600;
+}
