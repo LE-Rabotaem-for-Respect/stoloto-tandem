@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
+import { Public } from '../../core/access';
 import { ApiError } from '../../core/errors';
 import type { Actor } from '../../core/policies';
 import { CurrentActor, Roles } from '../auth';
@@ -19,6 +20,7 @@ export class OrganizationsController {
   constructor(private readonly organizations: OrganizationsService) {}
 
   @Get(':id')
+  @Public()
   view(
     @CurrentActor() actor: Actor,
     @Param('id') id: string,
