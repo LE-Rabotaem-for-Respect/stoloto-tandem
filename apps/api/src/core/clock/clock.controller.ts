@@ -2,9 +2,11 @@ import { Controller, Get, Inject } from '@nestjs/common';
 import { STAND_CONFIG } from '../config';
 import type { StandConfig } from '../config';
 import { Clock } from './clock';
+import { Public } from '../access';
 
 /** Web берёт «сейчас» и режим стенда отсюда, а не из часов браузера и сборки. */
 @Controller('clock')
+@Public()
 export class ClockController {
   constructor(
     private readonly clock: Clock,

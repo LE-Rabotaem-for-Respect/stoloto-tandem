@@ -20,6 +20,14 @@ services:
     environment:
       PORT: 3000
       DATABASE_URL: postgresql://tandem:${POSTGRES_PASSWORD:-tandem}@db:5432/tandem
+      # Быстрый вход, сброс и перемотка демо; на стенде без демо — DEMO_MODE=false
+      DEMO_MODE: ${DEMO_MODE:-true}
+      STAND_ID: ${STAND_ID:-}
+      # Пусто — секрет создаётся при первом старте и хранится в томе api-secrets
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+    volumes:
+      - api-secrets:/var/lib/tandem
     depends_on:
       db:
         condition: service_healthy
@@ -38,3 +46,4 @@ services:
 
 volumes:
   db-data:
+  api-secrets:
