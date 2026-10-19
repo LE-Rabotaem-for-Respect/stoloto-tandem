@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { TransitionError, participationMachine } from '@tandem/domain';
 import { describe, expect, it } from 'vitest';
 import { ApiError, logEntry } from '../src/core/errors';
@@ -56,6 +57,41 @@ describe('logEntry: запись об ошибке для журнала по б
     expect(entry).not.toContain(email);
   });
 
+  it('ошибка Node с кодом в заголовке stack — имя, код и кадры', () => {
+    // Настоящая ошибка Node; под vitest её stack пересобран без кода, поэтому заголовок
+    // ставим таким, каким его пишет сам Node: «TypeError [ERR_INVALID_ARG_TYPE]: …»
+    const error = thrown(() => readFileSync(undefined as never)) as Error & { code: string };
+    expect(error.code).toBe('ERR_INVALID_ARG_TYPE');
+    const frames = '    at Object.openSync (node:fs:622:5)\n    at run (/app/x.js:1:1)';
+    error.stack = `TypeError [ERR_INVALID_ARG_TYPE]: ${error.message}\n${frames}`;
+    const entry = logEntry(error);
+    expect(entry).toBe(`TypeError ERR_INVALID_ARG_TYPE\n${frames}`);
+    expect(entry).not.toContain('Received');
+  });
+
+  it('заголовок «Имя [КОД]» при пустом сообщении — кадры на месте', () => {
+    const error = Object.assign(new Error(''), { code: 'ERR_X' });
+    error.stack = `Error [ERR_X]${String.fromCharCode(10)}    at run (/app/x.js:1:1)`;
+    expect(logEntry(error)).toBe(`Error ERR_X${String.fromCharCode(10)}    at run (/app/x.js:1:1)`);
+  });
+
+  it.each([
+    ['код ошибки — лишь начало кода в скобках', 'ERR', 'Error [ERR_X]'],
+    ['недопустимое имя перед скобками', 'ERR_X', 'Ошибка 1 [ERR_X]'],
+  ])('заголовок не принят: %s', (_, code, header) => {
+    const error = Object.assign(new Error('ok'), { code });
+    error.stack = `${header}: ok${String.fromCharCode(10)}    at run (/app/x.js:1:1)`;
+    expect(logEntry(error)).toMatch(/\(кадры стека не записаны\)$/);
+  });
+
+  it('код в заголовке stack не совпал с кодом ошибки — кадры не пишутся', () => {
+    for (const code of [undefined, 'ERR_OTHER', `${email}`]) {
+      const error = Object.assign(new Error('ok'), { code });
+      error.stack = `Error [ERR_X]: ok${String.fromCharCode(10)}    at run (/app/x.js:1:1)`;
+      expect(logEntry(error)).toMatch(/\(кадры стека не записаны\)$/);
+    }
+  });
+
   it('код и имя с посторонними символами в журнал не идут', () => {
     const error = Object.assign(new Error('x'), { code: email });
     error.name = `Ошибка ${email}`;
@@ -94,14 +130,15 @@ describe('logEntry: запись об ошибке для журнала по б
       expect(entry).toMatch(/^SyntaxError\n\s+at /);
     });
 
-    it('сообщение изменили после создания — остаются только кадры строгого формата', () => {
+    // Заголовок stack не совпал с сообщением: где кончается текст, уже не узнать
+    const skipped = `Error${newline}(кадры стека не записаны)`;
+
+    it('сообщение изменили после создания — кадры не пишутся, вместо них пометка', () => {
       const error = new Error(`Привет${fakeFrame}`);
       // V8 собирает stack при первом обращении: обращаемся до смены сообщения
       expect(error.stack).toContain(email);
       error.message = 'другое';
-      const entry = logEntry(error);
-      expect(entry).not.toContain(email);
-      expect(entry.split(newline).slice(1)).not.toHaveLength(0);
+      expect(logEntry(error)).toBe(skipped);
     });
 
     it('сообщение укоротили до первой строки после чтения stack', () => {
@@ -111,22 +148,36 @@ describe('logEntry: запись об ошибке для журнала по б
       expect(logEntry(error)).not.toContain(email);
     });
 
-    it('сообщение укоротили посреди строки — строгий путь, кадры на месте', () => {
+    // Предел: та же подделка целиком в ASCII прошла бы — по одному stack её не отличить от кадра
+    it('сообщение укоротили до перевода строки, подделка с кириллицей без пробела и без @', () => {
+      const phone = '79991234567';
+      const error = new Error(`Привет${newline}    at /Анна_Иванова_+${phone}:1:1`);
+      expect(error.stack).toContain(phone);
+      error.message = 'Привет';
+      const entry = logEntry(error);
+      expect(entry).not.toContain(phone);
+      expect(entry).toMatch(/^Error\n\s+at /);
+    });
+
+    it('сообщение укоротили посреди строки — кадры не пишутся', () => {
       const error = new Error(`okay ${email}`);
       expect(error.stack).toContain(email);
       error.message = 'okay';
-      const entry = logEntry(error);
-      expect(entry).not.toContain(email);
-      expect(entry.split(newline).slice(1)).not.toHaveLength(0);
+      expect(logEntry(error)).toBe(skipped);
     });
 
-    it('сообщение очистили после чтения stack', () => {
+    it('сообщение очистили после чтения stack — кадры не пишутся', () => {
       const error = new Error(`Привет${fakeFrame}`);
       expect(error.stack).toContain(email);
       error.message = '';
-      const entry = logEntry(error);
-      expect(entry).not.toContain(email);
-      expect(entry.split(newline).slice(1)).not.toHaveLength(0);
+      expect(logEntry(error)).toBe(skipped);
+    });
+
+    it('строка сообщения в формате кадра, stack не меняли — её нет в записи', () => {
+      const fake = '    at run (/fake/frame.js:7:7)';
+      const entry = logEntry(new Error(`Привет${newline}${fake}`));
+      expect(entry).not.toContain('/fake/frame.js');
+      expect(entry).toMatch(/^Error\n\s+at /);
     });
 
     it('сообщение совпадает с именем ошибки', () => {
@@ -137,11 +188,16 @@ describe('logEntry: запись об ошибке для журнала по б
 
     it('к стеку приклеен стек причины (Caused by) — его строки не идут', () => {
       const cause = new Error(`Причина${fakeFrame}`);
+      cause.stack = `Error: Причина${fakeFrame}${newline}    at causeOnly (/cause/x.js:1:1)`;
       const error = new Error('Не удалось');
-      error.stack += `${newline}Caused by: ${cause.stack ?? ''}`;
+      const own = logEntry(error);
+      error.stack += `${newline}Caused by: ${cause.stack}`;
       const entry = logEntry(error);
       expect(entry).not.toContain(email);
       expect(entry).not.toContain('Caused by');
+      // Кадры причины правильного формата тоже не идут: блок обрывается на «Caused by»
+      expect(entry).not.toContain('/cause/x.js');
+      expect(entry).toBe(own);
       expect(entry.split(newline).slice(1)).not.toHaveLength(0);
     });
 
@@ -160,17 +216,63 @@ describe('logEntry: запись об ошибке для журнала по б
       }
     });
 
+    it('нестроковое сообщение — кадры не пишутся, даже правильного формата', () => {
+      // Массив и объект с length и toString похожи на строку: заголовок совпал бы
+      const lookalike = { length: 2, toString: () => 'ok' };
+      for (const message of [5, ['o'], lookalike]) {
+        const error = new Error('x');
+        error.stack = `Error: ${String(message)}${newline}    at run (/fake/frame.js:7:7)`;
+        Object.defineProperty(error, 'message', { value: message });
+        expect(logEntry(error)).toBe(skipped);
+      }
+    });
+
+    const escape = String.fromCharCode(27);
     it.each([
       ['имя функции с пробелом', '    at Anna Ivanova (/x.js:1:1)', 'Anna'],
       ['путь с @', `    at /home/${email}:1:1`, email],
       ['путь с @ в скобках', `    at run (/home/${email}/x.js:1:1)`, email],
       ['путь с @ в начале части и почтой дальше', `    at run (/@x/${email}/x.js:1:1)`, email],
+      ['«\\@» в пути POSIX', '    at /home/anna\\@demo.ru/x.js:1:1', 'demo.ru'],
+      ['«%40» в пути', '    at run (/home/anna%40demo.ru:1:1)', 'demo.ru'],
+      ['полноширинное «＠» в пути', '    at /home/anna＠demo.ru:1:1', 'demo.ru'],
+      ['кириллица и телефон в пути', '    at /Анна_Иванова_+79991234567:1:1', '79991234567'],
+      [
+        'ANSI-последовательность рисует поддельную запись',
+        `    at /x${escape}[2K${escape}[1G[Nest] 1 ERROR login ok:1:1`,
+        'login ok',
+      ],
+      // Без пробелов: строку отбрасывает сам управляющий символ, а не пробел
+      ['ANSI без пробелов', `    at /x${escape}[2K${escape}[1G:1:1`, '[2K'],
+      [
+        'OSC с BEL меняет заголовок окна',
+        `    at /x${escape}]0;title${String.fromCharCode(7)}:1:1`,
+        'title',
+      ],
+      ['управляющий символ без скобок', `    at /x${escape}y.js:1:1`, 'y.js'],
+      ['невидимый символ в пути', `    at /x${String.fromCharCode(0x200b)}y.js:1:1`, 'y.js'],
+      ['разные разделители в пути C:', '    at f (C:\\x/@y.js:1:1)', 'y.js'],
     ])('кадр-подделка: %s', (_, line, secret) => {
       for (const stack of [`Error: ok${newline}${line}`, `Error: другое${newline}${line}`]) {
         const error = new Error('ok');
         error.stack = stack;
-        expect(logEntry(error), stack).not.toContain(secret);
+        const entry = logEntry(error);
+        expect(entry, stack).not.toContain(secret);
+        expect(entry, stack).not.toContain(escape);
       }
+    });
+
+    it('имя ошибки читается один раз', () => {
+      const error = new Error('x');
+      // V8 читает имя, когда собирает stack: собираем заранее, чтобы считать только наши чтения
+      expect(error.stack).toMatch(/^Error: x/);
+      let reads = 0;
+      Object.defineProperty(error, 'name', {
+        get: () => (reads++ === 0 ? 'Error' : `${email}${newline}[Nest] FAKE`),
+      });
+      const entry = logEntry(error);
+      expect(entry).not.toContain(email);
+      expect(entry).not.toContain('FAKE');
     });
   });
 
@@ -188,7 +290,11 @@ describe('logEntry: запись об ошибке для журнала по б
       '    at PrismaClient._request (/app/node_modules/@prisma/client/runtime/client.js:1:1)',
       '    at RouterExplorer.x (C:\\app\\node_modules\\@nestjs\\core\\router.js:1:1)',
       '    at async file:///app/dist/run.mjs:2801:20',
+      '    at run (file:///C:/work/dist/run.mjs:3:7)',
+      '    at C:/work/apps/api/test/x.test.ts:6:14',
+      '    at run (C:/work/node_modules/@vitest/runner/dist/index.js:1:1)',
       '    at Holder.#secret (/app/dist/x.js:1:1)',
+      '    at Object.<anonymous> (/app/node_modules/.bin/vite-node~x+y.js:1:1)',
     ])('%s', (frame) => {
       const error = new Error('ok');
       error.stack = `Error: ok${newline}${frame}${newline}    at last (/app/x.js:1:1)`;
