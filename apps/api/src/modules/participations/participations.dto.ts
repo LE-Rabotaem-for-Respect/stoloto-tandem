@@ -15,3 +15,17 @@ export class JoinDto {
   @Matches(MULTI_LINE_TEXT, { message: 'В тексте есть недопустимые символы' })
   answer?: string;
 }
+
+export const REJECT_REASON_MAX_LENGTH = 500;
+
+/** Отказ по заявке (ТЗ 2.4): причина необязательна, пустая не сохраняется. */
+export class RejectDto {
+  @IsOptional()
+  @trim()
+  @IsString({ message: 'Причина — текст' })
+  @MaxLength(REJECT_REASON_MAX_LENGTH, {
+    message: `Причина — до ${REJECT_REASON_MAX_LENGTH} символов`,
+  })
+  @multiLine()
+  reason?: string;
+}

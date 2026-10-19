@@ -26,6 +26,23 @@ export interface ActiveParticipation {
   status: ParticipationStatus;
 }
 
+const rowSelect = {
+  id: true,
+  eventId: true,
+  userId: true,
+  status: true,
+} satisfies Prisma.ParticipationSelect;
+
+export type ParticipationRow = Prisma.ParticipationGetPayload<{ select: typeof rowSelect }>;
+
+export interface ParticipantRow extends ParticipationRow {
+  answer: string | null;
+  decisionReason: string | null;
+  decidedAt: Date | null;
+  createdAt: Date;
+  user: { id: string; name: string };
+}
+
 @Injectable()
 export class ParticipationsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -72,6 +89,61 @@ export class ParticipationsRepository {
       data: { ...fields, createdAt: at, updatedAt: at },
       select: { id: true, status: true },
     });
+  }
+
+  /** Мероприятие без блокировки — для просмотра списка. */
+  findEvent(id: string): Promise<JoinableEvent | null> {
+    return this.prisma.event.findUnique({ where: { id }, select: eventSelect });
+  }
+
+  /** К какому мероприятию относится запись — чтобы заблокировать его до чтения статуса. */
+  async eventIdOf(id: string): Promise<string | null> {
+    const row = await this.prisma.participation.findUnique({
+      where: { id },
+      select: { eventId: true },
+    });
+    return row?.eventId ?? null;
+  }
+
+  findById(id: string, tx: Db): Promise<ParticipationRow | null> {
+    return tx.participation.findUnique({ where: { id }, select: rowSelect });
+  }
+
+  /** Все записи мероприятия по времени подачи: из него же — позиция в листе ожидания. */
+  listByEvent(eventId: string): Promise<ParticipantRow[]> {
+    return this.prisma.participation.findMany({
+      where: { eventId },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        ...rowSelect,
+        answer: true,
+        decisionReason: true,
+        decidedAt: true,
+        createdAt: true,
+        user: { select: { id: true, name: true } },
+      },
+    });
+  }
+
+  /** Решение организатора: статус меняется, только если он ещё `from`. */
+  async decide(
+    id: string,
+    from: ParticipationStatus,
+    to: ParticipationStatus,
+    decision: { by: string; reason: string | null; at: Date },
+    tx: Db,
+  ): Promise<boolean> {
+    const { count } = await tx.participation.updateMany({
+      where: { id, status: from },
+      data: {
+        status: to,
+        decidedById: decision.by,
+        decisionReason: decision.reason,
+        decidedAt: decision.at,
+        updatedAt: decision.at,
+      },
+    });
+    return count === 1;
   }
 
   /** Меняет статус, только если он ещё `from`; `false` — запись уже изменили. */

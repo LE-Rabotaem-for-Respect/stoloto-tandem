@@ -1,6 +1,18 @@
 import { errorMessage, eventMachine, participationMachine } from '@tandem/domain';
-import type { Action, ActionCode, EventAction, EventMode } from '@tandem/domain';
-import { canJoin, canManageEvent, canModerate, canPostMessage } from './policies';
+import type {
+  Action,
+  ActionCode,
+  EventAction,
+  EventMode,
+  ParticipationStatus,
+} from '@tandem/domain';
+import {
+  canDecideParticipation,
+  canJoin,
+  canManageEvent,
+  canModerate,
+  canPostMessage,
+} from './policies';
 import type { Actor, Decision, PolicyEvent, ViewerParticipation } from './policies';
 
 /** Решение политики → элемент `actions[]`: неактивное — с причиной, гостю — `requiresAuth`. */
@@ -63,4 +75,28 @@ export function eventActions(
     actions.push(eventAction('delete_event', 'delete', event, now));
   }
   return actions;
+}
+
+/**
+ * `actions[]` у записи в «Участниках и заявках» (ТЗ 2.4, 2.5): принять и отклонить —
+ * только организатору и только у заявки. Администратор смотрит список без действий.
+ */
+export function participationActions(
+  actor: Actor,
+  event: CardEvent,
+  status: ParticipationStatus,
+  now: Date,
+): Action[] {
+  if (status !== 'pending' || !canManageEvent(actor, event).allowed) return [];
+  const decide = canDecideParticipation(actor, event, now);
+  if (!decide.allowed) {
+    return [toAction('accept_participation', decide), toAction('reject_participation', decide)];
+  }
+  const accept = participationMachine.check(status, 'accept', event);
+  return [
+    accept.ok
+      ? { code: 'accept_participation', enabled: true }
+      : disabled('accept_participation', accept.error.message),
+    { code: 'reject_participation', enabled: true },
+  ];
 }
