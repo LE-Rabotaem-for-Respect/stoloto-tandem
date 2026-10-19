@@ -274,7 +274,7 @@
         overflow: clip;
       }
 
-      /* Обложка — полоса 3:1, рисунок 16:9 вписан целиком, по бокам фон группы */
+      /* Обложка — полоса 5:1 (до 768 px), рисунок 16:9 вписан целиком, по бокам фон группы */
       .cover {
         display: block;
         width: 100%;
@@ -346,6 +346,18 @@
         font-size: var(--fs-title);
         line-height: var(--lh-tight);
         overflow-wrap: anywhere;
+      }
+
+      /* Название и адрес на первом экране — не больше двух строк с многоточием (кроме «Крупного
+         текста»: там первый экран прокручивается). Текст в разметке полный: его читает экранный
+         диктор, адрес целиком — в «Условиях» */
+      [data-text='normal'] .event-title,
+      [data-text='normal'] .place-text {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        overflow: hidden;
       }
 
       /* Листок даты */
@@ -617,6 +629,18 @@
         font-size: var(--fs-caption);
       }
 
+      /* В витрине панель — в потоке, без закрепления */
+      .action-bar--sample {
+        position: static;
+        margin: 0;
+        border: var(--border-width) solid var(--color-line);
+        border-radius: var(--radius-control);
+      }
+
+      .record-status--sample {
+        padding: 0;
+      }
+
       .action-bar .btn-primary {
         width: 100%;
         padding: var(--space-2) var(--space-4);
@@ -635,7 +659,31 @@
         transition: background-color var(--motion-fast) ease-out;
       }
 
-      .btn-primary:hover {
+      /* Неактивная кнопка не бледнеет до нечитаемости; причина — в статусе панели */
+      .btn-primary:disabled {
+        border-color: var(--color-line-strong);
+        background: var(--color-surface);
+        color: var(--color-ink-muted);
+        cursor: not-allowed;
+      }
+
+      /* Полный текст статуса — строкой под первым блоком карточки */
+      .record-status {
+        margin: 0;
+        padding: var(--space-3) var(--space-4) 0;
+        font-size: var(--fs-caption);
+        font-weight: 600;
+      }
+
+      .record-status--queue {
+        color: var(--status-queue-fg);
+      }
+
+      .record-status--off {
+        color: var(--status-off-fg);
+      }
+
+      .btn-primary:enabled:hover {
         background: var(--color-primary-hover);
         border-color: var(--color-primary-hover);
       }
@@ -964,7 +1012,7 @@
 
               <p class="place">
                 <svg class="icon" aria-hidden="true"><use href="#i-location" /></svg>
-                <span>Остров Татышев, у центрального входа</span>
+                <span class="place-text">Остров Татышев, у центрального входа</span>
               </p>
 
               <div class="seats">
@@ -993,6 +1041,7 @@
                 </div>
               </div>
             </div>
+            <p class="record-status" hidden></p>
 
             <details class="more">
               <summary>
@@ -1010,6 +1059,7 @@
                 Условия <svg class="icon" aria-hidden="true"><use href="#i-chevron" /></svg>
               </summary>
               <div class="more-body">
+                <p class="full-place">Место: Остров Татышев, у центрального входа.</p>
                 <p>Что взять: форма, вода, беговая обувь.</p>
               </div>
             </details>
@@ -1036,6 +1086,16 @@
       </template>
 
       <template id="gallery">
+        <div class="action-bar action-bar--sample">
+          <div class="status status--off">
+            <svg class="icon" aria-hidden="true"><use href="#i-cancelled" /></svg>
+            <span class="status-text">Запись закрыта</span>
+          </div>
+          <button class="btn-primary" type="button" disabled>Записаться</button>
+        </div>
+        <p class="record-status record-status--off record-status--sample">
+          Запись закрыта: мероприятие уже началось
+        </p>
         <div class="status status--wait">
           <svg class="icon" aria-hidden="true"><use href="#i-pending" /></svg
           ><span class="status-text">Заявка на рассмотрении</span>
@@ -1104,7 +1164,17 @@
         </section>
         <section class="frame">
           <p class="frame-name">Высокий контраст</p>
-          <div class="phone" data-theme="contrast" data-text="normal"></div>
+          <div
+            class="phone"
+            data-theme="contrast"
+            data-text="normal"
+            data-title="Пробежка 5 км по набережной Енисея и острову Татышев с разминкой"
+            data-place="Набережная Енисея, площадка у Коммунального моста, спуск к воде у лестницы"
+            data-status="Мест нет, есть лист ожидания"
+            data-status-full="Мест нет — можно встать в лист ожидания"
+            data-tone="queue"
+            data-button="Встать в лист ожидания"
+          ></div>
         </section>
       </div>
 
@@ -1145,6 +1215,28 @@
         copy
           .querySelector('[data-toggle="contrast"]')
           .setAttribute('aria-pressed', frame.dataset.theme === 'contrast');
+        // Худший случай: длинные название, адрес и пара «статус / кнопка»
+        const d = frame.dataset;
+        if (d.title) title.textContent = d.title;
+        if (d.place) {
+          copy.querySelector('.place-text').textContent = d.place;
+          copy.querySelector('.full-place').textContent = `Место: ${d.place}.`;
+        }
+        if (d.status) {
+          const bar = copy.querySelector('.action-bar');
+          const status = bar.querySelector('.status');
+          status.className = `status status--${d.tone}`;
+          status.querySelector('use').setAttribute('href', '#i-waitlist');
+          status.querySelector('.status-text').textContent = d.status;
+          bar.querySelector('.btn-primary').textContent = d.button;
+          // Полный текст статуса — строкой под первым блоком, плашка в панели ссылается на неё
+          const full = copy.querySelector('.record-status');
+          full.id = 'record-status-' + i;
+          full.className = `record-status record-status--${d.tone}`;
+          full.textContent = d.statusFull;
+          full.hidden = false;
+          status.setAttribute('aria-describedby', full.id);
+        }
         frame.append(copy);
       });
 
