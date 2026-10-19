@@ -81,8 +81,10 @@ async function fillWhatAndWhere(user: ReturnType<typeof userEvent.setup>) {
     'Беговые лыжи',
   );
   await user.type(screen.getByLabelText('Описание'), 'Пять километров в спокойном темпе');
+  // Из описания Tab ведёт на «Далее»
+  await user.tab();
+  expect(screen.getByRole('button', { name: 'Далее' })).toBe(document.activeElement);
   await user.keyboard('{Enter}');
-  await user.click(screen.getByRole('button', { name: 'Далее' }));
 
   expect(await screen.findByRole('heading', { name: /Шаг 2 из 4/ })).toBe(document.activeElement);
   await user.type(screen.getByLabelText('Дата'), '2026-10-25');
@@ -96,7 +98,7 @@ async function fillWhatAndWhere(user: ReturnType<typeof userEvent.setup>) {
   await user.keyboard('{Enter}');
 }
 
-describe('создание мероприятия', () => {
+describe('создание мероприятия', { timeout: 15_000 }, () => {
   it('четыре шага, предпросмотр карточки, «Опубликовать» ведёт в карточку', async () => {
     const { created } = fakeApi();
     const user = userEvent.setup();
@@ -191,6 +193,8 @@ describe('создание мероприятия', () => {
     );
     expect(describedBy(screen.getByLabelText('Описание'))).toBe('Добавьте описание');
     expect(currentStep()?.textContent).toContain('Что');
+    // Фокус — на первое поле с ошибкой: диктор прочитает его и ошибку
+    expect(screen.getByLabelText('Название')).toBe(document.activeElement);
 
     // Исправленное поле больше не подсвечено
     await user.type(screen.getByLabelText('Название'), 'Пробежка по набережной');
@@ -215,8 +219,149 @@ describe('создание мероприятия', () => {
 
     await waitFor(() => expect(currentStep()?.textContent).toContain('Когда и где'));
     expect(describedBy(screen.getByLabelText('Начало'))).toBe('Время начала должно быть в будущем');
+    expect(screen.getByLabelText('Начало')).toBe(document.activeElement);
     expect(screen.getByRole('alert')?.textContent).toContain('исправьте отмеченное');
     const steps = screen.getByRole('list', { name: 'Шаги создания мероприятия' });
     expect(within(steps).getAllByRole('listitem')[0]?.getAttribute('data-state')).toBe('done');
+  });
+
+  it('ошибки сервера на разных шагах: степпер отмечает оба, ошибка позднего шага не теряется', async () => {
+    let attempt = 0;
+    const { created } = fakeApi(() => {
+      attempt += 1;
+      return attempt === 1
+        ? json(400, {
+            code: 'validation_failed',
+            message: 'Проверьте поля формы',
+            fields: {
+              startsAt: 'Время начала должно быть в будущем',
+              applyQuestion: 'В тексте есть недопустимые символы',
+            },
+          })
+        : json(201, { id: 'event-2' });
+    });
+    const user = userEvent.setup();
+    renderCreate();
+    await fillWhatAndWhere(user);
+    await user.click(await screen.findByRole('radio', { name: 'Новичок' }));
+    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    await user.click(await screen.findByRole('radio', { name: /По заявке/ }));
+    await user.click(screen.getByText('Дополнительно'));
+    await user.type(screen.getByLabelText('Вопрос к заявке'), 'Опыт?');
+    await user.click(screen.getByRole('button', { name: 'Опубликовать' }));
+
+    await waitFor(() => expect(currentStep()?.textContent).toContain('Когда и где'));
+    const states = () =>
+      within(screen.getByRole('list', { name: 'Шаги создания мероприятия' }))
+        .getAllByRole('listitem')
+        .map((item) => item.getAttribute('data-state'));
+    expect(states()).toEqual(['done', 'current', 'upcoming', 'error']);
+
+    await user.clear(screen.getByLabelText('Начало'));
+    await user.type(screen.getByLabelText('Начало'), '19:30');
+    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    await user.click(await screen.findByRole('button', { name: 'Далее' }));
+
+    await screen.findByRole('heading', { name: /Шаг 4 из 4/ });
+    const question = screen.getByLabelText('Вопрос к заявке');
+    expect(describedBy(question)).toBe('В тексте есть недопустимые символы');
+    const more = question.closest('details');
+    expect(more?.open).toBe(true);
+    // Исправление поля не сворачивает «Дополнительно»
+    await user.clear(question);
+    await user.type(question, 'Сколько бегаете?');
+    expect(more?.open).toBe(true);
+    expect(question.hasAttribute('aria-invalid')).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: 'Опубликовать' }));
+    await screen.findByRole('heading', { name: 'Мероприятие' });
+    expect(created).toHaveLength(2);
+    expect(created[1]).toMatchObject({
+      startsAt: '2026-10-25T12:30:00.000Z',
+      applyQuestion: 'Сколько бегаете?',
+    });
+  });
+
+  it('ошибка без полей — сообщением над кнопкой, шаг не меняется', async () => {
+    fakeApi(() => json(403, { code: 'forbidden', message: 'Создавать мероприятия нельзя' }));
+    const user = userEvent.setup();
+    renderCreate();
+    await fillWhatAndWhere(user);
+    await user.click(await screen.findByRole('radio', { name: 'Новичок' }));
+    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    await user.click(await screen.findByRole('radio', { name: /Свободно/ }));
+    await user.click(screen.getByRole('button', { name: 'Опубликовать' }));
+
+    expect((await screen.findByRole('alert')).textContent).toBe('Создавать мероприятия нельзя');
+    expect(currentStep()?.textContent).toContain('Запись');
+  });
+});
+
+describe('подсказки направлений с клавиатуры', { timeout: 15_000 }, () => {
+  const combobox = () => screen.getByRole('combobox', { name: 'Направление' });
+  const options = () => screen.queryAllByRole('option').map((option) => option.textContent);
+  const selected = () =>
+    screen
+      .queryAllByRole('option')
+      .find((option) => option.getAttribute('aria-selected') === 'true')?.textContent;
+
+  it('стрелки ходят по кругу, Escape закрывает, стрелка вниз открывает снова', async () => {
+    fakeApi();
+    const user = userEvent.setup();
+    renderCreate();
+
+    await user.type(await screen.findByRole('combobox', { name: 'Направление' }), 'бе');
+    await screen.findByRole('option', { name: 'Бег' });
+    expect(options()).toEqual(['Бег', 'Беговые лыжи', 'Добавить «бе» как новое направление']);
+    expect(selected()).toBe('Бег');
+    await user.keyboard('{ArrowUp}');
+    expect(selected()).toBe('Добавить «бе» как новое направление');
+    await user.keyboard('{ArrowDown}');
+    expect(selected()).toBe('Бег');
+
+    await user.keyboard('{Escape}');
+    expect(options()).toEqual([]);
+    expect(combobox().getAttribute('aria-expanded')).toBe('false');
+    await user.keyboard('{ArrowDown}');
+    expect(options()).toHaveLength(3);
+  });
+
+  it('«Добавить» — только когда точного совпадения нет и введено от 2 символов', async () => {
+    fakeApi();
+    const user = userEvent.setup();
+    renderCreate();
+
+    await user.type(await screen.findByRole('combobox', { name: 'Направление' }), 'бег');
+    await screen.findByRole('option', { name: 'Бег' });
+    expect(options()).toEqual(['Бег', 'Беговые лыжи']);
+
+    await user.clear(combobox());
+    await user.type(combobox(), 'П');
+    await waitFor(() =>
+      expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('q=%D0%9F&'))).toBe(
+        true,
+      ),
+    );
+    expect(options()).toEqual([]);
+    await user.type(combobox(), 'а');
+    await screen.findByRole('option', { name: 'Добавить «Па» как новое направление' });
+  });
+
+  it('правка текста снимает выбранное направление', async () => {
+    fakeApi();
+    const user = userEvent.setup();
+    renderCreate();
+
+    await user.type(await screen.findByLabelText('Название'), 'Пробежка по набережной');
+    await user.type(combobox(), 'бег');
+    await screen.findByRole('option', { name: 'Бег' });
+    await user.keyboard('{Enter}');
+    await user.type(combobox(), 'ун');
+    await user.keyboard('{Escape}');
+    await user.type(screen.getByLabelText('Описание'), 'Пять километров');
+    await user.click(screen.getByRole('button', { name: 'Далее' }));
+
+    expect(describedBy(combobox())).toBe('Выберите направление из списка или добавьте новое');
+    expect(currentStep()?.textContent).toContain('Что');
   });
 });

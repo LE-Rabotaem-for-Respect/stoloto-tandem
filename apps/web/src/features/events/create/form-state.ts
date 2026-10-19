@@ -1,4 +1,4 @@
-import { SPORT_NAME_MAX_LENGTH } from '@tandem/domain';
+import { SPORT_NAME_MAX_LENGTH, isValidSportName } from '@tandem/domain';
 import type { SportCategory } from '@tandem/domain';
 import type { EventLevel } from '../../../shared/ui';
 
@@ -46,24 +46,25 @@ export const emptyState = (): CreateEventState => ({
 
 export type FieldErrors = Record<string, string>;
 
-/** На каком шаге поле: ошибку сервера показываем там, где поле видно. */
+/** На каком шаге поле формы: там его ошибка видна и там её отмечает степпер. */
 const FIELD_STEPS: Record<string, StepIndex> = {
   title: 0,
+  sport: 0,
   description: 0,
-  sportId: 0,
-  newSport: 0,
-  'newSport.name': 0,
-  'newSport.category': 0,
-  startsAt: 1,
-  endsAt: 1,
+  date: 1,
+  startTime: 1,
+  endTime: 1,
   city: 1,
   area: 1,
   placeText: 1,
-  participantInfo: 2,
   level: 2,
+  participantInfo: 2,
   mode: 3,
   applyQuestion: 3,
 };
+
+/** Шаг поля формы; `undefined` — поля в форме нет. */
+export const stepOfField = (field: string): StepIndex | undefined => FIELD_STEPS[field];
 
 /** Поле ответа api → поле формы (у нового направления ошибка имени — у поля направления). */
 export function formField(apiField: string): string {
@@ -76,7 +77,7 @@ export function formField(apiField: string): string {
 /** Первый шаг, на котором есть ошибка; `null` — ошибок полей нет. */
 export function firstStepWithError(apiFields: FieldErrors): StepIndex | null {
   const steps = Object.keys(apiFields)
-    .map((field) => FIELD_STEPS[field])
+    .map((field) => stepOfField(formField(field)))
     .filter((step): step is StepIndex => step !== undefined);
   return steps.length > 0 ? (Math.min(...steps) as StepIndex) : null;
 }
@@ -91,7 +92,10 @@ export function krasnoyarskTime(date: string, time: string): Date | null {
   return Number.isNaN(moment.getTime()) ? null : moment;
 }
 
-const length = (value: string) => value.trim().length;
+// Длина в символах, как считает сервер: эмодзи из двух половинок UTF-16 — один символ
+const length = (value: string) => Array.from(value.trim()).length;
+
+const SPORT_NAME_RULE = `Название направления — от 2 до ${SPORT_NAME_MAX_LENGTH} символов: буквы, цифры, пробелы и знаки . , ' ( ) × / + -; над буквой — не больше одного значка; в одном слове — буквы одного алфавита`;
 
 /**
  * Проверки шага до отправки — те же правила, что у api (ТЗ 2.2), чтобы человек
@@ -106,9 +110,9 @@ export function stepErrors(step: StepIndex, state: CreateEventState, now: Date):
     if (!state.sport) errors.sport = 'Выберите направление из списка или добавьте новое';
     else if (
       state.sport.kind === 'new' &&
-      (length(state.sport.name) < 2 || length(state.sport.name) > SPORT_NAME_MAX_LENGTH)
+      (length(state.sport.name) < 2 || !isValidSportName(state.sport.name))
     ) {
-      errors.sport = `Название направления — от 2 до ${SPORT_NAME_MAX_LENGTH} символов`;
+      errors.sport = SPORT_NAME_RULE;
     }
     if (length(state.description) === 0) errors.description = 'Добавьте описание';
     else if (length(state.description) > 2000) {

@@ -13,6 +13,7 @@ import {
   firstStepWithError,
   formField,
   stepErrors,
+  stepOfField,
   toRequestBody,
 } from './form-state';
 import type { CreateEventState, FieldErrors, StepIndex } from './form-state';
@@ -80,11 +81,18 @@ function Choice({
   );
 }
 
-/** Есть ли на шаге ошибки — по клиентской проверке или по ответу сервера. */
-function stepHasErrors(step: StepIndex, errors: FieldErrors, state: CreateEventState, now: Date) {
-  const own = Object.keys(stepErrors(step, state, now));
-  return own.some((field) => errors[field]);
-}
+/** Есть ли на шаге ошибки — найденные проверкой шага или пришедшие от сервера. */
+const stepHasErrors = (step: StepIndex, errors: FieldErrors) =>
+  Object.keys(errors).some((field) => stepOfField(field) === step);
+
+/** Ошибки других шагов остаются: проверка шага заменяет только свои. */
+const replaceStepErrors = (errors: FieldErrors, step: StepIndex, found: FieldErrors) => ({
+  ...Object.fromEntries(Object.entries(errors).filter(([field]) => stepOfField(field) !== step)),
+  ...found,
+});
+
+// Необязательные поля в «Дополнительно»
+type OptionalField = 'participantInfo' | 'applyQuestion';
 
 /**
  * Создание мероприятия (ТЗ 2.2, 2.11): четыре коротких шага со степпером,
@@ -99,6 +107,14 @@ export function CreateEventForm() {
   const [step, setStep] = useState<StepIndex>(0);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState<string>();
+  // Открытость «Дополнительно» — своим состоянием: исправление поля не сворачивает блок
+  const [moreOpen, setMoreOpen] = useState<Record<OptionalField, boolean>>({
+    participantInfo: false,
+    applyQuestion: false,
+  });
+  // Счётчик запросов «перевести фокус на первое поле с ошибкой»
+  const [focusInvalid, setFocusInvalid] = useState(0);
+  const form = useRef<HTMLFormElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const firstRender = useRef(true);
 
@@ -110,6 +126,26 @@ export function CreateEventForm() {
     }
     heading.current?.focus();
   }, [step]);
+
+  // Шаг не прошёл проверку — фокус на первое поле с ошибкой (после фокуса на заголовок)
+  useEffect(() => {
+    if (focusInvalid === 0) return;
+    const invalid = form.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
+    const target =
+      invalid instanceof HTMLFieldSetElement
+        ? invalid.querySelector<HTMLElement>('input')
+        : invalid;
+    target?.focus();
+  }, [focusInvalid]);
+
+  const showErrors = (next: FieldErrors) => {
+    setErrors(next);
+    setMoreOpen((current) => ({
+      participantInfo: current.participantInfo || Boolean(next.participantInfo),
+      applyQuestion: current.applyQuestion || Boolean(next.applyQuestion),
+    }));
+    setFocusInvalid((count) => count + 1);
+  };
 
   const set = (patch: Partial<CreateEventState>) => {
     setState((current) => ({ ...current, ...patch }));
@@ -129,15 +165,20 @@ export function CreateEventForm() {
 
   const next = () => {
     const found = stepErrors(step, state, now);
-    setErrors(found);
-    if (Object.keys(found).length === 0) goTo((step + 1) as StepIndex);
+    if (Object.keys(found).length > 0) {
+      showErrors(replaceStepErrors(errors, step, found));
+      return;
+    }
+    setErrors(replaceStepErrors(errors, step, {}));
+    goTo((step + 1) as StepIndex);
   };
 
   const publish = () => {
+    // Все шаги — заново: пока человек заполнял форму, время начала могло пройти
     for (const index of [0, 1, 2, 3] as StepIndex[]) {
       const found = stepErrors(index, state, now);
       if (Object.keys(found).length > 0) {
-        setErrors(found);
+        showErrors(replaceStepErrors(errors, index, found));
         goTo(index);
         return;
       }
@@ -157,7 +198,7 @@ export function CreateEventForm() {
         }
         const fields: FieldErrors = {};
         for (const [field, text] of Object.entries(error.fields)) fields[formField(field)] = text;
-        setErrors(fields);
+        showErrors(fields);
         setStep(target);
         setMessage('Сервер не принял часть полей — исправьте отмеченное');
       },
@@ -173,14 +214,12 @@ export function CreateEventForm() {
   const steps: Step[] = STEPS.map((label, index) => {
     const at = index as StepIndex;
     if (at === step) return { label, state: 'current', icon: 'action-create' };
-    if (at < step) {
-      return { label, state: stepHasErrors(at, errors, state, now) ? 'error' : 'done' };
-    }
-    return { label, state: stepHasErrors(at, errors, state, now) ? 'error' : 'upcoming' };
+    if (stepHasErrors(at, errors)) return { label, state: 'error' };
+    return { label, state: at < step ? 'done' : 'upcoming' };
   });
 
   return (
-    <form className="form create-event" onSubmit={submit} noValidate>
+    <form ref={form} className="form create-event" onSubmit={submit} noValidate>
       <Stepper steps={steps} label="Шаги создания мероприятия" />
       <h2 ref={heading} tabIndex={-1} className="create-event-step">
         Шаг {step + 1} из {STEPS.length}: {STEPS[step]}
@@ -191,7 +230,6 @@ export function CreateEventForm() {
           <Field
             label="Название"
             value={state.title}
-            maxLength={80}
             onChange={(event) => set({ title: event.target.value })}
             error={errors.title}
           />
@@ -203,7 +241,6 @@ export function CreateEventForm() {
           <TextArea
             label="Описание"
             value={state.description}
-            maxLength={2000}
             onChange={(event) => set({ description: event.target.value })}
             error={errors.description}
           />
@@ -238,21 +275,18 @@ export function CreateEventForm() {
           <Field
             label="Город"
             value={state.city}
-            maxLength={80}
             onChange={(event) => set({ city: event.target.value })}
             error={errors.city}
           />
           <Field
             label="Район или ориентир"
             value={state.area}
-            maxLength={120}
             onChange={(event) => set({ area: event.target.value })}
             error={errors.area}
           />
           <Field
             label="Адрес или как найти место"
             value={state.placeText}
-            maxLength={300}
             onChange={(event) => set({ placeText: event.target.value })}
             error={errors.placeText}
           />
@@ -274,12 +308,18 @@ export function CreateEventForm() {
               </label>
             ))}
           </Choice>
-          <details className="create-event-more" open={Boolean(errors.participantInfo)}>
+          <details
+            className="create-event-more"
+            open={moreOpen.participantInfo}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setMoreOpen((current) => ({ ...current, participantInfo: open }));
+            }}
+          >
             <summary>Дополнительно</summary>
             <TextArea
               label="Информация для участников (видна только записанным)"
               value={state.participantInfo}
-              maxLength={2000}
               onChange={(event) => set({ participantInfo: event.target.value })}
               error={errors.participantInfo}
             />
@@ -310,12 +350,18 @@ export function CreateEventForm() {
             </label>
           </Choice>
           {state.mode === 'approval' && (
-            <details className="create-event-more" open={Boolean(errors.applyQuestion)}>
+            <details
+              className="create-event-more"
+              open={moreOpen.applyQuestion}
+              onToggle={(event) => {
+                const open = event.currentTarget.open;
+                setMoreOpen((current) => ({ ...current, applyQuestion: open }));
+              }}
+            >
               <summary>Дополнительно</summary>
               <TextArea
                 label="Вопрос к заявке"
                 value={state.applyQuestion}
-                maxLength={300}
                 rows={2}
                 onChange={(event) => set({ applyQuestion: event.target.value })}
                 error={errors.applyQuestion}

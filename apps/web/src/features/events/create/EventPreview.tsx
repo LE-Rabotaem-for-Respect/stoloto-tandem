@@ -35,7 +35,10 @@ export function EventPreview({ state, now }: { state: CreateEventState; now: Dat
             {state.level && <LevelScale level={state.level} />}
           </EventDate>
         ) : (
-          <p className="event-preview-missing">Дата и время не указаны</p>
+          <>
+            <p className="event-preview-missing">Дата и время не указаны</p>
+            {state.level && <LevelScale level={state.level} />}
+          </>
         )}
         <p className="event-preview-place">
           <Icon name="action-location" />

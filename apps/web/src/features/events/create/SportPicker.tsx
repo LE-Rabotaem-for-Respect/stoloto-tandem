@@ -53,7 +53,14 @@ export function SportPicker({ value, onChange, error }: SportPickerProps) {
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (!listOpen) return;
+    // Закрытый список стрелка вниз открывает снова (шаблон combobox)
+    if (!listOpen) {
+      if (event.key === 'ArrowDown' && query.length > 0) {
+        event.preventDefault();
+        setOpen(true);
+      }
+      return;
+    }
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       setActive((index) => (index + 1) % options.length);

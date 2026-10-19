@@ -28,9 +28,7 @@ const filled = (patch: Partial<CreateEventState> = {}): CreateEventState => ({
 
 describe('время по Красноярску', () => {
   it('дата и время поля — момент UTC+7', () => {
-    expect(krasnoyarskTime('2026-10-25', '19:00')?.toISOString()).toBe(
-      '2026-10-25T12:00:00.000Z',
-    );
+    expect(krasnoyarskTime('2026-10-25', '19:00')?.toISOString()).toBe('2026-10-25T12:00:00.000Z');
   });
 
   it('неполный ввод — нет времени', () => {
@@ -52,20 +50,38 @@ describe('проверки шагов повторяют серверные', ()
     });
     expect(stepErrors(0, filled({ title: ' Бег ' }), now).title).toBeDefined();
     expect(stepErrors(0, filled({ title: 'Б'.repeat(81) }), now).title).toBeDefined();
-    expect(stepErrors(0, filled({ description: '   ' }), now).description).toBe('Добавьте описание');
+    expect(stepErrors(0, filled({ description: '   ' }), now).description).toBe(
+      'Добавьте описание',
+    );
     expect(stepErrors(0, filled({ description: 'а'.repeat(2001) }), now).description).toBe(
       'Описание — не длиннее 2000 символов',
     );
   });
 
-  it('«Что»: новое направление — от 2 до 50 символов', () => {
-    expect(stepErrors(0, filled({ sport: { kind: 'new', name: 'Х' } }), now).sport).toBe(
-      'Название направления — от 2 до 50 символов',
+  it('«Что»: новое направление — по правилу каталога, как на сервере', () => {
+    const sportError = (name: string) =>
+      stepErrors(0, filled({ sport: { kind: 'new', name } }), now).sport;
+    for (const name of ['Х', 'Х'.repeat(51), 'Падел!!', 'Пaдел']) {
+      expect(sportError(name)).toMatch(/^Название направления — от 2 до 50 символов: буквы/);
+    }
+    expect(sportError('Падел')).toBeUndefined();
+    expect(sportError('Футбол 7×7')).toBeUndefined();
+  });
+
+  it('длина — в символах, как на сервере: эмодзи считается одним', () => {
+    const runner = String.fromCodePoint(0x1f3c3);
+    expect(
+      stepErrors(0, filled({ title: `${'а'.repeat(79)}${runner}` }), now).title,
+    ).toBeUndefined();
+    expect(stepErrors(0, filled({ title: `${'а'.repeat(80)}${runner}` }), now).title).toBeDefined();
+  });
+
+  it('начало ровно «сейчас» — уже не в будущем', () => {
+    const at = filled({ date: '2026-10-19', startTime: '19:00', endTime: '20:00' });
+    expect(stepErrors(1, at, new Date('2026-10-19T12:00:00Z')).startTime).toBe(
+      'Время начала должно быть в будущем',
     );
-    expect(stepErrors(0, filled({ sport: { kind: 'new', name: 'Х'.repeat(51) } }), now).sport).toBe(
-      'Название направления — от 2 до 50 символов',
-    );
-    expect(stepErrors(0, filled({ sport: { kind: 'new', name: 'Падел' } }), now)).toEqual({});
+    expect(stepErrors(1, at, new Date('2026-10-19T11:59:00Z')).startTime).toBeUndefined();
   });
 
   it('«Когда и где»: начало в будущем, окончание позже начала, место', () => {
@@ -76,7 +92,11 @@ describe('проверки шагов повторяют серверные', ()
       'Окончание — позже начала',
     );
     expect(
-      stepErrors(1, filled({ date: '', startTime: '', endTime: '', area: 'О', placeText: '' }), now),
+      stepErrors(
+        1,
+        filled({ date: '', startTime: '', endTime: '', area: 'О', placeText: '' }),
+        now,
+      ),
     ).toEqual({
       date: 'Укажите дату',
       startTime: 'Укажите время начала',
