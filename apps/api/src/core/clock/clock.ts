@@ -33,6 +33,14 @@ export class Clock implements OnModuleInit {
     return new Date(this.realTime() + this.offsetMs);
   }
 
+  /**
+   * Настоящее время без демо-сдвига. Только для технических сроков (жизнь
+   * сессии): перемотка демо-часов не должна разлогинивать или продлевать вход.
+   */
+  realNow(): Date {
+    return new Date(this.realTime());
+  }
+
   /** Время последнего «Сбросить демо-данные»; вне демо-режима — `null`. */
   get lastResetAt(): Date | null {
     return this.lastReset;
