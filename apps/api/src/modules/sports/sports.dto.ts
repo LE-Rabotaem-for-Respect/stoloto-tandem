@@ -1,4 +1,5 @@
 import {
+  SINGLE_LINE_TEXT,
   SPORT_CATEGORIES,
   SPORT_NAME_MAX_LENGTH,
   SPORT_NAME_PATTERN,
@@ -20,14 +21,11 @@ import {
 
 export const SPORT_NAME_RULE = `Название направления — от 2 до ${SPORT_NAME_MAX_LENGTH} символов: буквы, цифры, пробелы и знаки . , ' ( ) × / + -; над буквой — не больше одного значка; в одном слове — буквы одного алфавита`;
 
-// Управляющие и невидимые символы (форматирующие, вроде U+200B и U+202E)
-const NO_HIDDEN_CHARS = /^[^\p{Cc}\p{Cf}]*$/u;
-
 export class SearchSportsQuery {
   @IsOptional()
   @IsString({ message: 'Запрос — строка' })
   @MaxLength(SPORT_NAME_MAX_LENGTH, { message: `Не длиннее ${SPORT_NAME_MAX_LENGTH} символов` })
-  @Matches(NO_HIDDEN_CHARS, { message: 'В запросе есть недопустимые символы' })
+  @Matches(SINGLE_LINE_TEXT, { message: 'В запросе есть недопустимые символы' })
   q?: string;
 
   @IsOptional()

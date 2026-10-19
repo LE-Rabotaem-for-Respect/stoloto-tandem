@@ -44,7 +44,9 @@ services:
       api:
         condition: service_healthy
     ports:
-      - '${WEB_PORT:-8080}:80'
+      # Адрес публикации: по умолчанию все адреса компьютера (стенд для экспертов),
+      # в CI — только 127.0.0.1
+      - '${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8080}:80'
 
 volumes:
   db-data:

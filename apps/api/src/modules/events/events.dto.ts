@@ -1,22 +1,33 @@
-import { EVENT_LEVELS, EVENT_MODES } from '@tandem/domain';
-import type { EventLevel, EventMode } from '@tandem/domain';
+import {
+  EVENT_LEVELS,
+  EVENT_MODES,
+  MULTI_LINE_TEXT,
+  SINGLE_LINE_TEXT,
+  SPORT_CATEGORIES,
+  normalizeLineBreaks,
+} from '@tandem/domain';
+import type { EventLevel, EventMode, SportCategory } from '@tandem/domain';
 import { Transform, Type } from 'class-transformer';
 import {
   IsDate,
   IsIn,
+  IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
   Length,
   Matches,
+  Max,
   MaxLength,
+  Min,
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { NewSportDto } from '../sports/sports.dto';
 
-export const trim = () =>
+const trim = () =>
   Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
 
 // Время приходит строкой ISO 8601 с поясом; «2026-10-21» без времени — не дата начала
@@ -36,12 +47,16 @@ const isoDate = () =>
       : value,
   );
 
-// Управляющие и форматирующие символы: U+202E переворачивает текст в ленте, U+200B невидим
+// Невидимые и переворачивающие текст символы запрещены (правило — в @tandem/domain)
 const HIDDEN_CHARS = 'В тексте есть недопустимые символы';
-const singleLine = () => Matches(/^[^\p{Cc}\p{Cf}]*$/u, { message: HIDDEN_CHARS });
-// В многострочном тексте из управляющих допустимы только перевод строки и табуляция
-export const multiLine = () =>
-  Matches(/^(?:[^\p{Cc}\p{Cf}]|[\n\r\t])*$/u, { message: HIDDEN_CHARS });
+const singleLine = () => Matches(SINGLE_LINE_TEXT, { message: HIDDEN_CHARS });
+const multiLine = () => Matches(MULTI_LINE_TEXT, { message: HIDDEN_CHARS });
+
+// Многострочный текст: переводы строк Windows (\r\n) — к \n, пробелы по краям — прочь
+const trimText = () =>
+  Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? normalizeLineBreaks(value).trim() : value,
+  );
 
 /**
  * Создание мероприятия (ТЗ 2.2). Организатор не вводится — его задаёт аккаунт.
@@ -55,7 +70,7 @@ export class CreateEventDto {
   @singleLine()
   title!: string;
 
-  @trim()
+  @trimText()
   @IsString({ message: 'Добавьте описание' })
   @IsNotEmpty({ message: 'Добавьте описание' })
   @MaxLength(2000, { message: 'Описание — не длиннее 2000 символов' })
@@ -66,7 +81,9 @@ export class CreateEventDto {
   @IsUUID('all', { message: 'Выберите направление из списка или добавьте новое' })
   sportId?: string;
 
+  // Массив прошёл бы ValidateNested поэлементно и обошёл проверку sportId
   @IsOptional()
+  @IsObject({ message: 'Новое направление — название и группа' })
   @ValidateNested()
   @Type(() => NewSportDto)
   newSport?: NewSportDto;
@@ -98,7 +115,7 @@ export class CreateEventDto {
   placeText!: string;
 
   @IsOptional()
-  @trim()
+  @trimText()
   @IsString({ message: 'Информация для участников — текст' })
   @MaxLength(2000, { message: 'Информация для участников — не длиннее 2000 символов' })
   @multiLine()
@@ -108,7 +125,7 @@ export class CreateEventDto {
   mode!: EventMode;
 
   @IsOptional()
-  @trim()
+  @trimText()
   @IsString({ message: 'Вопрос к заявке — текст' })
   @MaxLength(300, { message: 'Вопрос к заявке — не длиннее 300 символов' })
   @multiLine()
@@ -116,4 +133,75 @@ export class CreateEventDto {
 
   @IsIn(EVENT_LEVELS, { message: 'Выберите уровень' })
   level!: EventLevel;
+}
+
+export const FEED_DATES = ['today', 'tomorrow', 'weekend'] as const;
+export type FeedDate = (typeof FEED_DATES)[number];
+
+const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Лента и поиск (ТЗ 2.8, 4.5). Все фильтры необязательны и складываются через «и». */
+export class EventFeedQuery {
+  @IsOptional()
+  @trim()
+  @IsString({ message: 'Запрос — строка' })
+  @MaxLength(100, { message: 'Запрос — не длиннее 100 символов' })
+  @singleLine()
+  q?: string;
+
+  @IsOptional()
+  @IsUUID('all', { message: 'Выберите направление из списка' })
+  sport?: string;
+
+  @IsOptional()
+  @IsIn(SPORT_CATEGORIES, { message: 'Выберите группу из списка' })
+  category?: SportCategory;
+
+  @IsOptional()
+  @IsIn(FEED_DATES, { message: 'Дата: сегодня, завтра или выходные' })
+  date?: FeedDate;
+
+  @IsOptional()
+  @Matches(CALENDAR_DATE, { message: 'Дата «с» — в виде ГГГГ-ММ-ДД' })
+  from?: string;
+
+  @IsOptional()
+  @Matches(CALENDAR_DATE, { message: 'Дата «по» — в виде ГГГГ-ММ-ДД' })
+  to?: string;
+
+  @IsOptional()
+  @trim()
+  @IsString({ message: 'Город — строка' })
+  @MaxLength(80, { message: 'Город — не длиннее 80 символов' })
+  @singleLine()
+  city?: string;
+
+  @IsOptional()
+  @trim()
+  @IsString({ message: 'Район — строка' })
+  @MaxLength(120, { message: 'Район — не длиннее 120 символов' })
+  @singleLine()
+  area?: string;
+
+  @IsOptional()
+  @IsIn(EVENT_LEVELS, { message: 'Выберите уровень' })
+  level?: EventLevel;
+
+  @IsOptional()
+  @IsIn(EVENT_MODES, { message: 'Выберите режим записи' })
+  mode?: EventMode;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Лимит — целое число' })
+  @Min(1, { message: 'Лимит — от 1 до 50' })
+  @Max(50, { message: 'Лимит — от 1 до 50' })
+  limit?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Смещение — целое число' })
+  @Min(0, { message: 'Смещение — от 0 до 10000' })
+  @Max(10_000, { message: 'Смещение — от 0 до 10000' })
+  offset?: number;
 }

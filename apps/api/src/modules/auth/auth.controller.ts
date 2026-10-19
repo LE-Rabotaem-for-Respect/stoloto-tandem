@@ -63,6 +63,7 @@ export class AuthController {
     clearSessionCookie(res, this.config.cookieName);
   }
 
+  // Свои данные аккаунта: не кешируются, как и все ответы api (noStore в configure-app)
   @Get('me')
   @SignedInOnly()
   me(@Req() req: AuthRequest): SelfView {
