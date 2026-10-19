@@ -125,6 +125,17 @@ html {
     grid-column: 1 / -1;
     border-top: var(--border-width) solid var(--color-line);
   }
+
+  /* Имя — в одну строку с многоточием: длинное название организации иначе добавляет
+     шапке третью строку и выводит её за пределы docs/design.md («Первый экран») */
+  .account-name {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    overflow-wrap: normal;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
 }
 
 .app-main {
@@ -204,9 +215,12 @@ html {
     border-bottom: var(--border-width) solid var(--color-line);
   }
 
+  /* Перенос строк: в «Крупном тексте» пять пунктов в одну строку помещаются только
+     примерно с 920 px, без переноса на 768 появлялась горизонтальная прокрутка */
   .main-nav ul {
     display: flex;
-    gap: var(--space-2);
+    flex-wrap: wrap;
+    gap: 0 var(--space-2);
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 var(--space-4);

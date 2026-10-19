@@ -111,6 +111,18 @@ describe('каркас приложения', () => {
     expect(screen.getByRole('button', { name: 'Сменить аккаунт' })).toBeTruthy();
   });
 
+  it('в шапке — имя организации, полное имя в подсказке (на узком экране оно обрезается многоточием)', async () => {
+    const ladya: Me = {
+      ...anna,
+      role: 'org',
+      organization: { id: 'o1', name: 'Шахматный клуб «Ладья»', status: 'approved' },
+    };
+    fakeApi({ signedIn: ladya });
+    renderApp('/');
+    const name = await screen.findByText('Шахматный клуб «Ладья»');
+    expect(name.closest('.account-name')?.getAttribute('title')).toBe('Шахматный клуб «Ладья»');
+  });
+
   it('«Войти» на экране регистрации сохраняет адрес возврата, вошедшего форма не держит', async () => {
     fakeApi();
     renderApp('/register?next=%2Fmy');

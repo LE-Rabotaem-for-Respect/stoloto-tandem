@@ -68,7 +68,7 @@ function Account() {
 
   return (
     <div className="account">
-      <span className="account-name">
+      <span className="account-name" title={who}>
         <span className="visually-hidden">Вы вошли как </span>
         {who}
       </span>
