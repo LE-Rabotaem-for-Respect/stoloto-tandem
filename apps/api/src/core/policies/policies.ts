@@ -101,6 +101,27 @@ export function canPostMessage(actor: Actor, event: PolicyEvent): Decision {
   return deny('forbidden');
 }
 
+/**
+ * Править и удалять своё сообщение. Организация действует от своего имени только после
+ * допуска; в снятом и удалённом мероприятии новые действия заблокированы (ТЗ 2.7, 2.10).
+ * Статус сообщения проверяет автомат.
+ */
+export function canEditMessage(
+  actor: Actor,
+  event: PolicyEvent,
+  message: { authorUserId: string },
+): Decision {
+  if (event.status === 'unpublished' || event.status === 'deleted') {
+    return deny('event_not_available');
+  }
+  if (actor.role === 'guest') return loginFirst;
+  if (message.authorUserId !== actor.userId) return deny('not_message_author');
+  if (actor.role === 'org' && actor.organization.status !== 'approved') {
+    return deny('organization_not_approved');
+  }
+  return allow;
+}
+
 /** Редактировать профиль организации и отправить его на проверку — в любом статусе. */
 export function canEditOrganization(actor: Actor, organizationId: string): Decision {
   if (actor.role === 'guest') return loginFirst;
