@@ -1,11 +1,16 @@
 import 'reflect-metadata';
 import { RequestMethod } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { ModulesContainer } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
+import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/configure-app';
 import { PUBLIC_KEY, ROLES_KEY } from '../src/core/access';
+import { ClockStateSource } from '../src/core/clock';
+import { SportsRepository } from '../src/modules/sports/sports.repository';
 
 interface Route {
   name: string;
@@ -52,9 +57,18 @@ describe('метки доступа маршрутов', () => {
     await close();
   });
 
-  it('маршруты найдены', () => {
+  it('найдены все маршруты всех контроллеров', () => {
     expect(routes.map((route) => route.name)).toEqual(
-      expect.arrayContaining(['AuthController.login', 'HealthController.check']),
+      expect.arrayContaining([
+        'AuthController.register',
+        'AuthController.login',
+        'AuthController.demoLogin',
+        'AuthController.logout',
+        'AuthController.me',
+        'ClockController.get',
+        'HealthController.check',
+        'SportsController.search',
+      ]),
     );
   });
 
@@ -76,5 +90,35 @@ describe('метки доступа маршрутов', () => {
       )
       .map((route) => route.name);
     expect(unmarked).toEqual([]);
+  });
+});
+
+describe('гость и открытые маршруты (приложение целиком, с guard)', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    process.env.DATABASE_URL ??= 'postgresql://unused@127.0.0.1:1/unused';
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(ClockStateSource)
+      .useValue({ read: async () => ({ offsetSeconds: 0, lastResetAt: null }) })
+      .overrideProvider(SportsRepository)
+      .useValue({ search: async () => [] })
+      .compile();
+    app = configureApp(moduleRef.createNestApplication({ logger: false }));
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it.each(['/health', '/clock', '/sports'])('%s открыт гостю', async (path) => {
+    expect((await request(app.getHttpServer()).get(path)).status).toBe(200);
+  });
+
+  it('/me без входа — 401', async () => {
+    const response = await request(app.getHttpServer()).get('/me');
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('unauthorized');
   });
 });
