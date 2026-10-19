@@ -122,6 +122,28 @@ describe('пользователь', () => {
       }),
     ).rejects.toThrow(/users_email_normalized_check/);
   });
+
+  it('почта с табуляцией или переводом строки отклоняется базой', async () => {
+    for (const email of ['anna@demo\t', 'anna\n@demo']) {
+      await expect(
+        prisma.user.create({
+          data: { name: 'Анна', email, passwordHash: 'hash', createdAt: new Date(0) },
+        }),
+      ).rejects.toThrow(/users_email_normalized_check/);
+    }
+  });
+});
+
+describe('столбцы-массивы', () => {
+  it('NULL вместо массива отклоняется базой', async () => {
+    const [sport, event] = await Promise.all([createSport(), createEvent()]);
+    await expect(
+      prisma.$executeRaw`UPDATE "sports" SET "aliases" = NULL WHERE "id" = ${sport.id}::uuid`,
+    ).rejects.toThrow(/sports_aliases_not_null_check/);
+    await expect(
+      prisma.$executeRaw`UPDATE "events" SET "bring" = NULL WHERE "id" = ${event.id}::uuid`,
+    ).rejects.toThrow(/events_bring_not_null_check/);
+  });
 });
 
 describe('аксессуары Хелфигочи', () => {

@@ -304,7 +304,8 @@ model Participation {
   decidedBy User? @relation("ParticipationDecider", fields: [decidedById], references: [id], onDelete: Restrict)
 
   /// Одна неотменённая запись на пару: закрывает и дубль активной записи,
-  /// и повторную заявку после отказа (DECISION-003)
+  /// и повторную заявку после отказа (DECISION-003). Отменённых записей у пары может быть
+  /// несколько, поэтому ключ eventId_userId в where запрещён правилом ESLint
   @@unique([eventId, userId], map: "participations_event_user_not_cancelled_key", where: raw("status <> 'cancelled'"))
   @@index([eventId, status, createdAt, id])
   @@index([userId])
@@ -462,7 +463,8 @@ model UserAccessory {
   accessory Accessory @relation(fields: [accessoryId], references: [id], onDelete: Restrict)
   sport     Sport?    @relation(fields: [sportId], references: [id], onDelete: Restrict)
 
-  /// Аксессуар группы выдаётся один раз, значок «другое» — один раз на направление
+  /// Аксессуар группы выдаётся один раз, значок «другое» — один раз на направление.
+  /// Ключ userId_accessoryId не уникален для значков, поэтому в where он запрещён правилом ESLint
   @@unique([userId, accessoryId], map: "user_accessories_group_key", where: raw("sport_id IS NULL"))
   @@unique([userId, accessoryId, sportId], map: "user_accessories_sport_key", where: raw("sport_id IS NOT NULL"))
   @@map("user_accessories")
