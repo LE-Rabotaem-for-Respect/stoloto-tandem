@@ -40,8 +40,10 @@ function expectSafeLightSvg(path: string) {
   const svg = read(path);
   expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg" viewBox="')).toBe(true);
   expect(statSync(join(root, path)).size).toBeLessThanOrEqual(MAX_BYTES);
-  expect(svg).not.toMatch(/<script|<image|<foreignObject|href=|\son[a-z]+=/i);
+  expect(svg).not.toMatch(/<script|<image|<foreignObject|href=|\son[a-z]+=|\sstyle=/i);
 }
+
+const SHAPE = /<(path|rect|circle|ellipse|polygon|polyline|line)\b[^>]*>/g;
 
 describe('группы направлений', () => {
   it('восемь групп из ТЗ, у каждой есть название', () => {
@@ -85,8 +87,10 @@ describe('файлы обложек', () => {
   it.each(SPORT_GROUPS)('%s: контурная версия без заливок и полупрозрачности', (group) => {
     const svg = read(coverPath(group, { contrast: true }));
     expect(svg).not.toMatch(/opacity|rgba|hsla|#[0-9a-f]{8}\b|#[0-9a-f]{4}\b/i);
-    const fills = [...svg.matchAll(/fill="([^"]*)"/g)].map((m) => m[1]);
-    expect(fills.every((fill) => fill === 'none')).toBe(true);
+    // Без атрибута fill фигура залилась бы чёрным, поэтому он обязателен у каждой
+    const shapes = [...svg.matchAll(SHAPE)].map((m) => m[0]);
+    expect(shapes.length).toBeGreaterThan(0);
+    expect(shapes.every((shape) => shape.includes('fill="none"'))).toBe(true);
     const strokes = [...svg.matchAll(/stroke="([^"]*)"/g)].map((m) => m[1]);
     expect(strokes.length).toBeGreaterThan(0);
     expect(strokes.every((stroke) => stroke === 'currentColor')).toBe(true);
@@ -104,7 +108,10 @@ describe('пиктограммы', () => {
     const svg = read(path);
     expect(svg).toContain('viewBox="0 0 24 24"');
     expect(svg).toContain('stroke="currentColor"');
+    expect(svg).toMatch(/^<svg [^>]*fill="none"/);
     expect(svg).not.toMatch(/opacity|#[0-9a-f]{3,8}\b|rgb|hsl/i);
+    const shapes = [...svg.matchAll(SHAPE)].map((m) => m[0]);
+    expect(shapes.every((shape) => !/\sfill="(?!none")/.test(shape))).toBe(true);
     expectUrlServes(iconUrl(name), path);
   });
 });

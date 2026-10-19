@@ -32,6 +32,7 @@ export const ICONS = [
   'status-waitlist',
   'status-rejected',
   'status-cancelled',
+  'status-event-cancelled',
   'status-finished',
   'status-full',
   'status-rescheduled',
