@@ -1,6 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
+import {
+  AdminEventsPage,
+  AdminOrganizationsPage,
+  AdminOverviewPage,
+} from './features/admin/AdminPages';
 import { AppLayout } from './features/navigation/AppLayout';
 import {
   CreateEventPage,
@@ -34,6 +39,9 @@ export function AppRoutes() {
         <Route path="create" element={<CreateEventPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="admin" element={<AdminOverviewPage />} />
+        <Route path="admin/organizations" element={<AdminOrganizationsPage />} />
+        <Route path="admin/events" element={<AdminEventsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
