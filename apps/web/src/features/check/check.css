@@ -1,0 +1,71 @@
+.check-page {
+  display: grid;
+  gap: var(--space-3, 12px);
+  max-width: 72rem;
+}
+
+.check-page h1,
+.check-page h2,
+.check-page p {
+  margin: 0;
+}
+
+.check-route,
+.check-stands {
+  display: grid;
+  gap: var(--space-2, 8px);
+}
+
+.check-note {
+  font-style: italic;
+}
+
+.check-steps {
+  display: grid;
+  gap: var(--space-2, 8px);
+  margin: 0;
+  padding-left: 1.5em;
+}
+
+.check-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1, 4px) var(--space-2, 8px);
+}
+
+.check-who {
+  font-weight: 700;
+}
+
+.check-expected {
+  padding: 0 var(--space-2, 8px);
+  border-left: 3px solid currentColor;
+}
+
+.check-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+.check-credentials {
+  font-family: monospace;
+}
+
+.check-document table {
+  border-collapse: collapse;
+}
+
+.check-document th,
+.check-document td {
+  padding: var(--space-1, 4px) var(--space-2, 8px);
+  border: 1px solid currentColor;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-table {
+  overflow-x: auto;
+}
