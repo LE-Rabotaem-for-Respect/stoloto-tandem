@@ -14,6 +14,7 @@ export const SignedIn = () => Roles('user', 'org', 'admin');
 
 /**
  * Маршрут открыт и гостю. Без этой метки и без `@Roles` маршрут требует
- * входа: забытая метка не должна открыть гостю чужие данные.
+ * входа: забытая метка не должна открыть гостю чужие данные. Ставится только
+ * на метод: на контроллере она открыла бы и методы, добавленные позже.
  */
-export const Public = () => SetMetadata(PUBLIC_KEY, true);
+export const Public = (): MethodDecorator => SetMetadata(PUBLIC_KEY, true);

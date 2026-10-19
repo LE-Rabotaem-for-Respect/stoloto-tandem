@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AUTH_CONFIG, loadAuthConfig } from './auth-config';
+import { AUTH_LIMITS, DEFAULT_AUTH_LIMITS } from './attempt-limiter';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthRepository } from './auth.repository';
 import { AuthService } from './auth.service';
+import { PasswordHasher } from './password-hasher';
 import { SessionService } from './session.service';
 
 /** Вход, регистрация, сессии и проверка ролей для всех маршрутов api. */
@@ -13,7 +15,9 @@ import { SessionService } from './session.service';
   providers: [
     // Без секрета сессий api не стартует (DECISION-002)
     { provide: AUTH_CONFIG, useFactory: () => loadAuthConfig() },
+    { provide: AUTH_LIMITS, useValue: DEFAULT_AUTH_LIMITS },
     AuthRepository,
+    PasswordHasher,
     SessionService,
     AuthService,
     { provide: APP_GUARD, useClass: AuthGuard },

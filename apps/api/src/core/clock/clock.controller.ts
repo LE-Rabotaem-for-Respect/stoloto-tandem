@@ -6,13 +6,13 @@ import { Public } from '../access';
 
 /** Web берёт «сейчас» и режим стенда отсюда, а не из часов браузера и сборки. */
 @Controller('clock')
-@Public()
 export class ClockController {
   constructor(
     private readonly clock: Clock,
     @Inject(STAND_CONFIG) private readonly config: StandConfig,
   ) {}
 
+  @Public()
   @Get()
   get() {
     return {

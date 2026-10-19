@@ -131,10 +131,15 @@ function guardFor(sessionUser: UserWithOrganization | null, access: RouteAccess 
 }
 
 describe('проверка ролей', () => {
-  it('открытый маршрут (@Public) пускает гостя, в запросе — гость', async () => {
-    const { run, request } = guardFor(null, { controller: { public: true } });
+  it('открытый маршрут (@Public на методе) пускает гостя, в запросе — гость', async () => {
+    const { run, request } = guardFor(null, { handler: { public: true } });
     await expect(run()).resolves.toBe(true);
     expect(request.actor).toEqual({ role: 'guest' });
+  });
+
+  it('метка открытости на контроллере метод не открывает', async () => {
+    const { run } = guardFor(null, { controller: { public: true } });
+    await expect(run()).rejects.toMatchObject({ code: 'unauthorized' });
   });
 
   it('маршрут без меток закрыт для гостя и открыт любому вошедшему', async () => {
