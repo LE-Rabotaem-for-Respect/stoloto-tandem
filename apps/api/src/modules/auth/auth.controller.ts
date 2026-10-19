@@ -1,9 +1,10 @@
-import { Body, Controller, Get, HttpCode, Inject, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AUTH_CONFIG } from './auth-config';
 import type { AuthConfig } from './auth-config';
 import { AuthService } from './auth.service';
 import type { SignedIn } from './auth.service';
 import { clearSessionCookie, setSessionCookie } from './cookies';
+import { DemoModeGuard } from './demo-mode.guard';
 import type { CookieResponse } from './cookies';
 import { DemoLoginDto, LoginDto, RegisterDto } from './dto';
 import { SignedIn as SignedInOnly } from './roles';
@@ -38,6 +39,7 @@ export class AuthController {
   }
 
   @Post('auth/demo-login')
+  @UseGuards(DemoModeGuard)
   @HttpCode(200)
   async demoLogin(
     @Body() dto: DemoLoginDto,
