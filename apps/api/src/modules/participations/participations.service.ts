@@ -6,7 +6,7 @@ import { Clock } from '../../core/clock';
 import { ApiError } from '../../core/errors';
 import type { ErrorFields } from '../../core/errors';
 import { EventBus, domainEvent } from '../../core/event-bus';
-import { canJoin } from '../../core/policies';
+import { canJoin, canLeave } from '../../core/policies';
 import type { Actor } from '../../core/policies';
 import { ParticipationsRepository } from './participations.repository';
 import type { Db, JoinableEvent } from './participations.repository';
@@ -90,9 +90,11 @@ export class ParticipationsService {
   leave(actor: Actor, eventId: string): Promise<ParticipationView> {
     return this.bus.afterCommit((emit) =>
       this.participations.transaction(async (tx) => {
-        if (actor.role !== 'user') throw new ApiError('users_only');
         const event = await this.lock(eventId, tx);
         const now = this.clock.now();
+        const decision = canLeave(actor, event, now);
+        if (!decision.allowed) throw new ApiError(decision.code);
+        if (actor.role !== 'user') throw new ApiError('users_only');
 
         const active = await this.participations.findActive(event.id, actor.userId, tx);
         const status = participationMachine.nextState(active?.status ?? null, 'cancel', {

@@ -262,6 +262,28 @@ describe('POST /events/:id/leave', () => {
     expect(await statuses(event.id, igor.id)).toEqual(['rejected']);
   });
 
+  it.each([
+    ['снятого с публикации', { status: 'unpublished', statusReason: 'Проверка' }],
+    ['удалённого', { status: 'deleted', statusReason: 'Проверка' }],
+    ['отменённого', { status: 'cancelled', statusReason: 'Дождь' }],
+    ['завершённого', { startsAt: inDays(-1), endsAt: inDays(-1, 2) }],
+  ] as const)('у %s мероприятия запись не меняется (ТЗ 4.3, 2.10)', async (_, data) => {
+    const event = await createEvent(data);
+    await participation(event.id, anna.id, 'confirmed');
+    const response = await leave(anna, event.id);
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('event_not_joinable');
+    expect(await statuses(event.id, anna.id)).toEqual(['confirmed']);
+  });
+
+  it('несуществующее и неверный id — «Мероприятие недоступно»', async () => {
+    for (const id of [randomUUID(), 'not-a-uuid']) {
+      const response = await leave(anna, id);
+      expect(response.status).toBe(404);
+      expect(response.body.code).toBe('event_not_available');
+    }
+  });
+
   it('гостю — 401, организации и администратору — «только пользователи»', async () => {
     const event = await createEvent();
     expect((await http().post(`/events/${event.id}/leave`)).status).toBe(401);
