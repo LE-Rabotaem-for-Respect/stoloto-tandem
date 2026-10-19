@@ -15,7 +15,12 @@ export {
   toneTokens,
 } from './statuses';
 export type { StatusTone, StatusView } from './statuses';
-export { normalizeSportName } from './sport-normalize';
+export {
+  SPORT_NAME_PATTERN,
+  cleanSportName,
+  isValidSportName,
+  normalizeSportName,
+} from './sport-normalize';
 export {
   DEFAULT_SPORT_CATEGORY,
   SPORT_CATEGORIES,

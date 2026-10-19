@@ -49,10 +49,16 @@ class FakeSportsRepository {
       }));
   }
 
+  // Тот же порядок, что в базе: активное по имени → по алиасу → любое по имени → по алиасу
   async findByName(normalizedName: string) {
+    const byName = (s: Sport) => s.normalizedName === normalizedName;
+    const byAlias = (s: Sport) => s.aliases.includes(normalizedName);
+    const active = (s: Sport) => s.status === 'active';
     return (
-      this.sports.find((s) => s.normalizedName === normalizedName) ??
-      this.sports.find((s) => s.status === 'active' && s.aliases.includes(normalizedName)) ??
+      this.sports.find((s) => active(s) && byName(s)) ??
+      this.sports.find((s) => active(s) && byAlias(s)) ??
+      this.sports.find(byName) ??
+      this.sports.find(byAlias) ??
       null
     );
   }
@@ -127,11 +133,14 @@ describe('SportsService', () => {
 
     it('создаёт пользовательское направление с группой «другое» по умолчанию', async () => {
       const created = await service.findOrCreate({ name: '  Кёрлинг   на льду ' }, 'user-1');
-      expect(created).toMatchObject({
+      expect(created).toEqual({
+        id: 'id-керлинг на льду',
         name: 'Кёрлинг на льду',
-        normalizedName: 'керлинг на льду',
         category: 'other',
         isCustom: true,
+      });
+      expect(repository.sports.at(-1)).toMatchObject({
+        normalizedName: 'керлинг на льду',
         createdById: 'user-1',
       });
     });
@@ -144,9 +153,48 @@ describe('SportsService', () => {
     it('скрытое направление с тем же именем используется повторно', async () => {
       await expect(service.findOrCreate({ name: 'ёрш' }, 'user-1')).resolves.toMatchObject({
         id: 'id-ерш',
-        status: 'hidden',
       });
       expect(repository.sports).toHaveLength(3);
+    });
+
+    it('после объединения дублей старое имя ведёт к активному направлению', async () => {
+      repository.sports.push(
+        sport({ name: 'Падл', normalizedName: 'падл', status: 'hidden' }),
+        sport({ name: 'Падел-теннис', normalizedName: 'падел-теннис', aliases: ['падл'] }),
+      );
+      await expect(service.findOrCreate({ name: 'Падл' }, 'user-1')).resolves.toMatchObject({
+        id: 'id-падел-теннис',
+      });
+    });
+
+    it('алиас скрытого направления не создаётся заново как новое', async () => {
+      repository.sports.push(
+        sport({ name: 'Старое', normalizedName: 'старое', aliases: ['былое'], status: 'hidden' }),
+      );
+      await expect(service.findOrCreate({ name: 'Былое' }, 'user-1')).resolves.toMatchObject({
+        id: 'id-старое',
+      });
+      expect(repository.sports).toHaveLength(4);
+    });
+
+    it.each([
+      ['невидимый символ', 'Ёр\u200bш'],
+      ['переворот текста', '\u202eшрЁ'],
+      ['разметка', '<b>Ёрш</b>'],
+    ])('отклоняет название с недопустимыми символами: %s', async (_, name) => {
+      await expect(service.findOrCreate({ name }, 'user-1')).rejects.toMatchObject({
+        code: 'validation_failed',
+      });
+      expect(repository.sports).toHaveLength(3);
+    });
+
+    it('разложенная «й» находит направление с обычной', async () => {
+      repository.sports.push(sport({ name: 'Пробный', normalizedName: 'пробный' }));
+      await expect(
+        service.findOrCreate({ name: 'Пробны\u0438\u0306' }, 'user-1'),
+      ).resolves.toMatchObject({
+        id: 'id-пробный',
+      });
     });
 
     it('отклоняет название короче двух символов после нормализации', async () => {
@@ -191,6 +239,18 @@ describe('GET /sports', () => {
     repository.searches = [];
     await request(app.getHttpServer()).get('/sports').query({ q: 'с', limit: '3' });
     expect(repository.searches).toEqual([{ query: 'с', limit: 3 }]);
+  });
+
+  it.each([
+    ['нулевой байт', 'a\u0000b'],
+    ['невидимый символ', 'ск\u200bало'],
+  ])('отклоняет запрос с управляющими символами (%s) ошибкой проверки, а не 500', async (_, q) => {
+    const response = await request(app.getHttpServer()).get('/sports').query({ q });
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      code: 'validation_failed',
+      fields: { q: 'В запросе есть недопустимые символы' },
+    });
   });
 
   it('отклоняет неверный лимит понятной ошибкой', async () => {

@@ -80,7 +80,11 @@ describe('новое направление', () => {
     expect(second.id).toBe(first.id);
     expect(third.id).toBe(first.id);
     expect(await prisma.sport.count({ where: { normalizedName: `падел ${tag}` } })).toBe(1);
-    expect(first).toMatchObject({ isCustom: true, category: 'other', createdById: authorId });
+    expect(first).toMatchObject({ isCustom: true, category: 'other' });
+    expect(await prisma.sport.findUnique({ where: { id: first.id } })).toMatchObject({
+      createdById: authorId,
+      status: 'active',
+    });
   });
 
   it('ё и е — одно направление', async () => {
@@ -106,8 +110,34 @@ describe('новое направление', () => {
 
   it('скрытое направление с тем же именем используется повторно', async () => {
     const found = await service.findOrCreate({ name: `скрытый  ${tag}` }, authorId);
-    expect(found).toMatchObject({ name: `Скрытый ${tag}`, status: 'hidden' });
+    expect(found.name).toBe(`Скрытый ${tag}`);
     expect(await prisma.sport.count({ where: { normalizedName: `скрытый ${tag}` } })).toBe(1);
+  });
+
+  it('невидимые и управляющие символы не дают обойти скрытие и правило без дублей', async () => {
+    const before = await prisma.sport.count();
+    for (const name of [`Скры\u200bтый ${tag}`, `\u202eйытырксС ${tag}`, `Скры\u0007тый ${tag}`]) {
+      await expect(service.findOrCreate({ name }, authorId)).rejects.toMatchObject({
+        code: 'validation_failed',
+      });
+    }
+    expect(await prisma.sport.count()).toBe(before);
+  });
+
+  it('разложенная «й» находит то же направление', async () => {
+    const composed = await service.findOrCreate({ name: `Пробный ${tag}` }, authorId);
+    const decomposed = await service.findOrCreate({ name: `Пробны\u0438\u0306 ${tag}` }, authorId);
+    expect(decomposed.id).toBe(composed.id);
+  });
+
+  it('в транзакции: если мероприятие не сохранилось, направление не остаётся в каталоге', async () => {
+    await expect(
+      prisma.$transaction(async (tx) => {
+        await service.findOrCreate({ name: `Городки ${tag}` }, authorId, tx);
+        throw new Error('мероприятие не прошло проверку');
+      }),
+    ).rejects.toThrow('мероприятие не прошло проверку');
+    expect(await prisma.sport.count({ where: { normalizedName: `городки ${tag}` } })).toBe(0);
   });
 
   it('вставка уже существующего имени возвращает запись, не падая и не прерывая транзакцию', async () => {

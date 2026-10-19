@@ -1,9 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { DEFAULT_SPORT_CATEGORY, normalizeSportName } from '@tandem/domain';
+import {
+  DEFAULT_SPORT_CATEGORY,
+  cleanSportName,
+  isValidSportName,
+  normalizeSportName,
+} from '@tandem/domain';
 import type { SportCategory } from '@tandem/domain';
 import { ApiError } from '../../core/errors';
-import type { Sport } from '../../generated/prisma/client';
+import { SPORT_NAME_RULE } from './sports.dto';
 import { SportsRepository } from './sports.repository';
+import type { Db } from './sports.repository';
 
 export interface SportItem {
   id: string;
@@ -25,6 +31,13 @@ export interface NewSport {
 
 const DEFAULT_LIMIT = 10;
 
+const toItem = ({ id, name, category, isCustom }: SportItem): SportItem => ({
+  id,
+  name,
+  category,
+  isCustom,
+});
+
 @Injectable()
 export class SportsService {
   constructor(private readonly sports: SportsRepository) {}
@@ -34,7 +47,7 @@ export class SportsService {
     const normalized = normalizeSportName(query);
     const rows = await this.sports.search(normalized, limit);
     return {
-      items: rows.map(({ id, name, category, isCustom }) => ({ id, name, category, isCustom })),
+      items: rows.map(toItem),
       exactMatch: normalized !== '' && rows.some((row) => row.exact),
     };
   }
@@ -44,22 +57,23 @@ export class SportsService {
    * или алиасу) либо новое пользовательское, сразу доступное в поиске.
    * Поэтому «Падел» и «падел » не создают дубль. Скрытое направление с тем же
    * именем используется повторно: такое мероприятие показывается в группе «Другое» (ТЗ 2.3).
+   *
+   * Вызывать после всех проверок создания мероприятия и в его транзакции (`tx`):
+   * если мероприятие не сохранится, новое направление не останется в каталоге.
    */
-  async findOrCreate(input: NewSport, createdById: string): Promise<Sport> {
-    const name = input.name.trim().replace(/\s+/g, ' ');
-    const normalizedName = normalizeSportName(name);
-    if (normalizedName.length < 2) {
-      throw new ApiError('validation_failed', { name: 'Название направления — от 2 символов' });
+  async findOrCreate(input: NewSport, createdById: string, tx?: Db): Promise<SportItem> {
+    const name = cleanSportName(input.name);
+    if (name.length < 2 || !isValidSportName(name)) {
+      throw new ApiError('validation_failed', { name: SPORT_NAME_RULE });
     }
+    const normalizedName = normalizeSportName(name);
 
-    const existing = await this.sports.findByName(normalizedName);
-    if (existing) return existing;
-
-    return this.sports.createCustom({
-      name,
-      normalizedName,
-      category: input.category ?? DEFAULT_SPORT_CATEGORY,
-      createdById,
-    });
+    const sport =
+      (await this.sports.findByName(normalizedName, tx)) ??
+      (await this.sports.createCustom(
+        { name, normalizedName, category: input.category ?? DEFAULT_SPORT_CATEGORY, createdById },
+        tx,
+      ));
+    return toItem(sport);
   }
 }

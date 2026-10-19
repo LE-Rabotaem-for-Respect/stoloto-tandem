@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { SportCategory } from '@tandem/domain';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import type { Sport } from '../../generated/prisma/client';
+import type { Prisma, Sport } from '../../generated/prisma/client';
+
+/** Клиент базы: обычный или транзакции, в которой вызван метод. */
+export type Db = Prisma.TransactionClient;
 
 export interface SportSearchRow {
   id: string;
@@ -47,14 +50,21 @@ export class SportsRepository {
       LIMIT ${limit}::int`;
   }
 
-  /** Направление с таким нормализованным именем, а если его нет — активное с таким алиасом. */
-  async findByName(normalizedName: string): Promise<Sport | null> {
-    const byName = await this.prisma.sport.findUnique({ where: { normalizedName } });
-    if (byName) return byName;
-    return this.prisma.sport.findFirst({
-      where: { aliases: { has: normalizedName }, status: 'active' },
+  /**
+   * Направление, которое пользователь имел в виду, по нормализованному имени.
+   * Порядок: активное по имени → активное по алиасу → любое по имени → любое по алиасу.
+   * Так после объединения дублей старое имя (алиас) ведёт к активному направлению,
+   * а имя или алиас скрытого не создаётся заново как новое активное.
+   */
+  async findByName(normalizedName: string, tx?: Db): Promise<Sport | null> {
+    const db = tx ?? this.prisma;
+    const candidates = await db.sport.findMany({
+      where: { OR: [{ normalizedName }, { aliases: { has: normalizedName } }] },
       orderBy: { normalizedName: 'asc' },
     });
+    const rank = (sport: Sport) =>
+      (sport.status === 'active' ? 0 : 2) + (sport.normalizedName === normalizedName ? 0 : 1);
+    return candidates.sort((a, b) => rank(a) - rank(b))[0] ?? null;
   }
 
   /**
@@ -62,13 +72,9 @@ export class SportsRepository {
    * запрос, возвращается его запись: вставка идёт с ON CONFLICT DO NOTHING, поэтому
    * не падает на уникальности и не прерывает транзакцию, в которой её вызвали.
    */
-  async createCustom(record: NewSportRecord): Promise<Sport> {
-    await this.prisma.sport.createMany({
-      data: { ...record, isCustom: true },
-      skipDuplicates: true,
-    });
-    return this.prisma.sport.findUniqueOrThrow({
-      where: { normalizedName: record.normalizedName },
-    });
+  async createCustom(record: NewSportRecord, tx?: Db): Promise<Sport> {
+    const db = tx ?? this.prisma;
+    await db.sport.createMany({ data: { ...record, isCustom: true }, skipDuplicates: true });
+    return db.sport.findUniqueOrThrow({ where: { normalizedName: record.normalizedName } });
   }
 }
