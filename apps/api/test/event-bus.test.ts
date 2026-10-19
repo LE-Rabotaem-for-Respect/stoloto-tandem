@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { Injectable, Logger } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -11,6 +12,7 @@ import {
   domainEvent,
 } from '../src/core/event-bus';
 import type { DomainEvent } from '../src/core/event-bus';
+import { Prisma } from '../src/generated/prisma/client';
 
 const occurredAt = new Date('2026-10-19T05:00:00Z');
 const confirmed = () =>
@@ -20,6 +22,15 @@ const confirmed = () =>
     userId: 'u-1',
     via: 'accept',
     actorId: 'u-organizer',
+    occurredAt,
+  });
+
+const posted = () =>
+  domainEvent('MessagePosted', {
+    messageId: 'm-1',
+    eventId: 'e-1',
+    authorId: 'u-1',
+    actorId: 'u-1',
     occurredAt,
   });
 
@@ -39,8 +50,27 @@ class Handlers {
     this.received.push(event);
   }
 
+  @OnDomainEvent('EventRestored')
+  @OnEvent('EventUpdated')
+  restoredOrUpdated(event: DomainEvent<'EventRestored'> | DomainEvent<'EventUpdated'>) {
+    this.received.push(event);
+  }
+
   @OnDomainEvent('EventCancelled')
   cancelled(event: DomainEvent<'EventCancelled'>) {
+    this.received.push(event);
+  }
+
+  @OnDomainEvent('MessagePosted')
+  prismaFailing() {
+    throw new Prisma.PrismaClientValidationError(
+      'Invalid prisma.notification.create() invocation: data: { email: "anna@demo", text: "Анна, вас приняли" }',
+      { clientVersion: 'test' },
+    );
+  }
+
+  @OnDomainEvent('MessagePosted')
+  posted(event: DomainEvent<'MessagePosted'>) {
     this.received.push(event);
   }
 }
@@ -122,7 +152,44 @@ describe('core/event-bus: публикация и обработчики', () =>
     expect(() => bus.publish(confirmed())).not.toThrow();
     await nextTick();
     expect(handlers.received).toHaveLength(1);
-    expect(logged).toHaveBeenCalledWith('обработчик уведомлений упал', expect.any(String));
+    expect(logged).toHaveBeenCalledTimes(1);
+    const written = String(logged.mock.calls[0]?.[0]);
+    expect(written).toContain('Handlers.failing');
+    expect(written).toContain('обработчик уведомлений упал');
+    expect(written).toMatch(/\n\s+at /);
+  });
+
+  it('ошибка Prisma в обработчике — в журнале без аргументов вызова, действие выполнено', async () => {
+    const result = await bus.afterCommit(async (emit) => {
+      emit(posted());
+      return 'сообщение сохранено';
+    });
+    await nextTick();
+    expect(result).toBe('сообщение сохранено');
+    expect(handlers.received).toEqual([posted()]);
+    const written = JSON.stringify(logged.mock.calls);
+    expect(written).toContain('Handlers.prismaFailing');
+    expect(written).toContain('PrismaClientValidationError');
+    expect(written).not.toContain('anna@demo');
+    expect(written).not.toContain('вас приняли');
+  });
+
+  it('подписки других декораторов метода сохраняются', async () => {
+    const restored = domainEvent('EventRestored', {
+      eventId: 'e-1',
+      actorId: 'u-admin',
+      occurredAt,
+    });
+    const updated = domainEvent('EventUpdated', {
+      eventId: 'e-1',
+      fields: ['title'],
+      actorId: 'u-organizer',
+      occurredAt,
+    });
+    bus.publish(restored, updated);
+    await nextTick();
+    expect(handlers.received).toHaveLength(2);
+    expect(handlers.received).toEqual(expect.arrayContaining([restored, updated]));
   });
 
   it('afterCommit публикует события только после успешной работы', async () => {

@@ -94,6 +94,18 @@ describe('core/clock: Clock — единственный источник «се
     expect(missing.status).toBe(404);
     expect(missing.headers['x-server-time']).toBe('2026-10-19T05:01:00.000Z');
   });
+
+  it('ответы без заголовка X-Powered-By', async () => {
+    app = await start(
+      { demoMode: false, standId: null },
+      new FakeState({ offsetSeconds: 0, lastResetAt: null }),
+    );
+    const ok = await request(app.getHttpServer()).get('/clock');
+    const missing = await request(app.getHttpServer()).get('/no-such-route');
+    expect(ok.status).toBe(200);
+    expect(ok.headers['x-powered-by']).toBeUndefined();
+    expect(missing.headers['x-powered-by']).toBeUndefined();
+  });
 });
 
 describe('core/config: настройки стенда из окружения', () => {
