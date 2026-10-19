@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [prod]
+  push:
+    branches: [prod]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Запуск docker compose
+        run: docker compose up --build --detach --wait --wait-timeout 180
+      - name: Проверка web и api
+        run: |
+          curl --fail --silent --show-error http://localhost:3000/health
+          curl --fail --silent --show-error http://localhost:8080/api/health
+          curl --fail --silent --show-error http://localhost:8080/ | grep -q '<div id="root">'
+      - name: Логи сервисов
+        if: failure()
+        run: docker compose logs
+      - name: Остановка
+        if: always()
+        run: docker compose down --volumes
