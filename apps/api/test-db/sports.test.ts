@@ -124,6 +124,47 @@ describe('новое направление', () => {
     expect(await prisma.sport.count()).toBe(before);
   });
 
+  it('невидимые «буквы» Default_Ignorable не создают двойника скрытого направления', async () => {
+    const before = await prisma.sport.count();
+    for (const cp of [0x34f, 0x3164, 0xfe0f]) {
+      const name = `Скры${String.fromCodePoint(cp)}тый ${tag}`;
+      await expect(service.findOrCreate({ name }, authorId)).rejects.toMatchObject({
+        code: 'validation_failed',
+      });
+    }
+    expect(await prisma.sport.count()).toBe(before);
+  });
+
+  it('после объединения дублей старое имя ведёт к активному, а не к скрытому дублю', async () => {
+    await prisma.sport.createMany({
+      data: [
+        { name: `Падл ${tag}`, normalizedName: `падл ${tag}`, status: 'hidden' },
+        {
+          name: `Падел-теннис ${tag}`,
+          normalizedName: `падел-теннис ${tag}`,
+          aliases: [`падл ${tag}`],
+        },
+      ],
+    });
+    const found = await service.findOrCreate({ name: `Падл ${tag}` }, authorId);
+    expect(found.name).toBe(`Падел-теннис ${tag}`);
+  });
+
+  it('алиас скрытого направления ведёт к нему, новое не создаётся', async () => {
+    await prisma.sport.create({
+      data: {
+        name: `Старое ${tag}`,
+        normalizedName: `старое ${tag}`,
+        aliases: [`былое ${tag}`],
+        status: 'hidden',
+      },
+    });
+    const before = await prisma.sport.count();
+    const found = await service.findOrCreate({ name: `Былое ${tag}` }, authorId);
+    expect(found.name).toBe(`Старое ${tag}`);
+    expect(await prisma.sport.count()).toBe(before);
+  });
+
   it('разложенная «й» находит то же направление', async () => {
     const composed = await service.findOrCreate({ name: `Пробный ${tag}` }, authorId);
     const decomposed = await service.findOrCreate({ name: `Пробны\u0438\u0306 ${tag}` }, authorId);

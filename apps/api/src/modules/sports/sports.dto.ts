@@ -15,7 +15,7 @@ import {
 
 export const SPORT_NAME_MAX_LENGTH = 50;
 
-export const SPORT_NAME_RULE = `Название направления — от 2 до ${SPORT_NAME_MAX_LENGTH} символов: буквы, цифры, пробелы, дефис`;
+export const SPORT_NAME_RULE = `Название направления — от 2 до ${SPORT_NAME_MAX_LENGTH} символов: буквы, цифры, пробелы и знаки . , ' ( ) × / + -`;
 
 // Управляющие и невидимые символы (форматирующие, вроде U+200B и U+202E)
 const NO_HIDDEN_CHARS = /^[^\p{Cc}\p{Cf}]*$/u;
