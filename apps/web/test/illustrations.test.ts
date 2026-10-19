@@ -1,17 +1,17 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SPORT_CATEGORIES, SPORT_CATEGORY_TITLES } from '@tandem/domain';
 import { describe, expect, it } from 'vitest';
+import * as illustrations from '../src/shared/illustrations';
 import {
   ICONS,
-  SPORT_GROUPS,
-  SPORT_GROUP_TITLES,
   coverAlt,
   coverPath,
   coverUrl,
   iconPath,
   iconUrl,
-  sportGroupOrOther,
+  sportCategoryOrOther,
 } from '../src/shared/illustrations';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../src/shared/illustrations');
@@ -46,17 +46,30 @@ function expectSafeLightSvg(path: string) {
 const SHAPE = /<(path|rect|circle|ellipse|polygon|polyline|line)\b[^>]*>/g;
 
 describe('группы направлений', () => {
-  it('восемь групп из ТЗ, у каждой есть название', () => {
-    expect(SPORT_GROUPS).toHaveLength(8);
-    for (const group of SPORT_GROUPS) expect(SPORT_GROUP_TITLES[group]).toBeTruthy();
+  it('ключи групп — из SPORT_CATEGORIES (@tandem/domain), своего списка нет', () => {
+    expect(illustrations).not.toHaveProperty('SPORT_GROUPS');
+    expect(illustrations).not.toHaveProperty('SPORT_GROUP_TITLES');
+    for (const category of SPORT_CATEGORIES) {
+      expect(sportCategoryOrOther(category)).toBe(category);
+      expect(coverAlt(category)).toBe(SPORT_CATEGORY_TITLES[category]);
+    }
+  });
+
+  it('ключи api: интеллектуальные и единоборства — intellectual и martial', () => {
+    expect(coverPath('intellectual')).toBe('covers/intellectual.svg');
+    expect(coverPath('martial', { contrast: true })).toBe('covers/outline/martial.svg');
+    expect(coverAlt('intellectual')).toBe('Интеллектуальные');
+    expect(coverAlt('martial')).toBe('Единоборства');
+    expect(sportCategoryOrOther('mind')).toBe('other');
+    expect(sportCategoryOrOther('combat')).toBe('other');
   });
 
   it('неизвестная, пустая или скрытая группа показывается как «Другое»', () => {
-    expect(sportGroupOrOther('water')).toBe('water');
-    expect(sportGroupOrOther('petanque')).toBe('other');
-    expect(sportGroupOrOther('')).toBe('other');
-    expect(sportGroupOrOther(null)).toBe('other');
-    expect(sportGroupOrOther(undefined)).toBe('other');
+    expect(sportCategoryOrOther('water')).toBe('water');
+    expect(sportCategoryOrOther('petanque')).toBe('other');
+    expect(sportCategoryOrOther('')).toBe('other');
+    expect(sportCategoryOrOther(null)).toBe('other');
+    expect(sportCategoryOrOther(undefined)).toBe('other');
     expect(coverPath('petanque')).toBe('covers/other.svg');
     expect(coverAlt(undefined)).toBe('Другое');
   });
@@ -72,11 +85,11 @@ describe('группы направлений', () => {
 
 describe('файлы обложек', () => {
   it('есть цветная и контурная обложка для каждой группы и нет лишних', () => {
-    expect(svgFiles('covers')).toEqual([...SPORT_GROUPS].sort());
-    expect(svgFiles('covers/outline')).toEqual([...SPORT_GROUPS].sort());
+    expect(svgFiles('covers')).toEqual([...SPORT_CATEGORIES].sort());
+    expect(svgFiles('covers/outline')).toEqual([...SPORT_CATEGORIES].sort());
   });
 
-  it.each(SPORT_GROUPS)('%s: один формат кадра, лёгкие, без внешних ресурсов', (group) => {
+  it.each(SPORT_CATEGORIES)('%s: один формат кадра, лёгкие, без внешних ресурсов', (group) => {
     for (const contrast of [false, true]) {
       const path = coverPath(group, { contrast });
       expectSafeLightSvg(path);
@@ -84,7 +97,7 @@ describe('файлы обложек', () => {
     }
   });
 
-  it.each(SPORT_GROUPS)('%s: контурная версия без заливок и полупрозрачности', (group) => {
+  it.each(SPORT_CATEGORIES)('%s: контурная версия без заливок и полупрозрачности', (group) => {
     const svg = read(coverPath(group, { contrast: true }));
     expect(svg).not.toMatch(/opacity|rgba|hsla|#[0-9a-f]{8}\b|#[0-9a-f]{4}\b/i);
     // Без атрибута fill фигура залилась бы чёрным, поэтому он обязателен у каждой
