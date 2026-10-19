@@ -279,7 +279,7 @@ describe('поиск', () => {
 
     const approvedOnly = await http()
       .get('/admin/organizations')
-      .query({ q: tag, status: 'approved' })
+      .query({ q: `шахматы ${tag}`, status: 'approved' })
       .set('Cookie', cookie);
     expect(approvedOnly.body.items).toEqual([]);
 
