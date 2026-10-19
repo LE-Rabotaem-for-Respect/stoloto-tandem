@@ -7,6 +7,7 @@ set -e
 if [ -z "$SESSION_SECRET" ]; then
   secret_file=/var/lib/tandem/session-secret
   if [ ! -s "$secret_file" ]; then
+    umask 077
     node -e "process.stdout.write(require('crypto').randomBytes(32).toString('base64url'))" > "$secret_file"
   fi
   SESSION_SECRET=$(cat "$secret_file")

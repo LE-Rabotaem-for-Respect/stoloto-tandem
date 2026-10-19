@@ -26,12 +26,21 @@ docker compose up --build
 Порты меняются переменными `WEB_PORT` и `API_PORT`, например
 `WEB_PORT=8081 docker compose up --build`.
 
+Другие переменные окружения api:
+
+| Переменная       | По умолчанию в Compose | Что делает                                                                                                       |
+| ---------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `DEMO_MODE`      | `true`                 | Быстрый вход, сброс и перемотка демо. На стенде без демо — `false` (в коде по умолчанию `false`)                 |
+| `STAND_ID`       | пусто                  | Номер стенда (`stand-1` …): показывается в демо-панели и входит в имя cookie входа                               |
+| `SESSION_SECRET` | пусто                  | Секрет сессий стенда, не короче 32 символов. Пусто — создаётся при первом старте и хранится в томе `api-secrets` |
+
 ## Локальная разработка
 
 Нужен Node.js 22.12 или новее (рекомендуется 24, см. `.nvmrc`).
 
 ```sh
 npm ci
+export SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
 npm run build:domain              # общий пакет нужен api и web в собранном виде
 npm run dev -w @tandem/api        # сборка API в режиме наблюдения
 npm run start -w @tandem/api      # запуск API на http://localhost:3000
@@ -87,6 +96,13 @@ prisma.$transaction(…))`, тогда события уйдут только п
   `canManageEvent`, `canSeeParticipantInfo`, …) возвращают решение с кодом
   отказа. Сервис по нему бросает ошибку, а `toAction()` превращает его в
   элемент `actions[]` ответа. Пример — `eventActions()` для карточки события.
+- **Вход** (`modules/auth`): `POST /auth/register`, `/auth/login`,
+  `/auth/demo-login` (только при `DEMO_MODE=true`, ключ из `DEMO_ACCOUNTS`
+  в `@tandem/domain`), `/auth/logout`, `GET /me`. Сессия — cookie
+  `tandem_session[_<STAND_ID>]`. Глобальный guard кладёт в запрос `actor`;
+  в контроллере его берёт `@CurrentActor()`, а доступ задаёт `@Roles('user',
+'org')` или `@SignedIn()` (гостю — 401, чужой роли — 403). Пароли —
+  argon2id; учётки `*@demo` вне демо-режима не входят.
 
 ## Проверки
 
