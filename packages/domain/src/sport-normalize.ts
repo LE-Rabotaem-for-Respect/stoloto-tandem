@@ -21,10 +21,11 @@ export function normalizeSportName(name: string): string {
  * Невидимые символы не проходят — ни управляющие (U+200B, U+202E), ни те, что
  * Unicode считает буквами или знаками, но не показывает (Default_Ignorable:
  * U+034F, U+3164, U+FE0F): иначе ими обходят скрытие направления и правило
- * «без дублей». Подряд — не больше двух комбинируемых знаков.
+ * «без дублей». Комбинируемых знаков, оставшихся после NFKC, — не больше одного
+ * подряд: иначе надписи в «залго» (буква с десятком значков) налезают на соседние строки.
  */
 export const SPORT_NAME_PATTERN =
-  /^(?!.*\p{DI})(?!.*\p{M}{3})[\p{L}\p{N}][\p{L}\p{M}\p{N} .,'’()×/+–-]*$/u;
+  /^(?!.*\p{DI})(?!.*\p{M}{2})[\p{L}\p{N}][\p{L}\p{M}\p{N} .,'’()×/+–-]*$/u;
 
 export const isValidSportName = (name: string): boolean =>
   SPORT_NAME_PATTERN.test(cleanSportName(name));
