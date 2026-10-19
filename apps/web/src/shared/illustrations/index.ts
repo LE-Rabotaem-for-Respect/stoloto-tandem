@@ -1,30 +1,10 @@
 // Обложки групп направлений и пиктограммы статусов и действий.
 // Цветная обложка — для обычной темы и «Крупного текста», контурная
 // (без заливок и полупрозрачности, цвет — currentColor) — для «Высокого контраста».
+// Ключи и названия групп — SPORT_CATEGORIES из @tandem/domain, те же, что в базе и api.
 
-export const SPORT_GROUPS = [
-  'team',
-  'endurance',
-  'mind',
-  'combat',
-  'fitness',
-  'water',
-  'winter',
-  'other',
-] as const;
-
-export type SportGroup = (typeof SPORT_GROUPS)[number];
-
-export const SPORT_GROUP_TITLES: Record<SportGroup, string> = {
-  team: 'Командные',
-  endurance: 'Выносливость',
-  mind: 'Интеллектуальные',
-  combat: 'Единоборства',
-  fitness: 'Фитнес и зарядка',
-  water: 'Водные',
-  winter: 'Зимние',
-  other: 'Другое',
-};
+import { SPORT_CATEGORIES, SPORT_CATEGORY_TITLES } from '@tandem/domain';
+import type { SportCategory } from '@tandem/domain';
 
 export const ICONS = [
   'status-pending',
@@ -58,14 +38,14 @@ export const ICONS = [
 
 export type IconName = (typeof ICONS)[number];
 
-export function isSportGroup(value: unknown): value is SportGroup {
-  return typeof value === 'string' && (SPORT_GROUPS as readonly string[]).includes(value);
+export function isSportCategory(value: unknown): value is SportCategory {
+  return typeof value === 'string' && (SPORT_CATEGORIES as readonly string[]).includes(value);
 }
 
 // Направление без группы, с неизвестной или скрытой группой показывается
 // как «Другое» (ТЗ 2.3), поэтому новый вид спорта не требует новой картинки.
-export function sportGroupOrOther(group: string | null | undefined): SportGroup {
-  return isSportGroup(group) ? group : 'other';
+export function sportCategoryOrOther(group: string | null | undefined): SportCategory {
+  return isSportCategory(group) ? group : 'other';
 }
 
 export interface CoverOptions {
@@ -73,14 +53,14 @@ export interface CoverOptions {
 }
 
 export function coverPath(group: string | null | undefined, options: CoverOptions = {}): string {
-  const key = sportGroupOrOther(group);
+  const key = sportCategoryOrOther(group);
   return options.contrast ? `covers/outline/${key}.svg` : `covers/${key}.svg`;
 }
 
 // Шаблоны путей в new URL(...) — статические, чтобы сборщик нашёл и
 // скопировал файлы.
 export function coverUrl(group: string | null | undefined, options: CoverOptions = {}): string {
-  const key = sportGroupOrOther(group);
+  const key = sportCategoryOrOther(group);
   const url = options.contrast
     ? new URL(`./covers/outline/${key}.svg`, import.meta.url)
     : new URL(`./covers/${key}.svg`, import.meta.url);
@@ -88,7 +68,7 @@ export function coverUrl(group: string | null | undefined, options: CoverOptions
 }
 
 export function coverAlt(group: string | null | undefined): string {
-  return SPORT_GROUP_TITLES[sportGroupOrOther(group)];
+  return SPORT_CATEGORY_TITLES[sportCategoryOrOther(group)];
 }
 
 export function iconPath(name: IconName): string {
