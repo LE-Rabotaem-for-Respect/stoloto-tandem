@@ -2,9 +2,16 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 
-// Без таймаута пул pg ждёт недоступную базу до таймаута ОС, и запросы зависают
+// Без таймаута пул pg ждёт недоступную базу до таймаута ОС, и запросы зависают.
+// Сессия всегда в UTC: адаптер передаёт и читает timestamptz без смещения, поэтому при поясе
+// сервера не UTC время, записанное в SQL (в том числе now()), читалось бы со сдвигом.
+// Параметр options в DATABASE_URL заменил бы этот, поэтому в адресе базы его не задают
 function adapter(connectionString: string) {
-  return new PrismaPg({ connectionString, connectionTimeoutMillis: 5_000 });
+  return new PrismaPg({
+    connectionString,
+    connectionTimeoutMillis: 5_000,
+    options: '-c TimeZone=UTC',
+  });
 }
 
 export function createPrismaClient(connectionString: string) {
