@@ -8,6 +8,7 @@ import {
   safeNext,
   useMe,
 } from '../features/auth';
+import { CreateEventForm } from '../features/events';
 
 function useReturnAfterSignIn() {
   const [params] = useSearchParams();
@@ -94,7 +95,10 @@ export const MyParticipationsPage = () => (
 
 export const CreateEventPage = () => (
   <RequireAuth>
-    <Section title="Создать мероприятие" text="Здесь будет форма создания мероприятия." />
+    <div className="page page-narrow">
+      <h1>Создать мероприятие</h1>
+      <CreateEventForm />
+    </div>
   </RequireAuth>
 );
 
