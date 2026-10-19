@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { logEntry } from '../errors/log-entry';
 import type { DomainEvent, DomainEventType } from './events';
 
 /**
@@ -26,6 +27,33 @@ export class EventBus {
   }
 }
 
+const logger = new Logger('DomainEvent');
+const guarded = Symbol('guarded');
+
+type Handler = ((...args: unknown[]) => unknown) & { [guarded]?: true };
+
+/**
+ * Обработчик в своём try/catch: ошибку пишет общий `logEntry` без данных
+ * вызова Prisma. С `suppressErrors` библиотека сама пишет в журнал текст
+ * ошибки целиком, поэтому он выключен.
+ */
+function guard(type: DomainEventType, handler: Handler): Handler {
+  if (handler[guarded]) return handler;
+  const wrapped: Handler = async function (this: unknown, ...args: unknown[]) {
+    try {
+      return await handler.apply(this, args);
+    } catch (error) {
+      logger.error(`Обработчик ${type} упал: ${logEntry(error)}`);
+    }
+  };
+  wrapped[guarded] = true;
+  return wrapped;
+}
+
 /** Подписка на событие из перечня `events.ts`; обработчик идёт асинхронно. */
-export const OnDomainEvent = (type: DomainEventType) =>
-  OnEvent(type, { async: true, suppressErrors: true });
+export const OnDomainEvent =
+  (type: DomainEventType): MethodDecorator =>
+  (target, key, descriptor) => {
+    descriptor.value = guard(type, descriptor.value as Handler) as typeof descriptor.value;
+    return OnEvent(type, { async: true, suppressErrors: false })(target, key, descriptor);
+  };

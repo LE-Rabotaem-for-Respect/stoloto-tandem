@@ -11,6 +11,7 @@ import {
   domainEvent,
 } from '../src/core/event-bus';
 import type { DomainEvent } from '../src/core/event-bus';
+import { Prisma } from '../src/generated/prisma/client';
 
 const occurredAt = new Date('2026-10-19T05:00:00Z');
 const confirmed = () =>
@@ -20,6 +21,15 @@ const confirmed = () =>
     userId: 'u-1',
     via: 'accept',
     actorId: 'u-organizer',
+    occurredAt,
+  });
+
+const posted = () =>
+  domainEvent('MessagePosted', {
+    messageId: 'm-1',
+    eventId: 'e-1',
+    authorId: 'u-1',
+    actorId: 'u-1',
     occurredAt,
   });
 
@@ -41,6 +51,19 @@ class Handlers {
 
   @OnDomainEvent('EventCancelled')
   cancelled(event: DomainEvent<'EventCancelled'>) {
+    this.received.push(event);
+  }
+
+  @OnDomainEvent('MessagePosted')
+  prismaFailing() {
+    throw new Prisma.PrismaClientValidationError(
+      'Invalid prisma.notification.create() invocation: data: { email: "anna@demo", text: "Анна, вас приняли" }',
+      { clientVersion: 'test' },
+    );
+  }
+
+  @OnDomainEvent('MessagePosted')
+  posted(event: DomainEvent<'MessagePosted'>) {
     this.received.push(event);
   }
 }
@@ -122,7 +145,23 @@ describe('core/event-bus: публикация и обработчики', () =>
     expect(() => bus.publish(confirmed())).not.toThrow();
     await nextTick();
     expect(handlers.received).toHaveLength(1);
-    expect(logged).toHaveBeenCalledWith('обработчик уведомлений упал', expect.any(String));
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(logged.mock.calls)).toContain('обработчик уведомлений упал');
+  });
+
+  it('ошибка Prisma в обработчике — в журнале без аргументов вызова, действие выполнено', async () => {
+    const result = await bus.afterCommit(async (emit) => {
+      emit(posted());
+      return 'сообщение сохранено';
+    });
+    await nextTick();
+    expect(result).toBe('сообщение сохранено');
+    expect(handlers.received).toEqual([posted()]);
+    const written = JSON.stringify(logged.mock.calls);
+    expect(written).toContain('MessagePosted');
+    expect(written).toContain('PrismaClientValidationError');
+    expect(written).not.toContain('anna@demo');
+    expect(written).not.toContain('вас приняли');
   });
 
   it('afterCommit публикует события только после успешной работы', async () => {
