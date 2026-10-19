@@ -54,6 +54,8 @@ export const ICONS = [
   'action-hide',
   'action-delete',
   'action-back',
+  'action-profile',
+  'action-contrast',
 ] as const;
 
 export type IconName = (typeof ICONS)[number];
