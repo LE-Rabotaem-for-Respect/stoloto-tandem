@@ -237,3 +237,55 @@
   font-size: var(--fs-caption);
   font-weight: 400;
 }
+
+.main-nav-link {
+  position: relative;
+}
+
+.badge {
+  min-width: 1.5em;
+  padding: 0 var(--space-1);
+  border-radius: 999px;
+  background: var(--color-marker);
+  color: var(--color-on-marker);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.notifications {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notification-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  min-height: var(--tap-min);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.notification-unread .notification-body {
+  border-color: var(--color-marker-strong);
+  box-shadow: inset 4px 0 0 var(--color-marker);
+}
+
+.notification-text {
+  flex: 1 1 12rem;
+}
+
+.notification-time {
+  color: var(--color-ink-muted);
+  font-size: var(--fs-caption);
+}
