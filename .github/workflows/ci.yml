@@ -14,6 +14,23 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Интеграционные тесты api работают с настоящей PostgreSQL
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: tandem
+          POSTGRES_USER: tandem
+          POSTGRES_PASSWORD: tandem
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tandem -d tandem"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://tandem:tandem@localhost:5432/tandem
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

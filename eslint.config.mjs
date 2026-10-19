@@ -18,6 +18,24 @@ export default tseslint.config(
     rules: reactHooks.configs.recommended.rules,
   },
   {
+    // «Сейчас» берётся только из Clock: в демо-режиме время перематывается
+    files: ['apps/api/src/**', 'apps/web/src/**', 'packages/domain/src/**'],
+    ignores: ['apps/api/src/core/clock/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+          message: 'Текущее время — только из Clock (api) или useClock() (web).',
+        },
+        {
+          selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+          message: 'Текущее время — только из Clock (api) или useClock() (web).',
+        },
+      ],
+    },
+  },
+  {
     // NestJS внедряет зависимости по типам параметров конструктора и требует классы-модули
     files: ['apps/api/**/*.ts'],
     rules: { '@typescript-eslint/no-extraneous-class': 'off' },

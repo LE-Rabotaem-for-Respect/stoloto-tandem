@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: tandem
       POSTGRES_USER: tandem
-      POSTGRES_PASSWORD: tandem
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tandem}
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -19,7 +19,7 @@ services:
       dockerfile: apps/api/Dockerfile
     environment:
       PORT: 3000
-      DATABASE_URL: postgresql://tandem:tandem@db:5432/tandem
+      DATABASE_URL: postgresql://tandem:${POSTGRES_PASSWORD:-tandem}@db:5432/tandem
     depends_on:
       db:
         condition: service_healthy
