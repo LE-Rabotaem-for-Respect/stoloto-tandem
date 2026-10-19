@@ -14,7 +14,8 @@ import { SportsRepository } from '../src/modules/sports/sports.repository';
 
 interface Route {
   name: string;
-  method: RequestMethod;
+  // Без HTTP-метода Nest вешает обработчик на все методы, поэтому он изменяющий
+  method: RequestMethod | undefined;
   handler: object;
   controller: object;
 }
@@ -45,7 +46,7 @@ function collectRoutes(controllers: ControllerClass[]): Route[] {
       if (typeof handler !== 'function') continue;
       const method = Reflect.getMetadata(METHOD_METADATA, handler) as RequestMethod | undefined;
       const path = Reflect.getMetadata(PATH_METADATA, handler) as string | undefined;
-      if (method === undefined || path === undefined) continue;
+      if (path === undefined) continue;
       routes.push({ name: `${controller.name}.${key}`, method, handler, controller });
     }
   }
@@ -54,7 +55,7 @@ function collectRoutes(controllers: ControllerClass[]): Route[] {
 
 const unmarkedWrites = (routes: Route[]) =>
   routes
-    .filter((route) => !READS.includes(route.method))
+    .filter((route) => route.method === undefined || !READS.includes(route.method))
     .filter(
       (route) =>
         !Reflect.getMetadata(PUBLIC_KEY, route.handler) &&
@@ -67,7 +68,8 @@ const publicControllers = (controllers: ControllerClass[]) =>
     .filter((controller) => Reflect.getMetadata(PUBLIC_KEY, controller))
     .map((controller) => controller.name);
 
-// Образцы того, что проверка обязана заметить: унаследованный POST и @All без метки
+// Образцы того, что проверка обязана заметить: унаследованный POST, @All и путь
+// без HTTP-метода — все без метки
 class BaseWrites {
   @Post('reset')
   reset() {
@@ -86,21 +88,32 @@ class InheritedWrites extends BaseWrites {
   read() {
     return undefined;
   }
+
+  pathOnly() {
+    return undefined;
+  }
 }
+// Путь без HTTP-метода: Nest регистрирует такой обработчик через router.use — на все методы
+Reflect.defineMetadata(PATH_METADATA, 'path-only', InheritedWrites.prototype.pathOnly);
 
 @Controller('probe-public')
 class PublicController {}
 Reflect.defineMetadata(PUBLIC_KEY, true, PublicController);
 
 describe('проверка меток видит то, что регистрирует Nest', () => {
-  it('унаследованный изменяющий маршрут и @All без метки', () => {
+  it('унаследованный изменяющий маршрут, @All и путь без HTTP-метода — без метки', () => {
     const routes = collectRoutes([InheritedWrites]);
     expect(routes.map((route) => route.name).sort()).toEqual([
       'InheritedWrites.any',
+      'InheritedWrites.pathOnly',
       'InheritedWrites.read',
       'InheritedWrites.reset',
     ]);
-    expect(unmarkedWrites(routes).sort()).toEqual(['InheritedWrites.any', 'InheritedWrites.reset']);
+    expect(unmarkedWrites(routes).sort()).toEqual([
+      'InheritedWrites.any',
+      'InheritedWrites.pathOnly',
+      'InheritedWrites.reset',
+    ]);
   });
 
   it('@Public на контроллере без единого своего маршрута', () => {
