@@ -1,0 +1,31 @@
+{
+  "name": "@tandem/domain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Общие правила фронтенда и бэкенда: автоматы состояний, статусы, нормализация, время",
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "tsdown": "^0.23.1"
+  }
+}

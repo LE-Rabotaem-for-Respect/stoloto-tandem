@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [prod]
+  push:
+    branches: [prod]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Где идут задания: переменная репозитория CI_RUNNER — метка self-hosted runner
+# (wfr-windows — компьютеры участников); без неё — машины GitHub.
+# На Windows шаги выполняет Git Bash, поэтому команды одинаковы везде.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  ci:
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  compose:
+    # Нужен Docker: CI_DOCKER_RUNNER — метка runner'ов, где он есть (wfr-docker)
+    runs-on: ${{ vars.CI_DOCKER_RUNNER || vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    env:
+      # Свои порты и имя проекта: на компьютере участника может работать его собственный compose
+      COMPOSE_PROJECT_NAME: ci-${{ github.run_id }}
+      WEB_PORT: 18080
+      API_PORT: 13000
+    steps:
+      - uses: actions/checkout@v4
+      - name: Docker доступен
+        run: docker info --format 'Docker {{.ServerVersion}}, {{.OSType}}'
+      - name: Запуск docker compose
+        run: docker compose up --build --detach --wait --wait-timeout 300
+      - name: Проверка web и api
+        run: |
+          curl --fail --silent --show-error "http://localhost:$API_PORT/health"
+          curl --fail --silent --show-error "http://localhost:$WEB_PORT/api/health"
+          curl --fail --silent --show-error "http://localhost:$WEB_PORT/" | grep -q '<div id="root">'
+      - name: Логи сервисов
+        if: failure()
+        run: docker compose logs
+      - name: Остановка
+        if: always()
+        run: docker compose down --volumes --rmi local
