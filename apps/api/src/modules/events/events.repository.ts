@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import type { EventLevel, EventMode, ParticipationStatus, SportCategory } from '@tandem/domain';
+import type {
+  EventLevel,
+  EventMode,
+  EventStatus,
+  ParticipationStatus,
+  SportCategory,
+} from '@tandem/domain';
 import { escapeLike } from '../../core/prisma/like';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import type { Prisma } from '../../generated/prisma/client';
@@ -76,6 +82,13 @@ function feedWhere(filter: FeedFilter): Prisma.EventWhereInput {
   return { AND: and };
 }
 
+/** Поиск мероприятий в админке: любые статусы, текст по названию, фильтр по организации. */
+export interface AdminEventFilter {
+  text?: string;
+  status?: EventStatus;
+  organizerOrgId?: string;
+}
+
 @Injectable()
 export class EventsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -109,6 +122,36 @@ export class EventsRepository {
       this.prisma.event.count({ where }),
     ]);
     return { events, total };
+  }
+
+  /** Админка: новые сверху — так снятое модератором и только что созданное видны первыми. */
+  async adminSearch(
+    filter: AdminEventFilter,
+    page: { offset: number; limit: number },
+  ): Promise<{ events: EventWithCard[]; total: number }> {
+    const where: Prisma.EventWhereInput = {
+      ...(filter.status && { status: filter.status }),
+      ...(filter.organizerOrgId && { organizerOrgId: filter.organizerOrgId }),
+      ...(filter.text && {
+        title: { contains: escapeLike(filter.text), mode: 'insensitive' as const },
+      }),
+    };
+    const [events, total] = await Promise.all([
+      this.prisma.event.findMany({
+        where,
+        include: cardInclude,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: page.offset,
+        take: page.limit,
+      }),
+      this.prisma.event.count({ where }),
+    ]);
+    return { events, total };
+  }
+
+  /** Сколько мероприятий перешло в этот статус начиная с момента `since`. */
+  countStatusSince(status: EventStatus, since: Date): Promise<number> {
+    return this.prisma.event.count({ where: { status, statusChangedAt: { gte: since } } });
   }
 
   /** Подтверждённые участники по мероприятиям; мероприятий без участников в ответе нет. */
