@@ -24,6 +24,14 @@ class CreateThingDto {
   limit!: number;
 }
 
+// Так выглядит meta нарушения уникальности у Prisma 7 с @prisma/adapter-pg
+const adapterUniqueMeta = (index: string, modelName: string) => ({
+  driverAdapterError: {
+    cause: { originalCode: '23505', kind: 'UniqueConstraintViolation', constraint: { index } },
+  },
+  modelName,
+});
+
 const prismaError = (code: string, meta?: Record<string, unknown>) =>
   new Prisma.PrismaClientKnownRequestError('Ошибка базы', { code, clientVersion: 'test', meta });
 
@@ -51,7 +59,20 @@ class ProbeController {
 
   @Get('unique')
   unique() {
-    throw prismaError('P2002', { target: ['email'] });
+    throw prismaError('P2002', adapterUniqueMeta('users_email_key', 'User'));
+  }
+
+  @Get('unique-internal')
+  uniqueInternal() {
+    throw prismaError('P2002', adapterUniqueMeta('sessions_token_hash_key', 'Session'));
+  }
+
+  @Get('prisma-crash')
+  prismaCrash() {
+    throw new Prisma.PrismaClientValidationError(
+      'Invalid prisma.user.create() invocation: data: { email: "anna@demo", passwordHash: "секрет" }',
+      { clientVersion: 'test' },
+    );
   }
 
   @Get('timeout')
@@ -168,8 +189,25 @@ describe('core/errors: единый формат ошибок { code, message, f
     expect(response.body).toEqual({
       code: 'conflict',
       message: 'Такая запись уже есть',
-      fields: { email: 'Такое значение уже занято' },
+      fields: { email: 'Эта почта уже зарегистрирована' },
     });
+  });
+
+  it('служебная уникальность (P2002 без поля формы) — conflict без fields', async () => {
+    const response = await http().get('/probe/unique-internal');
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({ code: 'conflict', message: 'Такая запись уже есть' });
+  });
+
+  it('ошибка Prisma в журнале — без аргументов вызова', async () => {
+    const logged = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const response = await http().get('/probe/prisma-crash');
+    const written = JSON.stringify(logged.mock.calls);
+    logged.mockRestore();
+    expect(response.status).toBe(500);
+    expect(written).toContain('PrismaClientValidationError');
+    expect(written).not.toContain('anna@demo');
+    expect(written).not.toContain('секрет');
   });
 
   it('тайм-аут транзакции (P2028) — busy', async () => {

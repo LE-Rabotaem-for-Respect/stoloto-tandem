@@ -156,17 +156,24 @@ describe('policies по таблице ТЗ 4.4', () => {
 
   describe('писать в обсуждение', () => {
     it('гость — после входа', () => {
-      expect(canPostMessage(guest)).toEqual(loginFirst);
+      expect(canPostMessage(guest, userEvent)).toEqual(loginFirst);
     });
     it('пользователь — да', () => {
-      expect(canPostMessage(user)).toEqual(yes);
+      expect(canPostMessage(user, userEvent)).toEqual(yes);
     });
     it('организация — только при approved', () => {
-      expect(canPostMessage(orgApproved)).toEqual(yes);
-      expect(canPostMessage(orgPending)).toEqual(no('organization_not_approved'));
+      expect(canPostMessage(orgApproved, userEvent)).toEqual(yes);
+      expect(canPostMessage(orgPending, userEvent)).toEqual(no('organization_not_approved'));
     });
     it('администратор — нет', () => {
-      expect(canPostMessage(admin)).toEqual(no('forbidden'));
+      expect(canPostMessage(admin, userEvent)).toEqual(no('forbidden'));
+    });
+    it('в снятое и удалённое — нельзя никому: новые действия заблокированы (ТЗ 2.10)', () => {
+      for (const status of ['unpublished', 'deleted'] as const) {
+        const event = { ...userEvent, status };
+        expect(canPostMessage(user, event), status).toEqual(no('event_not_available'));
+        expect(canPostMessage(author, event), status).toEqual(no('event_not_available'));
+      }
     });
   });
 

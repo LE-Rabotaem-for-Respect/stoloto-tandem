@@ -88,7 +88,11 @@ export function canManageEvent(actor: Actor, event: PolicyEvent): Decision {
   return isEventOrganizer(actor, event) ? allow : deny('not_event_organizer');
 }
 
-export function canPostMessage(actor: Actor): Decision {
+/** Писать в обсуждение. Со снятым и удалённым мероприятием новые действия заблокированы (ТЗ 2.10). */
+export function canPostMessage(actor: Actor, event: PolicyEvent): Decision {
+  if (event.status === 'unpublished' || event.status === 'deleted') {
+    return deny('event_not_available');
+  }
   if (actor.role === 'guest') return loginFirst;
   if (actor.role === 'user') return allow;
   if (actor.role === 'org') {

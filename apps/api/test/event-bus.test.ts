@@ -46,7 +46,7 @@ class Handlers {
 }
 
 describe('core/event-bus: перечень доменных событий', () => {
-  it('стартовый состав DECISION-002 и события записи из #246', () => {
+  it('стартовый состав DECISION-002 и события попадания в лист ожидания', () => {
     expect([...DOMAIN_EVENT_TYPES].sort()).toEqual(
       [
         'EventCreated',
