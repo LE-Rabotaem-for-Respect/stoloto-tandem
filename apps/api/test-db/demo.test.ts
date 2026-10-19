@@ -156,6 +156,20 @@ describe('POST /demo/reset — минимальный сид', () => {
     });
   });
 
+  it('доступен гостю, но не со страницы чужого сайта', async () => {
+    app = await startApp(true);
+    await request(app.getHttpServer()).post('/demo/reset');
+    const before = await snapshot();
+    await prisma.organization.updateMany({ data: { status: 'approved' } });
+    const changed = await snapshot();
+    const response = await request(app.getHttpServer())
+      .post('/demo/reset')
+      .set('Sec-Fetch-Site', 'cross-site');
+    expect(response.status).toBe(403);
+    expect(await snapshot()).toEqual(changed);
+    expect(changed).not.toEqual(before);
+  });
+
   it('после сброса работает быстрый вход', async () => {
     app = await startApp(true);
     await request(app.getHttpServer()).post('/demo/reset');

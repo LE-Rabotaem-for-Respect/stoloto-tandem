@@ -1,5 +1,6 @@
 import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
 import { IsInt, Max, Min } from 'class-validator';
+import { Public } from '../../core/access';
 import { DemoModeGuard } from '../auth/demo-mode.guard';
 import { DemoService } from './demo.service';
 
@@ -13,7 +14,9 @@ export class ShiftClockDto {
   addSeconds!: number;
 }
 
+// Гостю открыто: «Сбросить демо-данные» есть на экране входа (ТЗ 4.6)
 @Controller('demo')
+@Public()
 @UseGuards(DemoModeGuard)
 export class DemoController {
   constructor(private readonly demo: DemoService) {}
