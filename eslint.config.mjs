@@ -91,6 +91,25 @@ export default tseslint.config(
     },
   },
   {
+    // Тесты e2e берут test и expect из фикстур: перед каждым тестом сбрасываются демо-данные
+    files: ['e2e/tests/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@playwright/test',
+              allowTypeImports: true,
+              message:
+                'Тест e2e берёт test и expect из ../support/fixtures: там перед каждым тестом сброс демо-данных.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // NestJS внедряет зависимости по типам параметров конструктора и требует классы-модули
     files: ['apps/api/**/*.ts'],
     rules: { '@typescript-eslint/no-extraneous-class': 'off' },

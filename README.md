@@ -168,7 +168,7 @@ npm run e2e                       # адрес меняется переменн
 `@tandem/domain`). Трейс и скриншот упавшего теста — в `e2e/test-results`, отчёт —
 в `e2e/playwright-report`; в CI они прикладываются к заданию `e2e`.
 
-Те же lint, типы, тесты, тесты базы и запуск compose выполняются в GitHub Actions на каждый
+Те же lint, типы, тесты, тесты базы, запуск compose и сквозные тесты выполняются в GitHub Actions на каждый
 PR в `prod` и push в `prod`.
 
 ## Графика

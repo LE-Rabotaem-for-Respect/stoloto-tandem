@@ -121,6 +121,12 @@ jobs:
       - name: Браузер для Playwright
         # На Linux нужны и системные библиотеки браузера; на Windows их ставить не нужно
         run: npx playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium
+      - name: Остатки прошлых прогонов
+        # Если runner оборвался посреди задания, контейнеры прошлого прогона держат порты;
+        # убираются только контейнеры этого задания — по префиксу имени проекта
+        run: |
+          stale=$(docker ps -aq --filter "name=ci-e2e-")
+          if [ -n "$stale" ]; then docker rm --force --volumes $stale; fi
       - name: Запуск docker compose
         run: docker compose up --build --detach --wait --wait-timeout 300
       - name: Сквозные тесты
