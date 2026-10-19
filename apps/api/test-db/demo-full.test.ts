@@ -8,6 +8,7 @@ import { configureApp } from '../src/configure-app';
 import { REAL_TIME } from '../src/core/clock';
 import { STAND_CONFIG } from '../src/core/config';
 import { RESET_TABLES } from '../src/modules/demo';
+import { verifyPassword } from '../src/modules/auth/password';
 import { dayAt, nearestWeekdayAt } from '../src/modules/demo/relative-dates';
 import { databaseUrl, prisma } from './db';
 
@@ -15,6 +16,8 @@ import { databaseUrl, prisma } from './db';
 const now = new Date('2026-10-19T12:00:00+07:00');
 
 let app: INestApplication;
+// Часы стенда в тесте: сброс можно проверить в любой момент недели
+let current = now;
 
 async function reset() {
   const response = await request(app.getHttpServer()).post('/demo/reset');
@@ -41,7 +44,7 @@ beforeAll(async () => {
     .overrideProvider(STAND_CONFIG)
     .useValue({ demoMode: true, standId: 'stand-1' })
     .overrideProvider(REAL_TIME)
-    .useValue(() => now.getTime())
+    .useValue(() => current.getTime())
     .compile();
   app = configureApp(moduleRef.createNestApplication({ logger: false }));
   await app.init();
@@ -65,17 +68,16 @@ afterAll(async () => {
 describe('полный сид после «Сбросить демо-данные»', () => {
   it('18 человек: демо-аккаунты и фоновые участники с почтой по имени', async () => {
     expect(await prisma.user.count()).toBe(18);
-    expect(await prisma.user.findUnique({ where: { email: 'ksenia@demo' } })).toMatchObject({
-      name: 'Ксения',
-      role: 'user',
-    });
+    const ksenia = await prisma.user.findUniqueOrThrow({ where: { email: 'ksenia@demo' } });
+    expect(ksenia).toMatchObject({ name: 'Ксения', role: 'user' });
+    expect(await verifyPassword('demo', ksenia.passwordHash)).toBe(true);
   });
 
   it('10 мероприятий, даты — от Clock по календарю Красноярска', async () => {
     expect(await prisma.event.count()).toBe(10);
     const football = await eventByTitle('Футбол 7×7 по средам');
     expect(football.startsAt).toEqual(nearestWeekdayAt(now, [3], '19:00'));
-    expect(football.endsAt).toEqual(nearestWeekdayAt(now, [3], '20:30'));
+    expect(football.endsAt).toEqual(dayAt(football.startsAt, 0, '20:30'));
     const run = await eventByTitle('Пробежка 5 км на острове Татышев');
     expect(run.startsAt).toEqual(dayAt(now, 2, '08:00'));
     const yoga = await eventByTitle('Йога на рассвете');
@@ -166,15 +168,23 @@ describe('полный сид после «Сбросить демо-данны�
   });
 
   it('ни одна отметка времени не позже Clock.now()', async () => {
-    const [events, participations, messages] = await Promise.all([
+    const [users, organizations, events, participations, messages, log] = await Promise.all([
+      prisma.user.findMany({ select: { createdAt: true } }),
+      prisma.organization.findMany({ select: { submittedAt: true, decidedAt: true } }),
       prisma.event.findMany({ select: { createdAt: true, statusChangedAt: true } }),
-      prisma.participation.findMany({ select: { createdAt: true, decidedAt: true } }),
+      prisma.participation.findMany({
+        select: { createdAt: true, updatedAt: true, decidedAt: true },
+      }),
       prisma.message.findMany({ select: { createdAt: true } }),
+      prisma.moderationLog.findMany({ select: { createdAt: true } }),
     ]);
     const stamps = [
+      ...users.map((u) => u.createdAt),
+      ...organizations.flatMap((o) => [o.submittedAt, o.decidedAt]),
       ...events.flatMap((e) => [e.createdAt, e.statusChangedAt]),
-      ...participations.flatMap((p) => [p.createdAt, p.decidedAt]),
+      ...participations.flatMap((p) => [p.createdAt, p.updatedAt, p.decidedAt]),
       ...messages.map((m) => m.createdAt),
+      ...log.map((entry) => entry.createdAt),
     ].filter((stamp): stamp is Date => stamp !== null);
     expect(stamps.every((stamp) => stamp.getTime() <= now.getTime())).toBe(true);
   });
@@ -208,5 +218,28 @@ describe('полный сид после «Сбросить демо-данны�
     });
     await reset();
     expect(await state()).toEqual(before);
+  });
+});
+
+describe('сброс в любой момент недели', () => {
+  // Окна, где до начала меньше 3 часов, а до окончания больше: раньше сброс здесь падал
+  it.each([
+    '2026-10-21T17:00:00+07:00',
+    '2026-10-24T10:00:00+07:00',
+    '2026-10-25T09:00:00+07:00',
+    '2026-10-20T04:45:00+07:00',
+  ])('сброс %s проходит, мероприятия кончаются в тот же день', async (moment) => {
+    current = new Date(moment);
+    await reset();
+    const events = await prisma.event.findMany();
+    expect(events).toHaveLength(10);
+    for (const event of events) {
+      expect(event.endsAt.getTime(), event.title).toBeGreaterThan(event.startsAt.getTime());
+      expect(dayAt(event.endsAt, 0, '00:00'), event.title).toEqual(
+        dayAt(event.startsAt, 0, '00:00'),
+      );
+    }
+    const football = events.find((event) => event.title === 'Футбол 7×7 по средам');
+    expect(football?.startsAt).toEqual(nearestWeekdayAt(current, [3], '19:00'));
   });
 });

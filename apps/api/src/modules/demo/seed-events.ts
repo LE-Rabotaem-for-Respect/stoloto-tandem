@@ -1,5 +1,6 @@
 import type { DemoAccountKey } from '@tandem/domain';
 import type { EventLevel, SportCategory } from '../../generated/prisma/client';
+import type { EventWhen } from './relative-dates';
 
 /** Фоновые участники (ТЗ 4.6): входят по почте `<ключ>@demo`, в быстрый вход не выносятся. */
 export const SEED_BACKGROUND_PEOPLE = [
@@ -24,10 +25,7 @@ export const SEED_CUSTOM_SPORT: {
   createdBy: SeedPersonKey;
 } = { name: 'Петанк', category: 'other', createdBy: 'sergey' };
 
-/** Когда: календарный день от сегодня или ближайший из дней недели (0 — воскресенье). */
-export type SeedWhen =
-  | { days: number; from: string; to: string }
-  | { weekdays: readonly number[]; from: string; to: string };
+export type SeedWhen = EventWhen;
 
 export interface SeedMessage {
   author: SeedPersonKey;
@@ -228,8 +226,8 @@ export const SEED_EVENTS: readonly SeedEvent[] = [
     organizer: { user: 'dmitry' },
     when: { days: 5, from: '18:00', to: '20:00' },
     description: 'Пляжный волейбол 2 на 2 и 4 на 4',
-    area: 'Октябрьский район',
-    placeText: 'Пляжные площадки на Татышеве',
+    area: 'Центральный район',
+    placeText: 'Пляжные площадки на острове Татышев',
     mode: 'free',
     level: 'amateur',
     price: 0,

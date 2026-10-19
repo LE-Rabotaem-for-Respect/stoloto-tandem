@@ -1,8 +1,8 @@
 import { DEMO_EMAIL_DOMAIN, normalizeSportName } from '@tandem/domain';
 import type { Prisma } from '../../generated/prisma/client';
-import { dayAt, nearestWeekdayAt } from './relative-dates';
+import { eventTimes } from './relative-dates';
 import { SEED_BACKGROUND_PEOPLE, SEED_CUSTOM_SPORT, SEED_EVENTS } from './seed-data';
-import type { SeedEvent, SeedWhen } from './seed-data';
+import type { SeedEvent } from './seed-data';
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
@@ -13,10 +13,6 @@ export interface SeedIds {
   /** Ключ аккаунта организации → id организации. */
   orgIds: Map<string, string>;
   sportId: (name: string) => string;
-}
-
-function at(now: Date, when: SeedWhen, time: string): Date {
-  return 'days' in when ? dayAt(now, when.days, time) : nearestWeekdayAt(now, when.weekdays, time);
 }
 
 const minDate = (a: Date, b: Date) => (a.getTime() < b.getTime() ? a : b);
@@ -81,8 +77,7 @@ async function seedEvent(
   item: SeedEvent,
   { userId, orgIds, sportOf, adminId }: EventIds,
 ) {
-  const startsAt = at(now, item.when, item.when.from);
-  const endsAt = at(now, item.when, item.when.to);
+  const { startsAt, endsAt } = eventTimes(now, item.when);
   // Опубликовано за неделю до начала, но не позже, чем сейчас
   const createdAt = new Date(minDate(startsAt, now).getTime() - 7 * DAY_MS);
   const step = (hours: number) => new Date(createdAt.getTime() + hours * HOUR_MS);

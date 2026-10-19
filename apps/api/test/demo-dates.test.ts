@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayAt, nearestWeekdayAt } from '../src/modules/demo/relative-dates';
+import { dayAt, eventTimes, nearestWeekdayAt } from '../src/modules/demo/relative-dates';
 
 // Красноярск — UTC+7: 10:00 по Красноярску — это 03:00 UTC
 const krsk = (local: string) => new Date(`${local}+07:00`);
@@ -66,5 +66,31 @@ describe('относительные даты сида — по календар
         iso('2026-10-24T12:00:00'),
       );
     });
+  });
+});
+
+describe('начало и окончание мероприятия — в один календарный день', () => {
+  // Окна, где до начала меньше 3 часов, а до окончания — больше: сброс раньше падал
+  it.each([
+    ['среда 17:00, «Футбол» по средам 19:00–20:30', '2026-10-21T17:00:00', [3], '19:00', '20:30'],
+    ['суббота 10:00, «Блиц» по субботам 12:00–15:00', '2026-10-24T10:00:00', [6], '12:00', '15:00'],
+    ['воскресенье 9:00, «Шахматы» 11:00–12:30', '2026-10-25T09:00:00', [0], '11:00', '12:30'],
+    ['вторник 4:45, «Зарядка» вт/чт 7:30–8:00', '2026-10-20T04:45:00', [2, 4], '07:30', '08:00'],
+  ])('%s', (_name, local, weekdays, from, to) => {
+    const now = krsk(local);
+    const { startsAt, endsAt } = eventTimes(now, { weekdays, from, to });
+    expect(startsAt.getTime() - now.getTime()).toBeGreaterThanOrEqual(3 * 3_600_000);
+    expect(endsAt.getTime()).toBeGreaterThan(startsAt.getTime());
+    expect(dayAt(endsAt, 0, '00:00')).toEqual(dayAt(startsAt, 0, '00:00'));
+  });
+
+  it('для «через N дней» — тот же день, время окончания из таблицы', () => {
+    const { startsAt, endsAt } = eventTimes(krsk('2026-10-19T10:00:00'), {
+      days: -12,
+      from: '05:30',
+      to: '06:30',
+    });
+    expect(startsAt.toISOString()).toBe(iso('2026-10-07T05:30:00'));
+    expect(endsAt.toISOString()).toBe(iso('2026-10-07T06:30:00'));
   });
 });

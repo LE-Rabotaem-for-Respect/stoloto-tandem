@@ -43,3 +43,21 @@ export function nearestWeekdayAt(now: Date, weekdays: readonly number[], time: s
   }
   throw new Error(`Не найден день недели из ${weekdays.join(', ')}`);
 }
+
+/** Когда проходит мероприятие: календарный день от сегодня или ближайший из дней недели (0 — воскресенье). */
+export type EventWhen =
+  | { days: number; from: string; to: string }
+  | { weekdays: readonly number[]; from: string; to: string };
+
+/**
+ * Начало — по правилу «через N дней» или «ближайший день недели», окончание —
+ * в тот же календарный день по времени `to`. Правило трёх часов относится
+ * только к началу: иначе окончание осталось бы сегодня, а начало ушло бы на неделю.
+ */
+export function eventTimes(now: Date, when: EventWhen): { startsAt: Date; endsAt: Date } {
+  const startsAt =
+    'days' in when
+      ? dayAt(now, when.days, when.from)
+      : nearestWeekdayAt(now, when.weekdays, when.from);
+  return { startsAt, endsAt: dayAt(startsAt, 0, when.to) };
+}
