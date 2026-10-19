@@ -1,6 +1,6 @@
 .check-page {
   display: grid;
-  gap: var(--space-3, 12px);
+  gap: var(--space-3);
   max-width: 72rem;
 }
 
@@ -13,7 +13,7 @@
 .check-route,
 .check-stands {
   display: grid;
-  gap: var(--space-2, 8px);
+  gap: var(--space-2);
 }
 
 .check-note {
@@ -22,7 +22,7 @@
 
 .check-steps {
   display: grid;
-  gap: var(--space-2, 8px);
+  gap: var(--space-2);
   margin: 0;
   padding-left: 1.5em;
 }
@@ -31,7 +31,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-1, 4px) var(--space-2, 8px);
+  gap: var(--space-1) var(--space-2);
 }
 
 .check-who {
@@ -39,7 +39,7 @@
 }
 
 .check-expected {
-  padding: 0 var(--space-2, 8px);
+  padding: 0 var(--space-2);
   border-left: 3px solid currentColor;
 }
 
@@ -47,7 +47,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2, 8px);
+  gap: var(--space-2);
 }
 
 .check-credentials {
@@ -60,7 +60,7 @@
 
 .check-document th,
 .check-document td {
-  padding: var(--space-1, 4px) var(--space-2, 8px);
+  padding: var(--space-1) var(--space-2);
   border: 1px solid currentColor;
   text-align: left;
   vertical-align: top;
