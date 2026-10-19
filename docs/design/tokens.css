@@ -1,0 +1,174 @@
+/*
+ * Токены оформления. Источник правды — docs/design.md.
+ * Тема задаётся атрибутами на корневом элементе (или на любом контейнере):
+ *   data-theme="default" | "contrast"   — палитра
+ *   data-text="normal"   | "large"      — масштаб текста и графики (+25 %)
+ * Атрибуты независимы: «Крупный текст» и «Высокий контраст» включаются вместе.
+ */
+
+:root,
+[data-theme='default'] {
+  /* Основная палитра */
+  --color-paper: #eef3f2;
+  --color-surface: #ffffff;
+  --color-ink: #14212b;
+  --color-ink-muted: #4a5a66;
+  --color-line: #d5dde0;
+  --color-line-strong: #7a8a95;
+  --color-primary: #0b5c6b;
+  --color-primary-hover: #08434f;
+  --color-on-primary: #ffffff;
+  --color-marker: #f2c230;
+  --color-marker-strong: #b07f00;
+  --color-on-marker: #14212b;
+  --color-focus: #1f5fd1;
+
+  /* Статусная палитра: текст/иконка (fg) на подложке (bg) */
+  --status-ok-fg: #1d6b35;
+  --status-ok-bg: #e3f4e8;
+  --status-wait-fg: #7a4a00;
+  --status-wait-bg: #fff1d1;
+  --status-queue-fg: #2a47a3;
+  --status-queue-bg: #e7edff;
+  --status-bad-fg: #a11d1d;
+  --status-bad-bg: #fce5e3;
+  --status-warn-fg: #8a3b00;
+  --status-warn-bg: #ffe8d6;
+  --status-off-fg: #4a5a66;
+  --status-off-bg: #ebeef0;
+
+  /* Группы направлений: фон обложки и цвет линии рисунка (docs/design.md) */
+  --cover-team: #ddf0e2;
+  --cover-team-tone: #1d3b2a;
+  --cover-endurance: #ffe7d6;
+  --cover-endurance-tone: #4a2511;
+  --cover-mind: #e6e3f7;
+  --cover-mind-tone: #2a2350;
+  --cover-combat: #fbe0e0;
+  --cover-combat-tone: #5a1a1a;
+  --cover-fitness: #fff3c9;
+  --cover-fitness-tone: #4a3a07;
+  --cover-water: #d8eef8;
+  --cover-water-tone: #0f3a52;
+  --cover-winter: #e7f0f7;
+  --cover-winter-tone: #1e3448;
+  --cover-other: #eceff3;
+  --cover-other-tone: #283240;
+  --border-width: 1px;
+  --shadow-card: 0 1px 0 var(--color-line);
+}
+
+[data-theme='contrast'] {
+  --color-paper: #000000;
+  --color-surface: #000000;
+  --color-ink: #ffffff;
+  --color-ink-muted: #d0d0d0;
+  --color-line: #ffffff;
+  --color-line-strong: #ffffff;
+  --color-primary: #ffe600;
+  --color-primary-hover: #ffffff;
+  --color-on-primary: #000000;
+  --color-marker: #ffe600;
+  --color-marker-strong: #ffe600;
+  --color-on-marker: #000000;
+  --color-focus: #ffe600;
+
+  --status-ok-fg: #7dff8f;
+  --status-ok-bg: #000000;
+  --status-wait-fg: #ffe600;
+  --status-wait-bg: #000000;
+  --status-queue-fg: #9cc3ff;
+  --status-queue-bg: #000000;
+  --status-bad-fg: #ff9c94;
+  --status-bad-bg: #000000;
+  --status-warn-fg: #ffb870;
+  --status-warn-bg: #000000;
+  --status-off-fg: #d0d0d0;
+  --status-off-bg: #000000;
+
+  /* Обложки в этой теме — контурные версии (covers/outline) */
+  --cover-team: #000000;
+  --cover-team-tone: #ffffff;
+  --cover-endurance: #000000;
+  --cover-endurance-tone: #ffffff;
+  --cover-mind: #000000;
+  --cover-mind-tone: #ffffff;
+  --cover-combat: #000000;
+  --cover-combat-tone: #ffffff;
+  --cover-fitness: #000000;
+  --cover-fitness-tone: #ffffff;
+  --cover-water: #000000;
+  --cover-water-tone: #ffffff;
+  --cover-winter: #000000;
+  --cover-winter-tone: #ffffff;
+  --cover-other: #000000;
+  --cover-other-tone: #ffffff;
+
+  --border-width: 2px;
+  --shadow-card: none;
+}
+
+:root,
+[data-text='normal'] {
+  --text-scale: 1;
+}
+
+[data-text='large'] {
+  --text-scale: 1.25;
+}
+
+:root,
+[data-theme],
+[data-text] {
+  /* Шрифты */
+  --font-text: 'Golos Text Variable', 'Golos Text', 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-display:
+    'Unbounded Variable', 'Unbounded', 'Golos Text Variable', 'Segoe UI', Arial, sans-serif;
+
+  /* Размеры в rem (уважают настройку шрифта браузера), умножены на масштаб темы.
+     База 18 px = 1.125rem. Размер шрифта на html не меняется, иначе rem перестанет быть 16 px */
+  --fs-caption: calc(0.9375rem * var(--text-scale)); /* 15 px — только подписи рядом с графикой */
+  --fs-body: calc(1.125rem * var(--text-scale)); /* 18 px */
+  --fs-lead: calc(1.25rem * var(--text-scale)); /* 20 px */
+  --fs-title: calc(
+    1.5rem * var(--text-scale)
+  ); /* 24 px — заголовок карточки и экрана на мобильном */
+  --fs-display: calc(
+    2rem * var(--text-scale)
+  ); /* 32 px — число на листке даты, заголовок на десктопе */
+  --lh-text: 1.45;
+  --lh-tight: 1.15;
+
+  /* Отступы: шаг 4 px */
+  --space-1: calc(0.25rem * var(--text-scale)); /* 4 */
+  --space-2: calc(0.5rem * var(--text-scale)); /* 8 */
+  --space-3: calc(0.75rem * var(--text-scale)); /* 12 */
+  --space-4: calc(1rem * var(--text-scale)); /* 16 */
+  --space-5: calc(1.5rem * var(--text-scale)); /* 24 */
+  --space-6: calc(2rem * var(--text-scale)); /* 32 */
+
+  --radius-control: calc(0.5rem * var(--text-scale)); /* 8 */
+  --radius-card: calc(1rem * var(--text-scale)); /* 16 */
+  --tap-min: calc(3rem * var(--text-scale)); /* 48 px, не меньше 44 по ТЗ */
+
+  --focus-ring: 3px solid var(--color-focus);
+  --focus-offset: 3px;
+
+  --motion-fast: 150ms;
+  --motion-base: 250ms;
+}
+
+body,
+[data-theme]:not(html),
+[data-text]:not(html) {
+  font-size: var(--fs-body);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  [data-theme],
+  [data-text] {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+  }
+}
