@@ -76,4 +76,32 @@ describe('logEntry: запись об ошибке для журнала по б
       `TransitionError rejected_final: ${(transition as TransitionError).message}`,
     );
   });
+
+  describe('строки сообщения не проходят под видом кадров стека', () => {
+    const newline = String.fromCharCode(10);
+    const fakeFrame = `${newline}    at встреча, ${email}`;
+
+    it('многострочное сообщение с «    at <почта>»', () => {
+      const entry = logEntry(new Error(`Не отправлено: Привет${fakeFrame}`));
+      expect(entry).not.toContain(email);
+      expect(entry).toMatch(/^Error\n\s+at /);
+    });
+
+    it('JSON.parse на таком входе', () => {
+      // Вход короткий: длинный V8 обрезает в тексте ошибки
+      const entry = logEntry(thrown(() => JSON.parse(`x${newline}    at ${email}`)));
+      expect(entry).not.toContain(email);
+      expect(entry).toMatch(/^SyntaxError\n\s+at /);
+    });
+
+    it('сообщение изменили после создания — остаются только кадры строгого формата', () => {
+      const error = new Error(`Привет${fakeFrame}`);
+      // V8 собирает stack при первом обращении: обращаемся до смены сообщения
+      expect(error.stack).toContain(email);
+      error.message = 'другое';
+      const entry = logEntry(error);
+      expect(entry).not.toContain(email);
+      expect(entry.split(newline).slice(1)).not.toHaveLength(0);
+    });
+  });
 });
