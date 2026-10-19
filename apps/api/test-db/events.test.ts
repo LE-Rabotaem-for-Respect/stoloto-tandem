@@ -160,6 +160,16 @@ describe('POST /events', () => {
     expect(search.body.items).toEqual([expect.objectContaining({ id: response.body.sport.id })]);
   });
 
+  it('эмодзи с соединителем и селектором начертания и мягкий перенос — допустимы', async () => {
+    const runner = String.fromCodePoint(0x1f3c3, 0x200d, 0x2640, 0xfe0f);
+    const softHyphen = String.fromCodePoint(0xad);
+    const title = `Бег ${runner} вместе`;
+    const description = `Пробеж${softHyphen}ка по набережной ${runner}`;
+    const response = await post(igor, { ...validEvent(), title, description });
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({ title, description });
+  });
+
   it('в описании и «Информации для участников» допустимы переводы строк', async () => {
     const newline = String.fromCharCode(10);
     const description = `Играем 7 на 7${newline}Команды делим на месте`;
@@ -207,6 +217,18 @@ describe('POST /events', () => {
     ['неизвестный уровень', { level: 'pro' }, 'level'],
     ['нет направления', { sportId: undefined }, 'sportId'],
     ['нет направления, новое — null', { sportId: undefined, newSport: null }, 'sportId'],
+    ['новое направление — пустой массив', { sportId: undefined, newSport: [] }, 'newSport'],
+    [
+      'новое направление — массив объектов',
+      { sportId: undefined, newSport: [{ name: 'Падел' }] },
+      'newSport',
+    ],
+    [
+      'изоляция направления текста в названии',
+      { title: `Футбол 7×7 ${String.fromCodePoint(0x2066)}` },
+      'title',
+    ],
+    ['невидимый пробел в районе', { area: `Цент${String.fromCodePoint(0x200b)}ральный` }, 'area'],
     ['неверный sportId, новое — null', { sportId: 'not-a-uuid', newSport: null }, 'sportId'],
     ['переворот текста в названии', { title: 'Футбол 7×7 \u202e' }, 'title'],
     ['управляющий символ в месте', { placeText: 'Поле \u0007 у школы' }, 'placeText'],
@@ -260,7 +282,9 @@ describe('GET /events/:id', () => {
   });
 
   it('«Информация для участников» — подтверждённому участнику, организатору и администратору', async () => {
-    const [confirmed, pending, waitlist] = await Promise.all([
+    const [confirmed, pending, waitlist, rejected, cancelled] = await Promise.all([
+      account('user'),
+      account('user'),
       account('user'),
       account('user'),
       account('user'),
@@ -268,6 +292,8 @@ describe('GET /events/:id', () => {
     await participation(eventId, confirmed.id, 'confirmed');
     await participation(eventId, pending.id, 'pending');
     await participation(eventId, waitlist.id, 'waitlist');
+    await participation(eventId, rejected.id, 'rejected');
+    await participation(eventId, cancelled.id, 'cancelled');
 
     const info = async (who: Account | null) => (await get(who, eventId)).body.participantInfo;
     expect(await info(igor)).toBe('Раздевалка открыта с 18:30');
@@ -275,12 +301,49 @@ describe('GET /events/:id', () => {
     expect(await info(admin)).toBe('Раздевалка открыта с 18:30');
     expect(await info(pending)).toBeNull();
     expect(await info(waitlist)).toBeNull();
+    expect(await info(rejected)).toBeNull();
+    expect(await info(cancelled)).toBeNull();
     expect(await info(anna)).toBeNull();
     expect(await info(orgApproved)).toBeNull();
     expect(await info(null)).toBeNull();
 
     const forParticipant = await get(confirmed, eventId);
     expect(forParticipant.body.participation).toBe('confirmed');
+  });
+
+  it('после перемотки демо-часов назад «новее» оказалась отменённая запись — участник всё равно участник', async () => {
+    const viewer = await account('user');
+    // Записался, отменил, записался снова, а часы перемотали назад: у активной записи
+    // время создания раньше, чем у отменённой
+    await prisma.participation.create({
+      data: {
+        eventId,
+        userId: viewer.id,
+        status: 'confirmed',
+        createdAt: new Date('2026-10-19T10:00:00Z'),
+        updatedAt: new Date('2026-10-19T10:00:00Z'),
+      },
+    });
+    await prisma.participation.create({
+      data: {
+        eventId,
+        userId: viewer.id,
+        status: 'cancelled',
+        createdAt: new Date('2026-10-20T10:00:00Z'),
+        updatedAt: new Date('2026-10-20T10:00:00Z'),
+      },
+    });
+    const response = await get(viewer, eventId);
+    expect(response.body.participation).toBe('confirmed');
+    expect(response.body.participantInfo).toBe('Раздевалка открыта с 18:30');
+  });
+
+  it('карточка и /me не кешируются: ответ зависит от того, кто смотрит', async () => {
+    expect((await get(anna, eventId)).headers['cache-control']).toBe('private, no-store');
+    expect((await get(null, eventId)).headers['cache-control']).toBe('private, no-store');
+    const me = await http().get('/me').set('Cookie', anna.cookie);
+    expect(me.status).toBe(200);
+    expect(me.headers['cache-control']).toBe('private, no-store');
   });
 
   it('гость видит опубликованное мероприятие, запись предлагает после входа', async () => {
