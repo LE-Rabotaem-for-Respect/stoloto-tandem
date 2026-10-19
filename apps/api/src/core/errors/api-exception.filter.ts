@@ -52,7 +52,7 @@ function clientErrorStatus(exception: unknown): number | undefined {
   return undefined;
 }
 
-const isPrismaError = (exception: unknown): exception is Error =>
+const isPrismaError = (exception: Error): boolean =>
   exception instanceof Prisma.PrismaClientKnownRequestError ||
   exception instanceof Prisma.PrismaClientUnknownRequestError ||
   exception instanceof Prisma.PrismaClientValidationError ||
