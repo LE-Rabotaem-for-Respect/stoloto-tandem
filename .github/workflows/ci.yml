@@ -34,7 +34,8 @@ jobs:
       - run: npm run build
 
   compose:
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    # Нужен Docker: CI_DOCKER_RUNNER — метка runner'ов, где он есть (wfr-docker)
+    runs-on: ${{ vars.CI_DOCKER_RUNNER || vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     env:
       # Свои порты и имя проекта: на компьютере участника может работать его собственный compose
