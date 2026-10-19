@@ -111,6 +111,18 @@ describe('каркас приложения', () => {
     expect(screen.getByRole('button', { name: 'Сменить аккаунт' })).toBeTruthy();
   });
 
+  it('«Войти» на экране регистрации сохраняет адрес возврата, вошедшего форма не держит', async () => {
+    fakeApi();
+    renderApp('/register?next=%2Fmy');
+    const link = await screen.findByRole('link', { name: 'Войти' });
+    expect(link.getAttribute('href')).toBe('/login?next=%2Fmy');
+
+    cleanup();
+    fakeApi({ signedIn: anna });
+    renderApp('/login?next=%2Fmy');
+    expect(await screen.findByRole('heading', { name: 'Мои записи' })).toBeTruthy();
+  });
+
   it('сбой /me — ошибка с повтором, а не уход на вход', async () => {
     fakeApi({ meDown: true });
     renderApp('/my');

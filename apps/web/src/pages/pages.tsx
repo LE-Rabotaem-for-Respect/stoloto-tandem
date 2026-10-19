@@ -1,4 +1,4 @@
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import {
   LoginForm,
   QuickLogin,
@@ -17,6 +17,9 @@ function useReturnAfterSignIn() {
 
 export function LoginPage() {
   const { next, done } = useReturnAfterSignIn();
+  const me = useMe();
+  // Уже вошедшему форма не нужна — сразу туда, куда он шёл
+  if (me.data) return <Navigate to={next} replace />;
   const registerLink = next === '/' ? '/register' : `/register?next=${encodeURIComponent(next)}`;
   return (
     <div className="page page-narrow">
@@ -32,6 +35,8 @@ export function LoginPage() {
 
 export function RegisterPage() {
   const { next, done } = useReturnAfterSignIn();
+  const me = useMe();
+  if (me.data) return <Navigate to={next} replace />;
   const loginLink = next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`;
   return (
     <div className="page page-narrow">

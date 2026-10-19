@@ -2,4 +2,4 @@ export { useDemoLogin, useLogin, useLogout, useMe, useRegister, useStandInfo } f
 export type { Me, StandInfo } from './api';
 export { LoginForm, QuickLogin, RegisterForm } from './forms';
 export { RequireAuth, useAuthAction } from './guards';
-export { loginPath, safeNext } from './return-path';
+export { loginPath, returnPath, safeNext } from './return-path';

@@ -21,3 +21,15 @@ export function safeNext(value: string | null): string {
   if (url.origin !== origin) return '/';
   return url.pathname + url.search + url.hash;
 }
+
+const AUTH_PAGES = new Set(['/login', '/register']);
+
+/**
+ * Куда вернуться после входа с текущей страницы. На экранах входа и регистрации
+ * это уже заданный `next`, а не сам экран — иначе после входа человек снова
+ * увидит форму, а `next` вложится сам в себя.
+ */
+export function returnPath(pathname: string, search: string): string {
+  if (AUTH_PAGES.has(pathname)) return safeNext(new URLSearchParams(search).get('next'));
+  return pathname + search;
+}

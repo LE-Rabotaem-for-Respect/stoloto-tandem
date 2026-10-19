@@ -2,7 +2,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { IconName } from '../../shared/illustrations';
 import { useTheme } from '../../shared/theme';
 import { Icon } from '../../shared/ui/Icon';
-import { loginPath, useLogout, useMe } from '../auth';
+import { loginPath, returnPath, useLogout, useMe } from '../auth';
 
 /** Пять пунктов (ТЗ 2.8): нижняя панель на мобильном, верхнее меню на компьютере. */
 export const NAV_ITEMS: readonly { to: string; label: string; icon: IconName }[] = [
@@ -55,7 +55,7 @@ function Account() {
   }
   if (!me.data) {
     return (
-      <Link className="header-link" to={loginPath(location.pathname + location.search)}>
+      <Link className="header-link" to={loginPath(returnPath(location.pathname, location.search))}>
         Войти
       </Link>
     );
@@ -63,7 +63,7 @@ function Account() {
   const who = me.data.organization?.name ?? me.data.name;
   const switchAccount = () =>
     logout.mutate(undefined, {
-      onSuccess: () => void navigate(loginPath(location.pathname + location.search)),
+      onSuccess: () => void navigate(loginPath(returnPath(location.pathname, location.search))),
     });
 
   return (
