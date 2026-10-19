@@ -7,6 +7,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/configure-app';
+import { AUTH_LIMITS } from '../src/modules/auth/attempt-limiter';
 import { OrganizationsService } from '../src/modules/organizations/organizations.service';
 import { createSport, createUser, databaseUrl, prisma } from './db';
 
@@ -16,7 +17,17 @@ const http = () => request(app.getHttpServer());
 beforeAll(async () => {
   process.env.DATABASE_URL = databaseUrl;
   process.env.SESSION_SECRET = 'test-session-secret-0123456789abcdef';
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+  const many = { attempts: 10_000, windowMs: 60_000 };
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+    // Лимиты попыток проверяет auth-limits.test.ts; здесь все регистрации идут с одного адреса
+    .overrideProvider(AUTH_LIMITS)
+    .useValue({
+      loginPerIp: many,
+      loginPerEmail: many,
+      registerPerIp: many,
+      registerPerEmail: many,
+    })
+    .compile();
   app = configureApp(moduleRef.createNestApplication());
   await app.init();
 });
