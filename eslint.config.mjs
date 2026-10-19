@@ -64,6 +64,33 @@ export default tseslint.config(
     rules: { 'no-restricted-syntax': ['error', ...partialUniqueKeys] },
   },
   {
+    // Обычный @OnEvent по умолчанию сам пишет в журнал текст ошибки обработчика целиком
+    files: ['apps/api/src/**'],
+    ignores: ['apps/api/src/core/event-bus/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@nestjs/event-emitter',
+              importNames: ['OnEvent'],
+              message:
+                'Подписка на события — через OnDomainEvent из core/event-bus: он пишет ошибки обработчика без данных вызова.',
+            },
+          ],
+          patterns: [
+            {
+              group: ['@nestjs/event-emitter/*'],
+              message:
+                'Внутренние модули @nestjs/event-emitter не импортируются: подписка — через OnDomainEvent.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // NestJS внедряет зависимости по типам параметров конструктора и требует классы-модули
     files: ['apps/api/**/*.ts'],
     rules: { '@typescript-eslint/no-extraneous-class': 'off' },
