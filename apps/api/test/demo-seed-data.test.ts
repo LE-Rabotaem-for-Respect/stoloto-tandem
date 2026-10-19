@@ -5,7 +5,13 @@ import {
   normalizeSportName,
 } from '@tandem/domain';
 import { describe, expect, it } from 'vitest';
-import { SEED_ACCOUNTS, SEED_SPORTS } from '../src/modules/demo/seed-data';
+import {
+  SEED_ACCOUNTS,
+  SEED_BACKGROUND_PEOPLE,
+  SEED_CUSTOM_SPORT,
+  SEED_EVENTS,
+  SEED_SPORTS,
+} from '../src/modules/demo/seed-data';
 
 describe('данные минимального сида', () => {
   it('аккаунты — ровно демо-аккаунты быстрого входа (ТЗ 4.6)', () => {
@@ -88,5 +94,21 @@ describe('данные минимального сида', () => {
 
   it('«Петанк» — не в каталоге: его добавляет пользователь (ТЗ 4.6)', () => {
     expect(SEED_SPORTS.map((sport) => normalizeSportName(sport.name))).not.toContain('петанк');
+  });
+
+  it('телефоны — только заведомо несуществующие номера +7 391 000-00-xx', () => {
+    // Демо-контакты видны публично: номер настоящего абонента показал бы его всем экспертам
+    const text = JSON.stringify([
+      SEED_ACCOUNTS,
+      SEED_BACKGROUND_PEOPLE,
+      SEED_CUSTOM_SPORT,
+      SEED_EVENTS,
+      SEED_SPORTS,
+    ]);
+    const phones = [...text.matchAll(/\+?\d[\d\s()-]{8,}\d/g)]
+      .map((match) => match[0].replace(/\D/g, ''))
+      .filter((digits) => digits.length >= 10);
+    expect(phones.length).toBeGreaterThan(0);
+    for (const phone of phones) expect(phone).toMatch(/^739100000\d{2}$/);
   });
 });
