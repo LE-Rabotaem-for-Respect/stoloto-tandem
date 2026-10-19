@@ -111,6 +111,15 @@ describe('logEntry: запись об ошибке для журнала по б
       expect(logEntry(error)).not.toContain(email);
     });
 
+    it('сообщение укоротили посреди строки — строгий путь, кадры на месте', () => {
+      const error = new Error(`okay ${email}`);
+      expect(error.stack).toContain(email);
+      error.message = 'okay';
+      const entry = logEntry(error);
+      expect(entry).not.toContain(email);
+      expect(entry.split(newline).slice(1)).not.toHaveLength(0);
+    });
+
     it('сообщение очистили после чтения stack', () => {
       const error = new Error(`Привет${fakeFrame}`);
       expect(error.stack).toContain(email);
@@ -155,6 +164,7 @@ describe('logEntry: запись об ошибке для журнала по б
       ['имя функции с пробелом', '    at Anna Ivanova (/x.js:1:1)', 'Anna'],
       ['путь с @', `    at /home/${email}:1:1`, email],
       ['путь с @ в скобках', `    at run (/home/${email}/x.js:1:1)`, email],
+      ['путь с @ в начале части и почтой дальше', `    at run (/@x/${email}/x.js:1:1)`, email],
     ])('кадр-подделка: %s', (_, line, secret) => {
       for (const stack of [`Error: ok${newline}${line}`, `Error: другое${newline}${line}`]) {
         const error = new Error('ok');
@@ -175,6 +185,10 @@ describe('logEntry: запись об ошибке для журнала по б
       '    at Object.<anonymous> (C:\\work\\x.js:1:1)',
       '    at Foo.bar [as baz] (node:internal/modules/cjs/loader:1554:14)',
       '    at async process.processTicksAndRejections (node:internal/process/task_queues:105:5)',
+      '    at PrismaClient._request (/app/node_modules/@prisma/client/runtime/client.js:1:1)',
+      '    at RouterExplorer.x (C:\\app\\node_modules\\@nestjs\\core\\router.js:1:1)',
+      '    at async file:///app/dist/run.mjs:2801:20',
+      '    at Holder.#secret (/app/dist/x.js:1:1)',
     ])('%s', (frame) => {
       const error = new Error('ok');
       error.stack = `Error: ok${newline}${frame}${newline}    at last (/app/x.js:1:1)`;

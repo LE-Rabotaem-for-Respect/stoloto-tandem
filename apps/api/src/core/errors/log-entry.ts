@@ -10,12 +10,15 @@ const hasOwnMessage = (error: Error) =>
   error instanceof ApiError || error instanceof TransitionError;
 
 // Кадр V8: «at функция (путь:строка:столбец)» или «at путь:строка:столбец». Функция —
-// идентификаторы через точку (с async, new, [as x], <anonymous>), путь — без пробелов и «@»:
-// в имени с пробелом или в пути с «@» мог оказаться текст сообщения
-const identifier = String.raw`(?:[\w$]+|<anonymous>)`;
+// идентификаторы через точку (с async, new, [as x], <anonymous>, #приватные), путь — без
+// пробелов, а «@» — только в начале части пути (node_modules/@prisma): в имени с пробелом
+// или в пути вида «anna@demo» мог оказаться текст сообщения
+const identifier = String.raw`(?:#?[\w$]+|<anonymous>)`;
 const functionName = String.raw`(?:async )?(?:new )?${identifier}(?:\.${identifier})*(?: \[as [\w$]+\])?`;
-const location = String.raw`(?:node:|file:\/\/|[A-Za-z]:[\\/]|\/)[^()\s@]*:\d+:\d+`;
-const frameLine = new RegExp(String.raw`^ +at (?:${functionName} \(${location}\)|${location})$`);
+const location = String.raw`(?:node:|file:\/\/|[A-Za-z]:[\\/]|\/)(?:[^()\s@]|(?<=[\\/])@)*:\d+:\d+`;
+const frameLine = new RegExp(
+  String.raw`^ +at (?:${functionName} \(${location}\)|(?:async )?${location})$`,
+);
 const frameLike = /^ +at /;
 
 /** Длина заголовка «имя: сообщение» (или «имя» при пустом сообщении) в начале `stack`, иначе -1. */
@@ -35,14 +38,16 @@ function headerLength(stack: string, message: unknown): number {
  * сообщения вида «    at …» иначе прошли бы за кадры. Если `stack` начинается ровно с этого
  * заголовка, кадры — сплошной блок сразу после него, до первой строки другого вида: так
  * отбрасывается и склеенное «Caused by». Если заголовок не совпал (сообщение или стек
- * изменили после создания ошибки), остаются лишь строки формата кадра из всего `stack`.
+ * изменили после создания ошибки, в том числе укоротили посреди строки), остаются лишь
+ * строки формата кадра из всего `stack`.
  */
 function stackFrames(error: Error): string[] {
   const stack = typeof error.stack === 'string' ? error.stack : '';
   const length = headerLength(stack, error.message);
-  if (length < 0) return stack.split('\n').filter((line) => frameLine.test(line));
-  const rest = stack.slice(length);
-  if (rest && !rest.startsWith('\n')) return [];
+  const rest = length < 0 ? '' : stack.slice(length);
+  if (length < 0 || (rest && !rest.startsWith('\n'))) {
+    return stack.split('\n').filter((line) => frameLine.test(line));
+  }
   const frames: string[] = [];
   for (const line of rest.split('\n').slice(1)) {
     if (!frameLike.test(line)) break;
