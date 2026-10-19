@@ -34,11 +34,6 @@ export class OrganizationsRepository {
     return this.prisma.organization.findUnique({ where: { id }, include: withSports });
   }
 
-  /** Сколько из этих направлений есть в каталоге и не скрыты. */
-  countActiveSports(ids: readonly string[]): Promise<number> {
-    return this.prisma.sport.count({ where: { id: { in: [...ids] }, status: 'active' } });
-  }
-
   // Профиль и направления меняются вместе: без половины правки
   updateProfile(
     id: string,

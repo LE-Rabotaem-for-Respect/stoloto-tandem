@@ -110,6 +110,23 @@ describe('профиль организации', () => {
       .send({ sportIds: [randomUUID()] });
     expect(badSport.status).toBe(400);
     expect(badSport.body.fields).toEqual({ sportIds: 'Такого направления нет в каталоге' });
+
+    const hidden = await createSport();
+    await prisma.sport.update({ where: { id: hidden.id }, data: { status: 'hidden' } });
+    const hiddenSport = await http()
+      .patch(`/organizations/${id}`)
+      .set('Cookie', cookie)
+      .send({ sportIds: [hidden.id] });
+    expect(hiddenSport.status).toBe(400);
+    expect(hiddenSport.body.fields).toEqual({ sportIds: 'Такого направления нет в каталоге' });
+
+    const sport = await createSport();
+    const repeated = await http()
+      .patch(`/organizations/${id}`)
+      .set('Cookie', cookie)
+      .send({ sportIds: [sport.id, sport.id] });
+    expect(repeated.status).toBe(200);
+    expect(repeated.body.sports).toEqual([expect.objectContaining({ id: sport.id })]);
   });
 
   it('чужую организацию не правит ни другая организация, ни пользователь; гостю — 401', async () => {

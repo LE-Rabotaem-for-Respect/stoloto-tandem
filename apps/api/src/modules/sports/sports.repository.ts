@@ -67,6 +67,11 @@ export class SportsRepository {
     return candidates.sort((a, b) => rank(a) - rank(b))[0] ?? null;
   }
 
+  /** Сколько из этих направлений есть в каталоге и не скрыты. */
+  countActive(ids: readonly string[]): Promise<number> {
+    return this.prisma.sport.count({ where: { id: { in: [...ids] }, status: 'active' } });
+  }
+
   /**
    * Новое пользовательское направление. Если то же имя одновременно добавил другой
    * запрос, возвращается его запись: вставка идёт с ON CONFLICT DO NOTHING, поэтому

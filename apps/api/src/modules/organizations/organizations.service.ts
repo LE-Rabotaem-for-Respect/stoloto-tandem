@@ -8,6 +8,7 @@ import type { Actor, Decision } from '../../core/policies';
 import type { UpdateOrganizationDto } from './dto';
 import { toOwnView, toPublicView } from './organization-view';
 import type { OwnOrganizationView, PublicOrganizationView } from './organization-view';
+import { SportsService } from '../sports/sports.service';
 import { OrganizationsRepository } from './organizations.repository';
 import type { OrganizationRecord } from './organizations.repository';
 
@@ -43,6 +44,7 @@ export class OrganizationsService {
     private readonly repository: OrganizationsRepository,
     private readonly clock: Clock,
     private readonly eventBus: EventBus,
+    private readonly sports: SportsService,
   ) {}
 
   /**
@@ -64,10 +66,7 @@ export class OrganizationsService {
     allowOrThrow(canEditOrganization(actor, id));
     const { sportIds, website, ...profile } = dto;
     const uniqueSports = sportIds && [...new Set(sportIds)];
-    if (
-      uniqueSports &&
-      (await this.repository.countActiveSports(uniqueSports)) !== uniqueSports.length
-    ) {
+    if (uniqueSports && !(await this.sports.allActive(uniqueSports))) {
       throw new ApiError('validation_failed', { sportIds: 'Такого направления нет в каталоге' });
     }
     const changes = website === undefined ? profile : { ...profile, website: website || null };

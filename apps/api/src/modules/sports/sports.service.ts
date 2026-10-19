@@ -52,6 +52,12 @@ export class SportsService {
     };
   }
 
+  /** Все ли направления из списка есть в каталоге и не скрыты. */
+  async allActive(ids: readonly string[]): Promise<boolean> {
+    const unique = new Set(ids);
+    return (await this.sports.countActive([...unique])) === unique.size;
+  }
+
   /**
    * Направление по названию из формы: уже известное (по нормализованному имени
    * или алиасу) либо новое пользовательское, сразу доступное в поиске.
