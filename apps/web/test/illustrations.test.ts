@@ -12,9 +12,9 @@ import {
   iconPath,
   iconUrl,
   sportGroupOrOther,
-} from './index';
+} from '../src/shared/illustrations';
 
-const root = dirname(fileURLToPath(import.meta.url));
+const root = join(dirname(fileURLToPath(import.meta.url)), '../src/shared/illustrations');
 const read = (path: string) => readFileSync(join(root, path), 'utf8');
 const svgFiles = (dir: string) =>
   readdirSync(join(root, dir))
@@ -23,6 +23,18 @@ const svgFiles = (dir: string) =>
     .sort();
 
 const MAX_BYTES = 4096;
+
+// Сборщик отдаёт мелкие SVG как data:-URI, крупные — ссылкой на файл.
+// Проверяем, что по адресу лежит именно нужный файл.
+function expectUrlServes(url: string, path: string) {
+  const prefix = 'data:image/svg+xml,';
+  if (url.startsWith(prefix)) {
+    const normalize = (text: string) => text.trim().replaceAll('"', "'");
+    expect(normalize(decodeURIComponent(url.slice(prefix.length)))).toBe(normalize(read(path)));
+  } else {
+    expect(url.endsWith(path)).toBe(true);
+  }
+}
 
 function expectSafeLightSvg(path: string) {
   const svg = read(path);
@@ -50,8 +62,9 @@ describe('группы направлений', () => {
   it('контрастная тема получает контурную обложку', () => {
     expect(coverPath('winter')).toBe('covers/winter.svg');
     expect(coverPath('winter', { contrast: true })).toBe('covers/outline/winter.svg');
-    expect(coverUrl('winter', { contrast: true })).toMatch(/covers\/outline\/winter\.svg$/);
-    expect(coverUrl('winter')).toMatch(/covers\/winter\.svg$/);
+    expectUrlServes(coverUrl('winter', { contrast: true }), 'covers/outline/winter.svg');
+    expectUrlServes(coverUrl('winter'), 'covers/winter.svg');
+    expectUrlServes(coverUrl('petanque'), 'covers/other.svg');
   });
 });
 
@@ -92,6 +105,6 @@ describe('пиктограммы', () => {
     expect(svg).toContain('viewBox="0 0 24 24"');
     expect(svg).toContain('stroke="currentColor"');
     expect(svg).not.toMatch(/opacity|#[0-9a-f]{3,8}\b|rgb|hsl/i);
-    expect(iconUrl(name)).toMatch(new RegExp(`icons/${name}\\.svg$`));
+    expectUrlServes(iconUrl(name), path);
   });
 });
