@@ -14,6 +14,7 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   too_large: 413,
   busy: 503,
   internal: 500,
+  invalid_credentials: 401,
   event_not_available: 404,
   event_not_joinable: 409,
   own_event: 403,

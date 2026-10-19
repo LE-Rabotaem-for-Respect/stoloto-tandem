@@ -1,0 +1,42 @@
+import { SetMetadata, createParamDecorator } from '@nestjs/common';
+import type { ExecutionContext } from '@nestjs/common';
+import type { Actor } from '../../core/policies';
+import type { UserWithOrganization } from './auth.repository';
+
+export type SignedInRole = Exclude<Actor['role'], 'guest'>;
+
+/** Что guard кладёт в запрос: кто действует и чем вошёл. */
+export interface AuthRequest {
+  headers: { cookie?: string };
+  actor?: Actor;
+  user?: UserWithOrganization;
+  sessionToken?: string;
+}
+
+export const ROLES_KEY = 'auth:roles';
+
+/** Маршрут доступен только этим ролям: гостю — 401, остальным — 403. */
+export const Roles = (...roles: SignedInRole[]) => SetMetadata(ROLES_KEY, roles);
+
+/** Маршрут доступен любому, кто вошёл. */
+export const SignedIn = () => Roles('user', 'org', 'admin');
+
+/** Кто выполняет запрос; без входа — гость. */
+export const CurrentActor = createParamDecorator(
+  (_: unknown, context: ExecutionContext): Actor =>
+    context.switchToHttp().getRequest<AuthRequest>().actor ?? { role: 'guest' },
+);
+
+/** Роль и организация — из базы по сессии, а не из запроса. */
+export function toActor(user: UserWithOrganization): Actor {
+  if (user.role === 'admin') return { role: 'admin', userId: user.id };
+  if (user.role === 'org') {
+    if (!user.organization) throw new Error(`У аккаунта организации ${user.id} нет организации`);
+    return {
+      role: 'org',
+      userId: user.id,
+      organization: { id: user.organization.id, status: user.organization.status },
+    };
+  }
+  return { role: 'user', userId: user.id };
+}

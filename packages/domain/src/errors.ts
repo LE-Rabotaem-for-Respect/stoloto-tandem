@@ -9,6 +9,7 @@ const GENERAL_ERROR_CODES = [
   'too_large',
   'busy',
   'internal',
+  'invalid_credentials',
 ] as const;
 
 /** Отказы политик доступа (ТЗ 4.4). */
@@ -45,6 +46,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   too_large: 'Слишком большой запрос',
   busy: 'Сервер занят, попробуйте ещё раз',
   internal: 'Что-то пошло не так. Попробуйте ещё раз',
+  invalid_credentials: 'Неверная почта или пароль',
   event_not_available: 'Мероприятие недоступно',
   event_not_joinable: 'Мероприятие недоступно для записи',
   own_event: 'Нельзя записаться на своё мероприятие',

@@ -17,6 +17,15 @@ export {
 export type { StatusTone, StatusView } from './statuses';
 export { normalizeSportName } from './sport-normalize';
 export {
+  DEMO_ACCOUNTS,
+  DEMO_ACCOUNT_KEYS,
+  DEMO_EMAIL_DOMAIN,
+  demoAccountEmail,
+  isDemoEmail,
+  normalizeEmail,
+} from './accounts';
+export type { DemoAccountKey } from './accounts';
+export {
   TIME_ZONE,
   dayRange,
   endOfDay,

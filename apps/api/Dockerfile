@@ -29,10 +29,12 @@ COPY --from=build /app/packages/domain/dist packages/domain/dist
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY apps/api/prisma apps/api/prisma
 COPY apps/api/prisma.config.ts apps/api/
+COPY --chmod=755 apps/api/docker-entrypoint.sh /usr/local/bin/api-entrypoint
+# Том со сгенерированным секретом сессий стенда
+RUN mkdir -p /var/lib/tandem && chown node:node /var/lib/tandem
 WORKDIR /app/apps/api
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=5s --timeout=3s --start-period=30s --retries=10 \
   CMD wget -qO- http://127.0.0.1:3000/health || exit 1
-# Перед запуском применяются миграции; при ошибке api не стартует
-CMD ["sh", "-c", "/app/node_modules/.bin/prisma migrate deploy && exec node dist/main.js"]
+CMD ["api-entrypoint"]
