@@ -1,4 +1,11 @@
-import { EVENT_LEVELS, EVENT_MODES, SPORT_CATEGORIES } from '@tandem/domain';
+import {
+  EVENT_LEVELS,
+  EVENT_MODES,
+  MULTI_LINE_TEXT,
+  SINGLE_LINE_TEXT,
+  SPORT_CATEGORIES,
+  normalizeLineBreaks,
+} from '@tandem/domain';
 import type { EventLevel, EventMode, SportCategory } from '@tandem/domain';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -40,22 +47,15 @@ const isoDate = () =>
       : value,
   );
 
-// Управляющие символы и опасные форматирующие: управление направлением текста
-// (U+202A–202E, U+2066–2069, метки U+200E/F и U+061C переворачивают текст в ленте),
-// U+200B, U+2060 и U+FEFF невидимы. Соединитель U+200D и селекторы начертания (составные эмодзи, например «бегунья»)
-// и мягкий перенос U+00AD допустимы: они приходят при обычном вводе и копировании
+// Невидимые и переворачивающие текст символы запрещены (правило — в @tandem/domain)
 const HIDDEN_CHARS = 'В тексте есть недопустимые символы';
-const singleLine = () =>
-  Matches(/^[^\p{Cc}\u061C\u200B\u200E\u200F\u2060\u202A-\u202E\u2066-\u2069\uFEFF]*$/u, {
-    message: HIDDEN_CHARS,
-  });
-// В многострочном тексте из управляющих допустимы только перевод строки и табуляция
-const multiLine = () =>
-  Matches(
-    /^(?:[^\p{Cc}\u061C\u200B\u200E\u200F\u2060\u202A-\u202E\u2066-\u2069\uFEFF]|[\n\r\t])*$/u,
-    {
-      message: HIDDEN_CHARS,
-    },
+const singleLine = () => Matches(SINGLE_LINE_TEXT, { message: HIDDEN_CHARS });
+const multiLine = () => Matches(MULTI_LINE_TEXT, { message: HIDDEN_CHARS });
+
+// Многострочный текст: переводы строк Windows (\r\n) — к \n, пробелы по краям — прочь
+const trimText = () =>
+  Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? normalizeLineBreaks(value).trim() : value,
   );
 
 /**
@@ -70,7 +70,7 @@ export class CreateEventDto {
   @singleLine()
   title!: string;
 
-  @trim()
+  @trimText()
   @IsString({ message: 'Добавьте описание' })
   @IsNotEmpty({ message: 'Добавьте описание' })
   @MaxLength(2000, { message: 'Описание — не длиннее 2000 символов' })
@@ -115,7 +115,7 @@ export class CreateEventDto {
   placeText!: string;
 
   @IsOptional()
-  @trim()
+  @trimText()
   @IsString({ message: 'Информация для участников — текст' })
   @MaxLength(2000, { message: 'Информация для участников — не длиннее 2000 символов' })
   @multiLine()
@@ -125,7 +125,7 @@ export class CreateEventDto {
   mode!: EventMode;
 
   @IsOptional()
-  @trim()
+  @trimText()
   @IsString({ message: 'Вопрос к заявке — текст' })
   @MaxLength(300, { message: 'Вопрос к заявке — не длиннее 300 символов' })
   @multiLine()

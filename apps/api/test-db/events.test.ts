@@ -178,6 +178,18 @@ describe('POST /events', () => {
     expect(response.body.description).toBe(description);
   });
 
+  it('переводы строк Windows в описании сохраняются как обычные', async () => {
+    const [cr, lf] = [String.fromCharCode(13), String.fromCharCode(10)];
+    const response = await post(igor, {
+      ...validEvent(),
+      description: `Играем 7 на 7${cr}${lf}Команды делим на месте${cr}Мяч есть`,
+      participantInfo: `Вход со двора${cr}${lf}Раздевалка открыта`,
+    });
+    expect(response.status).toBe(201);
+    expect(response.body.description).toBe(`Играем 7 на 7${lf}Команды делим на месте${lf}Мяч есть`);
+    expect(response.body.participantInfo).toBe(`Вход со двора${lf}Раздевалка открыта`);
+  });
+
   it('режим «по заявке» сохраняет вопрос к заявке', async () => {
     const response = await post(igor, {
       ...validEvent(),
@@ -242,6 +254,33 @@ describe('POST /events', () => {
       'title',
     ],
     ['арабская метка в названии', { title: `Футбол ${String.fromCodePoint(0x61c)}7×7` }, 'title'],
+    // Не перечень символов, а классы невидимого целиком
+    [
+      'невидимый оператор внутри слова в названии',
+      { title: `Фут${String.fromCodePoint(0x2063)}бол 7×7` },
+      'title',
+    ],
+    ['тег в названии', { title: `Футбол 7×7 ${String.fromCodePoint(0xe0041)}` }, 'title'],
+    [
+      'заполнитель хангыля вместо названия',
+      { title: String.fromCodePoint(0x3164).repeat(5) },
+      'title',
+    ],
+    [
+      'подстрочная аннотация в названии',
+      { title: `Футбол ${String.fromCodePoint(0xfff9)}7×7` },
+      'title',
+    ],
+    [
+      'разделитель строк в названии',
+      { title: `Футбол${String.fromCodePoint(0x2028)}7×7` },
+      'title',
+    ],
+    [
+      'разделитель абзацев в описании',
+      { description: `Играем${String.fromCodePoint(0x2029)}7 на 7` },
+      'description',
+    ],
     [
       'словесный соединитель в районе',
       { area: `Цент${String.fromCodePoint(0x2060)}ральный` },
@@ -372,12 +411,18 @@ describe('GET /events/:id', () => {
     expect(response.body.participantInfo).toBe('Раздевалка открыта с 18:30');
   });
 
-  it('карточка и /me не кешируются: ответ зависит от того, кто смотрит', async () => {
-    expect((await get(anna, eventId)).headers['cache-control']).toBe('private, no-store');
-    expect((await get(null, eventId)).headers['cache-control']).toBe('private, no-store');
+  it('карточка, лента, /me и ответы с ошибкой не кешируются', async () => {
+    expect((await get(anna, eventId)).headers['cache-control']).toBe('no-store');
+    expect((await get(null, eventId)).headers['cache-control']).toBe('no-store');
     const me = await http().get('/me').set('Cookie', anna.cookie);
     expect(me.status).toBe(200);
-    expect(me.headers['cache-control']).toBe('private, no-store');
+    expect(me.headers['cache-control']).toBe('no-store');
+    const feed = await http().get('/events');
+    expect(feed.status).toBe(200);
+    expect(feed.headers['cache-control']).toBe('no-store');
+    const missing = await get(anna, randomUUID());
+    expect(missing.status).toBe(404);
+    expect(missing.headers['cache-control']).toBe('no-store');
   });
 
   it('гость видит опубликованное мероприятие, запись предлагает после входа', async () => {
