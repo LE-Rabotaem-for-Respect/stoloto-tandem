@@ -53,9 +53,11 @@ export interface EventCard {
 
 const SPORT_REQUIRED = 'Выберите направление из списка или добавьте новое';
 
+// Поля организатора перечислены явно: лишнее поле из выборки не уйдёт в ответ
 function organizerOf(event: EventWithCard): EventCard['organizer'] {
-  if (event.organizerOrg) return { kind: 'organization', ...event.organizerOrg };
-  if (event.organizerUser) return { kind: 'user', ...event.organizerUser };
+  const { organizerOrg: org, organizerUser: user } = event;
+  if (org) return { kind: 'organization', id: org.id, name: org.name };
+  if (user) return { kind: 'user', id: user.id, name: user.name };
   throw new Error(`У мероприятия ${event.id} нет организатора`);
 }
 

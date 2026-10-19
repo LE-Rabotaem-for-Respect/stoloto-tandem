@@ -6,7 +6,8 @@ import { EventsService } from './events.service';
 import type { EventCard } from './events.service';
 
 // Кто может создать мероприятие, решает политика в сервисе, а не декоратор маршрута:
-// так гость, администратор и недопущенная организация получают её точные отказы
+// так гость, администратор и недопущенная организация получают её точные отказы.
+// Форму целиком проверяет ValidationPipe до сервиса: с неверным телом ответ — 400
 @Controller('events')
 export class EventsController {
   constructor(private readonly events: EventsService) {}

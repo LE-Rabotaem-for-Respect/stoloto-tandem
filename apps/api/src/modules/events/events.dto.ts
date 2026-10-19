@@ -20,9 +20,19 @@ const trim = () =>
 
 // Время приходит строкой ISO 8601 с поясом; «2026-10-21» без времени — не дата начала
 const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
+// new Date молча переносит несуществующий день («30 февраля» → 2 марта): такой день не дата
+function existingDay(value: string): boolean {
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  if (year === undefined || month === undefined || day === undefined) return false;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
 const isoDate = () =>
   Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' && ISO_WITH_ZONE.test(value) ? new Date(value) : value,
+    typeof value === 'string' && ISO_WITH_ZONE.test(value) && existingDay(value)
+      ? new Date(value)
+      : value,
   );
 
 /**

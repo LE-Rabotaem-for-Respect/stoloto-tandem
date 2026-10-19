@@ -132,6 +132,8 @@ describe('POST /events', () => {
       participation: null,
       participantInfo: 'Раздевалка открыта с 18:30',
     });
+    // Строго: без почты и других полей аккаунта
+    expect(response.body.organizer).toEqual({ kind: 'user', id: igor.id, name: 'Аккаунт user' });
     const codes = (response.body.actions as { code: string }[]).map((action) => action.code);
     expect(codes).toEqual(expect.arrayContaining(['reschedule_event', 'cancel_event']));
     expect(published).toHaveBeenCalledWith(
@@ -171,7 +173,8 @@ describe('POST /events', () => {
   it('организация публикует от себя только после допуска', async () => {
     const approved = await post(orgApproved, validEvent());
     expect(approved.status).toBe(201);
-    expect(approved.body.organizer).toMatchObject({ kind: 'organization' });
+    expect(Object.keys(approved.body.organizer).sort()).toEqual(['id', 'kind', 'name']);
+    expect(approved.body.organizer.kind).toBe('organization');
 
     const pending = await post(orgPending, validEvent());
     expect(pending.status).toBe(403);
@@ -190,6 +193,7 @@ describe('POST /events', () => {
     ['пустое описание', { description: '   ' }, 'description'],
     ['описание длиннее 2000', { description: 'а'.repeat(2001) }, 'description'],
     ['дата без времени и пояса', { startsAt: '2030-01-01' }, 'startsAt'],
+    ['несуществующий день', { startsAt: '2030-02-30T10:00:00Z' }, 'startsAt'],
     ['нет места', { placeText: '' }, 'placeText'],
     ['неизвестный режим', { mode: 'open' }, 'mode'],
     ['неизвестный уровень', { level: 'pro' }, 'level'],
