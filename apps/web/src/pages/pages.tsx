@@ -1,5 +1,6 @@
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
 import {
+  AppearanceSettings,
   LoginForm,
   QuickLogin,
   RegisterForm,
@@ -8,6 +9,8 @@ import {
   safeNext,
   useMe,
 } from '../features/auth';
+import { CreateEventForm } from '../features/events';
+import { FeedScreen } from '../features/feed';
 import { NotificationCenter } from '../features/notifications';
 import { MyParticipations } from '../features/participations';
 
@@ -80,9 +83,7 @@ function Section({ title, text }: { title: string; text: string }) {
   );
 }
 
-export const FeedPage = () => (
-  <Section title="Найти занятие" text="Здесь будет лента мероприятий с поиском и фильтрами." />
-);
+export const FeedPage = () => <FeedScreen />;
 
 export const EventPage = () => (
   <Section title="Мероприятие" text="Здесь будет карточка мероприятия." />
@@ -99,7 +100,10 @@ export const MyParticipationsPage = () => (
 
 export const CreateEventPage = () => (
   <RequireAuth>
-    <Section title="Создать мероприятие" text="Здесь будет форма создания мероприятия." />
+    <div className="page page-narrow">
+      <h1>Создать мероприятие</h1>
+      <CreateEventForm />
+    </div>
   </RequireAuth>
 );
 
@@ -136,6 +140,7 @@ function Profile() {
           </>
         )}
       </dl>
+      <AppearanceSettings />
       {me.data.role === 'admin' && (
         <p>
           <Link className="button" to="/admin">
