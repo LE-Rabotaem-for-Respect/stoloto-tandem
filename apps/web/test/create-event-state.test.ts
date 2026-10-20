@@ -124,6 +124,50 @@ describe('проверки шагов повторяют серверные', ()
   });
 });
 
+describe('символы — то же правило, что у api', () => {
+  const char = (...codePoints: number[]) => String.fromCodePoint(...codePoints);
+
+  it('невидимые символы в однострочном и многострочном поле — ошибка у поля', () => {
+    expect(stepErrors(0, filled({ title: `Фут${char(0x200b)}бол по средам` }), now).title).toBe(
+      'В тексте есть недопустимые символы',
+    );
+    expect(
+      stepErrors(0, filled({ description: `Играем ${char(0x202e)}7 на 7` }), now).description,
+    ).toBe('В тексте есть недопустимые символы');
+    expect(stepErrors(1, filled({ area: `Цент${char(0x2063)}ральный` }), now).area).toBe(
+      'В тексте есть недопустимые символы',
+    );
+  });
+
+  it('название из одних знаков — нужна буква или цифра', () => {
+    expect(stepErrors(0, filled({ title: '— — — — —' }), now).title).toBe(
+      'Нужна хотя бы одна буква или цифра',
+    );
+  });
+
+  it('составной эмодзи, перевод строки в описании и мягкий перенос — допустимы', () => {
+    const runner = char(0x1f3c3, 0x200d, 0x2640, 0xfe0f);
+    expect(
+      stepErrors(
+        0,
+        filled({
+          title: `Бег ${runner} вместе`,
+          description: `Пробеж${char(0xad)}ка${char(10)}после — чай`,
+        }),
+        now,
+      ),
+    ).toEqual({});
+  });
+
+  it('вопрос к заявке в режиме «Свободно» не проверяется — он не уйдёт на сервер', () => {
+    const hidden = `Опыт${char(0x2066)}?`;
+    expect(stepErrors(3, filled({ mode: 'free', applyQuestion: hidden }), now)).toEqual({});
+    expect(stepErrors(3, filled({ mode: 'approval', applyQuestion: hidden }), now)).toEqual({
+      applyQuestion: 'В тексте есть недопустимые символы',
+    });
+  });
+});
+
 describe('тело запроса', () => {
   it('выбранное направление — sportId, время — ISO, поля без пробелов по краям', () => {
     expect(toRequestBody(filled({ participantInfo: '  ' }))).toEqual({

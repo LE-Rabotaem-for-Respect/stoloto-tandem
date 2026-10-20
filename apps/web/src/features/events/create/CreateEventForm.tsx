@@ -1,10 +1,11 @@
+import { EVENT_LEVELS, EVENT_LEVEL_TITLES } from '@tandem/domain';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent, ReactNode, TextareaHTMLAttributes } from 'react';
 import { useNavigate } from 'react-router';
 import { ApiRequestError } from '../../../shared/api';
 import { useClock } from '../../../shared/clock';
 import { Field, PrimaryButton, Stepper } from '../../../shared/ui';
-import type { EventLevel, Step } from '../../../shared/ui';
+import type { Step } from '../../../shared/ui';
 import { useCreateEvent } from '../api';
 import { EventPreview } from './EventPreview';
 import {
@@ -19,12 +20,7 @@ import {
 import type { CreateEventState, FieldErrors, StepIndex } from './form-state';
 import { SportPicker } from './SportPicker';
 
-const LEVEL_OPTIONS: { value: EventLevel; label: string }[] = [
-  { value: 'beginner', label: 'Новичок' },
-  { value: 'amateur', label: 'Любитель' },
-  { value: 'advanced', label: 'Опытный' },
-  { value: 'any', label: 'Любой уровень' },
-];
+const LEVEL_OPTIONS = EVENT_LEVELS.map((value) => ({ value, label: EVENT_LEVEL_TITLES[value] }));
 
 const LAST_STEP = (STEPS.length - 1) as StepIndex;
 

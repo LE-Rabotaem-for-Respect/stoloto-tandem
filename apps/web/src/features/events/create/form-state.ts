@@ -1,6 +1,13 @@
-import { SPORT_NAME_MAX_LENGTH, isValidSportName } from '@tandem/domain';
-import type { SportCategory } from '@tandem/domain';
-import type { EventLevel } from '../../../shared/ui';
+import {
+  MULTI_LINE_TEXT,
+  SINGLE_LINE_TEXT,
+  SPORT_NAME_MAX_LENGTH,
+  VISIBLE_TEXT,
+  cleanSingleLine,
+  isValidSportName,
+  normalizeLineBreaks,
+} from '@tandem/domain';
+import type { EventLevel, SportCategory } from '@tandem/domain';
 
 /** Шаги формы (ТЗ 2.11, «Бюджет экранов»): короткие экраны вместо одной длинной формы. */
 export const STEPS = ['Что', 'Когда и где', 'Условия', 'Запись'] as const;
@@ -94,6 +101,34 @@ export function krasnoyarskTime(date: string, time: string): Date | null {
 
 // Длина в символах, как считает сервер: эмодзи из двух половинок UTF-16 — один символ
 const length = (value: string) => Array.from(value.trim()).length;
+// Однострочное поле сервер сначала чистит (пробелы по краям, мягкие переносы), потом мерит
+const lineLength = (value: string) => Array.from(cleanSingleLine(value)).length;
+
+// Невидимые символы и «пустой» на вид текст — то же правило, что у api (@tandem/domain)
+const HIDDEN_CHARS = 'В тексте есть недопустимые символы';
+function lineError(value: string): string | undefined {
+  const clean = cleanSingleLine(value);
+  if (!SINGLE_LINE_TEXT.test(clean)) return HIDDEN_CHARS;
+  if (!VISIBLE_TEXT.test(clean)) return 'Нужна хотя бы одна буква или цифра';
+  return undefined;
+}
+const blockError = (value: string) =>
+  MULTI_LINE_TEXT.test(normalizeLineBreaks(value).trim()) ? undefined : HIDDEN_CHARS;
+
+type LineField = 'title' | 'city' | 'area' | 'placeText';
+type BlockField = 'description' | 'participantInfo' | 'applyQuestion';
+const LINE_FIELDS: Record<StepIndex, LineField[]> = {
+  0: ['title'],
+  1: ['city', 'area', 'placeText'],
+  2: [],
+  3: [],
+};
+const BLOCK_FIELDS: Record<StepIndex, BlockField[]> = {
+  0: ['description'],
+  1: [],
+  2: ['participantInfo'],
+  3: ['applyQuestion'],
+};
 
 const SPORT_NAME_RULE = `Название направления — от 2 до ${SPORT_NAME_MAX_LENGTH} символов: буквы, цифры, пробелы и знаки . , ' ( ) × / + -; над буквой — не больше одного значка; в одном слове — буквы одного алфавита`;
 
@@ -104,7 +139,7 @@ const SPORT_NAME_RULE = `Название направления — от 2 до
 export function stepErrors(step: StepIndex, state: CreateEventState, now: Date): FieldErrors {
   const errors: FieldErrors = {};
   if (step === 0) {
-    if (length(state.title) < 5 || length(state.title) > 80) {
+    if (lineLength(state.title) < 5 || lineLength(state.title) > 80) {
       errors.title = 'Название — от 5 до 80 символов';
     }
     if (!state.sport) errors.sport = 'Выберите направление из списка или добавьте новое';
@@ -127,13 +162,13 @@ export function stepErrors(step: StepIndex, state: CreateEventState, now: Date):
     else if (starts <= now) errors.startTime = 'Время начала должно быть в будущем';
     if (!ends) errors.endTime = 'Укажите время окончания';
     else if (starts && ends <= starts) errors.endTime = 'Окончание — позже начала';
-    if (length(state.city) < 2 || length(state.city) > 80) {
+    if (lineLength(state.city) < 2 || lineLength(state.city) > 80) {
       errors.city = 'Город — от 2 до 80 символов';
     }
-    if (length(state.area) < 2 || length(state.area) > 120) {
+    if (lineLength(state.area) < 2 || lineLength(state.area) > 120) {
       errors.area = 'Район или ориентир — от 2 до 120 символов';
     }
-    if (length(state.placeText) < 3 || length(state.placeText) > 300) {
+    if (lineLength(state.placeText) < 3 || lineLength(state.placeText) > 300) {
       errors.placeText = 'Адрес или описание места — от 3 до 300 символов';
     }
   }
@@ -148,6 +183,16 @@ export function stepErrors(step: StepIndex, state: CreateEventState, now: Date):
     if (state.mode === 'approval' && length(state.applyQuestion) > 300) {
       errors.applyQuestion = 'Вопрос к заявке — не длиннее 300 символов';
     }
+  }
+  // Символы — после длины: у поля одна ошибка, сначала понятная
+  for (const field of LINE_FIELDS[step]) {
+    const error = errors[field] ? undefined : lineError(state[field]);
+    if (error) errors[field] = error;
+  }
+  for (const field of BLOCK_FIELDS[step]) {
+    if (field === 'applyQuestion' && state.mode !== 'approval') continue;
+    const error = errors[field] ? undefined : blockError(state[field]);
+    if (error) errors[field] = error;
   }
   return errors;
 }
