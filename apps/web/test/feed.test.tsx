@@ -38,7 +38,12 @@ const item = (n: number) => ({
 });
 
 /** Api в памяти: лента из `total` событий страницами, гость. */
-function fakeApi(total = 1, fail: (offset: number, attempt: number) => boolean = () => false) {
+function fakeApi(
+  total = 1,
+  fail: (offset: number, attempt: number) => boolean = () => false,
+  /** Ответ ждёт, пока не выполнится этот промис, — чтобы застать запрос в пути. */
+  wait: (attempt: number) => Promise<void> | undefined = () => undefined,
+) {
   let attempt = 0;
   const feedRequests: URLSearchParams[] = [];
   vi.stubGlobal(
@@ -66,6 +71,7 @@ function fakeApi(total = 1, fail: (offset: number, attempt: number) => boolean =
         const limit = Number(searchParams.get('limit'));
         const offset = Number(searchParams.get('offset'));
         attempt += 1;
+        await wait(attempt);
         if (fail(offset, attempt)) {
           return json(500, {
             code: 'internal',
@@ -363,6 +369,67 @@ describe('лента и поиск', { timeout: 15_000 }, () => {
       40,
     );
     screen.getByRole('button', { name: 'Показать ещё' });
+  });
+
+  it('во время «Повторить» — статус загрузки, кнопка неактивна', async () => {
+    let release: () => void = () => undefined;
+    const third = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // Лента загрузилась, перечитывание упало (например, после перемотки демо-часов),
+    // «Повторить» — третий запрос, его ответ задержан
+    const { feedRequests } = fakeApi(
+      1,
+      (_offset, attempt) => attempt === 2,
+      (attempt) => (attempt === 3 ? third : undefined),
+    );
+    const client = createQueryClient();
+    const user = userEvent.setup();
+    render(
+      <AppProviders client={client}>
+        <MemoryRouter initialEntries={['/']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AppProviders>,
+    );
+    await screen.findByRole('link', { name: /Пробежка 5 км на Татышеве/ });
+    await client.refetchQueries({ queryKey: ['feed'] });
+    await screen.findByRole('alert');
+    await user.click(screen.getByRole('button', { name: 'Повторить' }));
+
+    expect(await screen.findByText('Загрузка…')).toBeTruthy();
+    const retry = screen.getByRole('button', { name: 'Повторить' });
+    expect(retry.getAttribute('aria-disabled')).toBe('true');
+    // Повторное нажатие, пока идёт запрос, нового запроса не делает
+    const requests = feedRequests.length;
+    await user.click(retry);
+    expect(feedRequests).toHaveLength(requests);
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    release();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Повторить' })).toBeNull());
+    expect(screen.queryByText('Загрузка…')).toBeNull();
+  });
+
+  it('фокус на первой новой карточке и после смены фильтров с тем же индексом', async () => {
+    fakeApi(45);
+    const user = userEvent.setup();
+    renderFeed();
+    await screen.findByText('Найдено: 45');
+    await user.click(screen.getByRole('button', { name: 'Показать ещё' }));
+    await waitFor(() => expect(document.activeElement?.textContent).toContain('Событие 21'));
+
+    // Другой фильтр — лента заново с первой страницы, догрузка снова начинается с 21-й
+    await user.click(screen.getByRole('radio', { name: 'Сегодня' }));
+    await waitFor(() =>
+      expect(screen.getAllByRole('listitem').filter((li) => li.matches('.feed-card'))).toHaveLength(
+        20,
+      ),
+    );
+    const more = screen.getByRole('button', { name: 'Показать ещё' });
+    await user.click(more);
+    await waitFor(() => expect(document.activeElement?.textContent).toContain('Событие 21'));
+    expect(document.activeElement).not.toBe(more);
   });
 
   it('обложка — содержательная: alt — название группы', async () => {

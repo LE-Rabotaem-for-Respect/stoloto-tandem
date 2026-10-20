@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import type { DemoAccountKey } from '@tandem/domain';
 import { ApiRequestError, apiRequest } from '../../shared/api';
 import { CLOCK_KEY } from '../../shared/clock';
@@ -30,6 +31,17 @@ export interface RegisterBody {
 
 export const ME_KEY = ['me'] as const;
 
+/** Сохранения оформления в аккаунт: их сбой показывается, пока вход не сменился. */
+export const SAVE_THEME_KEY = ['save-theme'] as const;
+
+// Сбой сохранения прежнего аккаунта после выхода или входа другим не показывается
+function forgetThemeSaves(client: QueryClient) {
+  const mutations = client.getMutationCache();
+  for (const mutation of mutations.findAll({ mutationKey: SAVE_THEME_KEY })) {
+    mutations.remove(mutation);
+  }
+}
+
 /** `null` — гость. */
 export function useMe() {
   return useQuery({
@@ -53,6 +65,7 @@ function useSignIn<Body>(path: string) {
     mutationFn: (body: Body) => apiRequest<Me>(path, { method: 'POST', body }),
     onSuccess: (me) => {
       client.removeQueries({ predicate: (query) => query.queryKey[0] !== CLOCK_KEY[0] });
+      forgetThemeSaves(client);
       client.setQueryData(ME_KEY, me);
     },
   });
@@ -68,6 +81,7 @@ export function useLogout() {
     mutationFn: () => apiRequest<undefined>('/auth/logout', { method: 'POST' }),
     onSuccess: () => {
       client.removeQueries({ predicate: (query) => query.queryKey[0] !== CLOCK_KEY[0] });
+      forgetThemeSaves(client);
       client.setQueryData(ME_KEY, null);
     },
   });
