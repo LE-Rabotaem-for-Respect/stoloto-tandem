@@ -2,6 +2,7 @@ import '@fontsource-variable/golos-text';
 import '@fontsource-variable/unbounded';
 import './shared/theme/tokens.css';
 import './shared/theme/base.css';
+import './shared/ui/graphics.css';
 import './features/navigation/layout.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
