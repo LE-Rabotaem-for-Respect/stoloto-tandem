@@ -58,6 +58,17 @@ REMOTE
 # Каждый стенд отвечает и отдаёт свой номер; список стендов — из выкатываемого коммита
 failed=0
 for file in $(git ls-tree --name-only "$commit" stands/ | grep '\.env$'); do
+  # Имя стенда — по имени файла, как у stands.sh; на сервер уходит только stand-<число>
+  name=${file#stands/}
+  name=${name%.env}
+  case "$name" in
+    stand-[0-9] | stand-[0-9][0-9]) ;;
+    *)
+      echo "Пропускаю $file: имя стенда — stand-<номер>" >&2
+      failed=1
+      continue
+      ;;
+  esac
   settings=$(git show "$commit:$file")
   stand=$(printf '%s\n' "$settings" | sed -n 's/^STAND_ID=//p')
   port=$(printf '%s\n' "$settings" | sed -n 's/^WEB_PORT=//p')
@@ -79,7 +90,12 @@ for file in $(git ls-tree --name-only "$commit" stands/ | grep '\.env$'); do
     echo "$stand — $url — работает"
   else
     echo "$stand — $url — не отвечает" >&2
-    ssh -o BatchMode=yes "$host" "cd ~/tandem/current && sh scripts/stands.sh ps $stand && sh scripts/stands.sh logs $stand" >&2 || true
+    # Имя (уже проверенное stand-<число>) — аргументом фиксированной команды
+    ssh -o BatchMode=yes "$host" sh -s -- "$name" >&2 <<'REMOTE' || true
+cd "$HOME/tandem/current"
+sh scripts/stands.sh ps "$1"
+sh scripts/stands.sh logs "$1"
+REMOTE
     failed=1
   fi
 done
