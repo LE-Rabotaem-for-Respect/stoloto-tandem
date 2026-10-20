@@ -360,6 +360,23 @@
         overflow: hidden;
       }
 
+      /* Строка «направление / режим» в обычном тексте — одна: длинное направление обрезается
+         многоточием, бейдж не сжимается. Полное направление — в «Условиях» */
+      [data-text='normal'] .heading-line {
+        flex-wrap: nowrap;
+      }
+
+      [data-text='normal'] .sport {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      [data-text='normal'] .mode-badge {
+        flex-shrink: 0;
+      }
+
       /* Листок даты */
       .when {
         display: flex;

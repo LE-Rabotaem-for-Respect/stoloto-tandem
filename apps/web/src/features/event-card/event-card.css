@@ -107,6 +107,24 @@
     -webkit-line-clamp: 2;
     line-clamp: 2;
   }
+
+  /* Строка над названием в обычном тексте — всегда одна: длинное направление обрезается
+     многоточием, бейдж режима остаётся справа и не переносится. Иначе строка становится
+     двумя и места уходят под панель действия; полное название направления — в «Условиях» */
+  [data-text='normal'] .event-card-heading {
+    flex-wrap: nowrap;
+  }
+
+  [data-text='normal'] .event-card-sport {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  [data-text='normal'] .event-card-heading > :last-child {
+    flex-shrink: 0;
+  }
 }
 
 .event-card-heading {
