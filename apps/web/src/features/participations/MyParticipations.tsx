@@ -8,7 +8,7 @@ import {
 import type { EventDisplayStatus } from '@tandem/domain';
 import { Link } from 'react-router';
 import { useClock } from '../../shared/clock';
-import { EmptyState, EventDate, StatusBadge } from '../../shared/ui';
+import { EmptyState, EventDate, Icon, StatusBadge } from '../../shared/ui';
 import { useMyParticipations } from './api';
 import type { MyParticipation } from './api';
 
@@ -37,8 +37,13 @@ function Row({ item, now }: { item: MyParticipation; now: Date }) {
         />
         <span className="my-participation-text">
           <span className="my-participation-title">{event.title}</span>
+          {/* Направление — ярлыком, место — с пиктограммой: не одна серая строка */}
           <span className="my-participation-meta">
-            {event.sport.name} · {event.area ? `${event.city}, ${event.area}` : event.city}
+            <span className="my-participation-sport">{event.sport.name}</span>
+            <span className="my-participation-place">
+              <Icon name="action-location" />
+              {event.area ? `${event.city}, ${event.area}` : event.city}
+            </span>
           </span>
           <StatusBadge view={view} reason={item.decisionReason} compact />
           {NOTABLE.includes(event.displayStatus) && (

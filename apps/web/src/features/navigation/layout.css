@@ -324,12 +324,8 @@ html {
   left: 0;
   z-index: 10;
   border-radius: var(--radius-inner) var(--radius-inner) 0 0;
-  background: var(--charcoal);
+  background: var(--color-nav);
   box-shadow: var(--shadow-nav);
-}
-
-[data-scheme='dark'] .main-nav {
-  background: #1d1d1d;
 }
 
 [data-theme='contrast'] .main-nav {
@@ -357,7 +353,7 @@ html {
   gap: 2px;
   min-height: var(--nav-height);
   padding: var(--space-1) 2px;
-  color: #c9d1d9;
+  color: rgb(246 241 226 / 0.88);
   font-size: var(--fs-caption);
   line-height: var(--lh-tight);
   text-align: center;
@@ -367,7 +363,7 @@ html {
 }
 
 .main-nav-link:hover {
-  color: #ffffff;
+  color: var(--cream);
 }
 
 [data-theme='contrast'] .main-nav-link {
@@ -386,7 +382,7 @@ html {
 }
 
 .main-nav-link[aria-current='page'] {
-  color: var(--pistachio);
+  color: var(--lime);
   font-weight: 700;
 }
 
@@ -432,7 +428,7 @@ html {
 
   .main-nav-link[aria-current='page'] .icon {
     position: relative;
-    color: var(--charcoal);
+    color: var(--licorice);
   }
 
   [data-theme='contrast'] .main-nav-link::before {
@@ -583,7 +579,7 @@ html {
   padding: 0 var(--space-1);
   border-radius: 999px;
   background: var(--color-sky);
-  color: var(--charcoal);
+  color: var(--licorice);
   font-size: var(--fs-caption);
   font-weight: 700;
   line-height: 1.5;
@@ -638,6 +634,55 @@ a.notification-body:hover {
 
 .notification-text {
   flex: 1 1 12rem;
+  font-weight: 600;
+}
+
+.notification-body > .icon {
+  width: 1.5em;
+  height: 1.5em;
+  color: var(--color-action);
+}
+
+/* Пусто — карточка с крупной пиктограммой: заголовок жирно, пояснение ниже */
+.notifications-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: 40rem;
+  padding: var(--space-5);
+  border: 2px dashed var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  animation: rise-in var(--motion-enter) var(--ease-out) both;
+}
+
+.notifications-empty p {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.notifications-empty strong {
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: var(--fs-lead);
+}
+
+.notifications-empty-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: calc(4rem * var(--text-scale));
+  height: calc(4rem * var(--text-scale));
+  border-radius: 50%;
+  background: var(--color-sky-soft);
+  color: var(--color-ink);
+  font-size: calc(1.5rem * var(--text-scale));
+}
+
+[data-theme='contrast'] .notifications-empty-icon {
+  border: var(--border-width) solid var(--color-line);
 }
 
 .notification-time {

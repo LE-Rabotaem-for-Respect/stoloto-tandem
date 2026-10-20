@@ -102,7 +102,7 @@ export function LevelScale({ level }: { level: EventLevel }) {
 /** Бейдж режима записи: пиктограмма и подпись. */
 export function ModeBadge({ mode }: { mode: 'free' | 'approval' }) {
   return (
-    <span className="mode-badge">
+    <span className="mode-badge" data-mode={mode}>
       <Icon name={mode === 'free' ? 'mode-free' : 'mode-request'} />
       {mode === 'free' ? 'Свободно' : 'По заявке'}
     </span>

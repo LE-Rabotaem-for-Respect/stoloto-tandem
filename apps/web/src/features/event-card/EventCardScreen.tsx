@@ -1,10 +1,11 @@
 import type { Action } from '@tandem/domain';
 import { useId, useState, useSyncExternalStore } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { ApiRequestError } from '../../shared/api';
 import { useClock } from '../../shared/clock';
 import { coverAlt, coverUrl } from '../../shared/illustrations';
+import type { IconName } from '../../shared/illustrations';
 import { useTheme } from '../../shared/theme';
 import {
   EmptyState,
@@ -29,6 +30,13 @@ const LEVEL_TEXT = {
   advanced: 'Для опытных',
   any: 'Любой уровень',
 } as const;
+
+/** Текст организатора по абзацам: пустая строка или перенос — граница абзаца. */
+const paragraphs = (text: string) =>
+  text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 
 // Ошибка поля важнее общей: «Ответьте на вопрос организатора», а не «Проверьте поля формы»
 function errorText(error: unknown): string {
@@ -137,17 +145,38 @@ function EditLink({ event }: { event: EventCardView }) {
   );
 }
 
+/** Организатор — плашкой с кружком-инициалом: подпись мелко, имя крупно. */
 function Organizer({ organizer }: { organizer: EventCardView['organizer'] }) {
   return (
     <p className="event-card-organizer">
-      Организатор:{' '}
-      {organizer.kind === 'organization' ? (
-        <Link to={`/organizations/${organizer.id}`}>{organizer.name}</Link>
-      ) : (
-        // Публичных страниц пользователей в сервисе нет — только имя
-        <>{organizer.name}</>
-      )}
+      <span className="organizer-avatar" aria-hidden="true">
+        {organizer.name.trim().charAt(0).toUpperCase()}
+      </span>
+      <span className="organizer-text">
+        <span className="organizer-label">Организатор</span>{' '}
+        {organizer.kind === 'organization' ? (
+          <Link className="organizer-name" to={`/organizations/${organizer.id}`}>
+            {organizer.name}
+          </Link>
+        ) : (
+          // Публичных страниц пользователей в сервисе нет — только имя
+          <span className="organizer-name">{organizer.name}</span>
+        )}
+      </span>
     </p>
+  );
+}
+
+/** Одна плитка «Условий»: пиктограмма, короткая подпись и значение крупнее. */
+function Fact({ icon, label, children }: { icon: IconName; label: string; children: ReactNode }) {
+  return (
+    <div className="fact-tile">
+      <dt>
+        <Icon name={icon} />
+        {label}
+      </dt>
+      <dd>{children}</dd>
+    </div>
   );
 }
 
@@ -240,41 +269,56 @@ function CardBody({ event }: { event: EventCardView }) {
 
         <details className="event-card-section">
           <summary>Об активности</summary>
-          <p className="event-card-text">{event.description}</p>
+          {/* Абзацы организатора — отдельными блоками с воздухом между ними */}
+          <div className="event-card-about">
+            {paragraphs(event.description).map((text, index) => (
+              <p key={index} className="event-card-text">
+                {text}
+              </p>
+            ))}
+          </div>
         </details>
         <details className="event-card-section">
           <summary>Условия</summary>
-          <dl className="facts">
+          {/* Плитки вместо сплошной таблицы: за пиктограмму и подпись цепляется глаз */}
+          <dl className="fact-tiles">
             {/* Полное направление: на первом экране до 768 px оно может быть обрезано */}
-            <dt>Направление</dt>
-            <dd>{event.sport.name}</dd>
-            <dt>Место</dt>
-            <dd>{place}</dd>
-            <dt>Уровень</dt>
-            <dd>{LEVEL_TEXT[event.level]}</dd>
-            <dt>Запись</dt>
-            <dd>
+            <Fact icon="action-racket" label="Направление">
+              {event.sport.name}
+            </Fact>
+            <Fact icon="action-location" label="Место">
+              {place}
+            </Fact>
+            <Fact icon="action-shoes" label="Уровень">
+              {LEVEL_TEXT[event.level]}
+            </Fact>
+            <Fact icon={event.mode === 'free' ? 'mode-free' : 'mode-request'} label="Запись">
               {event.mode === 'free'
                 ? 'Свободно — участник записывается сразу'
                 : 'По заявке — организатор подтверждает каждого'}
-            </dd>
+            </Fact>
             {event.mode === 'approval' && event.applyQuestion && (
-              <>
-                <dt>Вопрос к заявке</dt>
-                <dd>{event.applyQuestion}</dd>
-              </>
+              <Fact icon="action-message" label="Вопрос к заявке">
+                {event.applyQuestion}
+              </Fact>
             )}
           </dl>
           {event.participantInfo && (
             <div className="event-card-info">
-              <h2>Информация для участников</h2>
+              <h2>
+                <Icon name="action-notify" />
+                Информация для участников
+              </h2>
               <p className="event-card-text">{event.participantInfo}</p>
             </div>
           )}
         </details>
         <section className="event-card-section" aria-labelledby="faq-title">
           <h2 id="faq-title">Частые вопросы</h2>
-          <p className="event-card-soon">Здесь появятся ответы организатора на частые вопросы.</p>
+          <p className="event-card-soon">
+            <Icon name="action-message" />
+            Здесь появятся ответы организатора на частые вопросы.
+          </p>
         </section>
         <Discussion eventId={event.id} post={findAction(event.actions, 'post_message')} />
       </div>
@@ -368,7 +412,7 @@ export function EventCardScreen() {
   }
   const event = card.data;
   return (
-    <div className="page page-narrow">
+    <div className="page page-event">
       {findAction(event.actions, 'view_participants') ? (
         <ParticipantsTabs event={event} />
       ) : (

@@ -75,7 +75,17 @@ export function NotificationCenter() {
     return <p role="alert">Не удалось загрузить уведомления. Попробуйте обновить страницу</p>;
   }
   if (notifications.data.items.length === 0) {
-    return <p>Уведомлений пока нет. Здесь появятся ответы на заявки и изменения мероприятий.</p>;
+    return (
+      <div className="notifications-empty">
+        <span className="notifications-empty-icon" aria-hidden="true">
+          <Icon name="action-notify" />
+        </span>
+        <p>
+          <strong>Уведомлений пока нет</strong>
+          Здесь появятся ответы на заявки и изменения мероприятий.
+        </p>
+      </div>
+    );
   }
   return (
     <ul className="notifications">

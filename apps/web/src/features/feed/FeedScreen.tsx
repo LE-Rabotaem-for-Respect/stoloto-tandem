@@ -284,10 +284,10 @@ export function FeedScreen() {
           <p className="feed-hero-kicker" aria-hidden="true">
             <span className="script-accent">вместе — веселее!</span>
           </p>
-          <h1 id="feed-title">Найти занятие</h1>
-          <p className="feed-hero-lead">
-            Компания для бега, падела, шахмат и&nbsp;других занятий — рядом с&nbsp;вами.
-          </p>
+          <h1 id="feed-title">
+            Найти <em>занятие</em>
+          </h1>
+          <p className="feed-hero-lead">Компания для спорта рядом с&nbsp;вами.</p>
         </div>
         <FeedFiltersForm filters={filters} onChange={(next) => setParams(filterParams(next))} />
       </section>

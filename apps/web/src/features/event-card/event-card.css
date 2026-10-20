@@ -1,5 +1,10 @@
 /* Карточка мероприятия: первый экран на 360 px — обложка, название, дата, место, статусы, кнопка. */
 
+/* Карточка шире формы: плиткам «Условий» есть где встать в два столбца */
+.page-event {
+  max-width: 48rem;
+}
+
 /* Без overflow: hidden — иначе панель действия не прилипает к краю экрана */
 .event-card {
   border: var(--border-width) solid var(--color-line);
@@ -154,16 +159,6 @@
   font-weight: 600;
 }
 
-.event-card-heading .mode-badge {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-pill);
-  background: var(--color-lime-soft);
-}
-
-[data-theme='contrast'] .event-card-heading .mode-badge {
-  border: var(--border-width) solid var(--color-line);
-}
-
 .event-card-title {
   margin: 0;
   font-size: var(--fs-title);
@@ -185,9 +180,52 @@
   overflow-wrap: anywhere;
 }
 
+/* Организатор — плашка с кружком-инициалом: подпись мелко, имя жирно */
 .event-card-organizer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  justify-self: start;
+  max-width: 100%;
   margin: 0;
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
   overflow-wrap: anywhere;
+}
+
+.organizer-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: calc(2.75rem * var(--text-scale));
+  height: calc(2.75rem * var(--text-scale));
+  border-radius: 50%;
+  background: var(--color-block);
+  color: var(--color-block-accent);
+  font-family: var(--font-display);
+  font-size: var(--fs-lead);
+  font-weight: 800;
+}
+
+[data-theme='contrast'] .organizer-avatar,
+[data-theme='contrast'] .event-card-organizer {
+  border: var(--border-width) solid var(--color-line);
+}
+
+.organizer-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.organizer-label {
+  color: var(--color-ink-muted);
+  font-size: var(--fs-caption);
+}
+
+.organizer-name {
+  font-weight: 700;
 }
 
 /* Ссылка — областью нажатия не меньше 48 px */
@@ -195,6 +233,64 @@
   display: inline-flex;
   align-items: center;
   min-height: var(--tap-min);
+}
+
+/* «Об активности»: абзацы организатора с лаймовой полосой слева и воздухом между ними */
+.event-card-about {
+  display: grid;
+  gap: var(--space-3);
+  padding-left: var(--space-4);
+  border-left: 4px solid var(--color-marker);
+}
+
+.event-card-about .event-card-text {
+  max-width: 60ch;
+  font-size: var(--fs-lead);
+  line-height: 1.5;
+}
+
+/* «Условия» — плитки: пиктограмма с подписью сверху, значение крупнее; цвета чередуются */
+.fact-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.fact-tile {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-green-soft);
+  animation: rise-in var(--motion-base) var(--ease-out) both;
+}
+
+.fact-tile:nth-child(3n + 2) {
+  background: var(--color-sky-soft);
+}
+
+.fact-tile:nth-child(3n) {
+  background: var(--color-lime-soft);
+}
+
+[data-theme='contrast'] .fact-tile {
+  border: var(--border-width) solid var(--color-line);
+}
+
+.fact-tile dt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-ink-muted);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+}
+
+.fact-tile dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .event-card-edit {
@@ -205,6 +301,16 @@
 .event-card-action-off {
   margin: 0;
   color: var(--color-ink-muted);
+}
+
+/* Заглушка будущего раздела — пунктирная рамка с пиктограммой, а не строка серого текста */
+.event-card-soon {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 2px dashed var(--color-line);
+  border-radius: var(--radius-control);
 }
 
 .event-card-text {
@@ -287,10 +393,25 @@
   font-size: var(--fs-lead);
 }
 
+/* Информация для участников — выделенный зелёный блок: это главное после записи */
 .event-card-info {
   display: grid;
   gap: var(--space-2);
   margin-top: var(--space-3);
+  padding: var(--space-4);
+  border-left: 4px solid var(--color-action);
+  border-radius: var(--radius-control);
+  background: var(--color-green-soft);
+}
+
+.event-card-info h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+[data-theme='contrast'] .event-card-info {
+  border: var(--border-width) solid var(--color-line);
 }
 
 .event-card-tabs {

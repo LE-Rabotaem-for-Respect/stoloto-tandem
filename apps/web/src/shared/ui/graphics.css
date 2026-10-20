@@ -40,8 +40,8 @@
   position: relative;
   width: 100%;
   padding: var(--space-2) 0 var(--space-1);
-  background: var(--color-marker);
-  color: var(--color-on-marker);
+  background: var(--color-sky);
+  color: var(--licorice);
   font-size: var(--fs-caption);
   font-weight: 700;
   line-height: 1;
@@ -170,16 +170,32 @@
   line-height: 1;
 }
 
-/* Бейдж режима записи */
+/* Бейдж режима записи — «пилюля»: свободно — зелёная, по заявке — голубая */
 .mode-badge {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-green-soft);
   color: var(--color-ink);
   font-size: var(--fs-caption);
-  font-weight: 600;
-  line-height: 1;
+  font-weight: 700;
+  line-height: 1.2;
   white-space: nowrap;
+}
+
+.mode-badge[data-mode='approval'] {
+  background: var(--color-sky-soft);
+}
+
+[data-theme='contrast'] .mode-badge {
+  border: var(--border-width) solid var(--color-line);
+}
+
+[data-theme='contrast'] .leaf-month {
+  background: var(--color-marker);
+  color: var(--color-on-marker);
 }
 
 /* Статус: текст, пиктограмма и цвет */

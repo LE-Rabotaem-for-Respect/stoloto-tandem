@@ -10,59 +10,70 @@
 
 :root,
 [data-theme='default'] {
-  /* Опорные цвета палитры: Frost, Pistachio, Iced Denim и Charcoal для тёмных акцентов */
-  --frost: #e6f1fa;
-  --pistachio: #b9c255;
-  --denim: #5798d7;
+  /* Опорные цвета: тёплый Dutch white, «кортовый» зелёный, небесный голубой, лайм-«мяч»
+     и charcoal для тёмной схемы */
+  --dutch: #d7ceaf;
+  --cream: #f6f1e2;
+  --green: #1f6b45;
+  --green-deep: #17573a;
+  --lime: #c6d84a;
+  --sky: #5ba4e6;
+  --blue-deep: #174c85;
   --charcoal: #323232;
+  --licorice: #1c150f;
+  /* Старые имена — те же роли в новой палитре */
+  --pistachio: var(--lime);
+  --denim: var(--sky);
 
-  /* Основная палитра */
-  --color-paper: var(--frost);
-  --color-surface: #ffffff;
-  --color-surface-2: #f3f8fc;
-  --color-ink: var(--charcoal);
-  --color-ink-muted: #56606b;
-  --color-line: #d4e2ee;
-  --color-line-strong: #7d8c99;
-  /* Ссылки и всё «ваше»: глубокий деним, 6,5:1 на белом */
-  --color-primary: #24609e;
-  --color-primary-hover: #1a4b7d;
-  --color-on-primary: #ffffff;
-  /* Главная кнопка — charcoal, как в референсе: 12,8:1 */
-  --color-action: var(--charcoal);
-  --color-action-hover: #1f1f1f;
-  --color-on-action: #ffffff;
-  --color-marker: var(--pistachio);
-  --color-marker-strong: #5e6b12;
-  --color-on-marker: var(--charcoal);
-  --color-sky: var(--denim);
-  --color-sky-soft: #cfe3f6;
-  --color-lime-soft: #eef2c9;
-  --color-focus: #24609e;
-  --color-glass: rgb(255 255 255 / 0.92);
+  /* Основная палитра: фон — Dutch white, карточки и поля — светлый крем того же тона */
+  --color-paper: var(--dutch);
+  --color-surface: var(--cream);
+  --color-surface-2: #ebe3ca;
+  --color-ink: var(--licorice);
+  --color-ink-muted: #4e4636;
+  --color-line: #c9bf9c;
+  --color-line-strong: #7a7058;
+  /* Ссылки и всё «ваше»: глубокий голубой — AA и на креме, и на Dutch white */
+  --color-primary: var(--blue-deep);
+  --color-primary-hover: #0f3966;
+  --color-on-primary: var(--cream);
+  /* Главная кнопка — зелёная «пилюля», текст кремом: 5,7:1 */
+  --color-action: var(--green);
+  --color-action-hover: var(--green-deep);
+  --color-on-action: var(--cream);
+  --color-marker: var(--lime);
+  --color-marker-strong: #4d5a10;
+  --color-on-marker: var(--licorice);
+  --color-sky: var(--sky);
+  --color-sky-soft: #cfe2ef;
+  --color-lime-soft: #e3e8b4;
+  --color-green-soft: #cfe0c4;
+  --color-focus: var(--blue-deep);
+  --color-glass: rgb(246 241 226 / 0.94);
 
-  /* Градиенты: «размытая» смесь фисташки, инея и денима */
-  --gradient-hero:
-    radial-gradient(60% 80% at 12% 18%, #d7df8a 0%, transparent 60%),
-    radial-gradient(55% 75% at 88% 12%, #9cc4ec 0%, transparent 62%),
-    radial-gradient(70% 90% at 70% 100%, #b9c255 0%, transparent 58%),
-    radial-gradient(60% 80% at 0% 100%, #7fb2e3 0%, transparent 60%), #e6f1fa;
-  --gradient-cover: linear-gradient(135deg, #eef2c9 0%, #e6f1fa 48%, #cfe3f6 100%);
-  --gradient-action: linear-gradient(100deg, #323232 0%, #2a2a2a 55%, #4a4a4a 100%);
+  /* Цветные блоки, как в «теннисном» референсе: глубокий зелёный и текст кремом (7,6:1) */
+  --color-block: var(--green-deep);
+  --color-on-block: var(--cream);
+  --color-block-accent: var(--lime);
+  --color-nav: var(--green-deep);
+
+  --gradient-hero: var(--green-deep);
+  --gradient-cover: linear-gradient(135deg, #d9e6b8 0%, #cfe2ef 55%, #b3d3f0 100%);
+  --gradient-action: var(--green);
 
   /* Статусная палитра: текст/иконка (fg) на подложке (bg) */
   --status-ok-fg: #1d6b35;
-  --status-ok-bg: #e3f4e8;
+  --status-ok-bg: #dcecd2;
   --status-wait-fg: #7a4a00;
-  --status-wait-bg: #fff1d1;
+  --status-wait-bg: #f8e6bb;
   --status-queue-fg: #2a47a3;
-  --status-queue-bg: #e7edff;
+  --status-queue-bg: #dbe3f4;
   --status-bad-fg: #a11d1d;
-  --status-bad-bg: #fce5e3;
+  --status-bad-bg: #f5d9cf;
   --status-warn-fg: #8a3b00;
-  --status-warn-bg: #ffe8d6;
-  --status-off-fg: #4a5a66;
-  --status-off-bg: #ebeef0;
+  --status-warn-bg: #f6dcc0;
+  --status-off-fg: #4e4636;
+  --status-off-bg: #e6dfcb;
 
   /* Группы направлений: фон обложки и цвет линии рисунка (docs/design.md) */
   --cover-team: #ddf0e2;
@@ -82,42 +93,42 @@
   --cover-other: #eceff3;
   --cover-other-tone: #283240;
   --border-width: 1px;
-  --shadow-card: 0 1px 2px rgb(50 50 50 / 0.06), 0 8px 24px -12px rgb(36 96 158 / 0.25);
-  --shadow-lift: 0 2px 4px rgb(50 50 50 / 0.06), 0 22px 40px -18px rgb(36 96 158 / 0.45);
-  --shadow-nav: 0 -8px 24px -12px rgb(50 50 50 / 0.35);
+  --shadow-card: 0 1px 2px rgb(28 21 15 / 0.08), 0 10px 24px -14px rgb(23 87 58 / 0.35);
+  --shadow-lift: 0 2px 4px rgb(28 21 15 / 0.08), 0 24px 40px -18px rgb(23 87 58 / 0.5);
+  --shadow-nav: 0 -8px 24px -12px rgb(28 21 15 / 0.4);
 }
 
-/* Тёмная схема: charcoal вместо инея, фисташка — главное действие */
+/* Тёмная схема: charcoal вместо Dutch white, лайм — главное действие, зелёный и голубой —
+   те же цветные блоки */
 :root[data-scheme='dark']:not([data-theme='contrast']) {
   color-scheme: dark;
-  --color-paper: #2a2a2a;
-  --color-surface: #363636;
-  --color-surface-2: #3f3f3f;
-  --color-ink: #f4f8fb;
-  --color-ink-muted: #c3cbd3;
-  --color-line: #4b4b4b;
-  --color-line-strong: #8f9aa5;
-  --color-primary: #9cc6ee;
-  --color-primary-hover: #c4ddf5;
-  --color-on-primary: #1d2a36;
-  --color-action: var(--pistachio);
-  --color-action-hover: #cdd57a;
-  --color-on-action: var(--charcoal);
-  --color-marker: var(--pistachio);
-  --color-marker-strong: #cdd57a;
-  --color-on-marker: var(--charcoal);
-  --color-sky-soft: #2f4357;
-  --color-lime-soft: #43472a;
-  --color-focus: #9cc6ee;
-  --color-glass: rgb(42 42 42 / 0.92);
+  --color-paper: #262626;
+  --color-surface: #333230;
+  --color-surface-2: #3d3b38;
+  --color-ink: var(--cream);
+  --color-ink-muted: #cfc7b0;
+  --color-line: #4a4741;
+  --color-line-strong: #9a917b;
+  --color-primary: #8cc2f2;
+  --color-primary-hover: #b8d9f7;
+  --color-on-primary: #1c150f;
+  --color-action: var(--lime);
+  --color-action-hover: #d6e46f;
+  --color-on-action: var(--licorice);
+  --color-marker: var(--lime);
+  --color-marker-strong: #d6e46f;
+  --color-on-marker: var(--licorice);
+  --color-sky-soft: #2c4256;
+  --color-lime-soft: #434a24;
+  --color-green-soft: #29402f;
+  --color-focus: #8cc2f2;
+  --color-glass: rgb(38 38 38 / 0.94);
+  --color-block: #17402c;
+  --color-nav: #1a1a1a;
 
-  --gradient-hero:
-    radial-gradient(60% 80% at 12% 18%, rgb(185 194 85 / 0.55) 0%, transparent 60%),
-    radial-gradient(55% 75% at 88% 12%, rgb(87 152 215 / 0.6) 0%, transparent 62%),
-    radial-gradient(70% 90% at 70% 100%, rgb(185 194 85 / 0.35) 0%, transparent 58%),
-    radial-gradient(60% 80% at 0% 100%, rgb(87 152 215 / 0.4) 0%, transparent 60%), #323232;
-  --gradient-cover: linear-gradient(135deg, #4a4f2c 0%, #3a3f45 48%, #2f4357 100%);
-  --gradient-action: linear-gradient(100deg, #b9c255 0%, #c8cf6f 60%, #a9b247 100%);
+  --gradient-hero: #17402c;
+  --gradient-cover: linear-gradient(135deg, #3e4a2a 0%, #2f4255 100%);
+  --gradient-action: var(--lime);
 
   --status-ok-fg: #8fe0a4;
   --status-ok-bg: #263d2d;
@@ -157,6 +168,11 @@
   --color-sky: #ffffff;
   --color-sky-soft: #000000;
   --color-lime-soft: #000000;
+  --color-green-soft: #000000;
+  --color-block: #000000;
+  --color-on-block: #ffffff;
+  --color-block-accent: #ffe600;
+  --color-nav: #000000;
   --color-focus: #ffe600;
   --color-glass: #000000;
 
