@@ -41,6 +41,8 @@ const card = (patch: Record<string, unknown> = {}) => ({
   participation: null,
   participationReason: null,
   participantInfo: null,
+  capacity: null,
+  confirmedCount: 0,
   actions: [{ code: 'join', enabled: true }],
   ...patch,
 });
@@ -226,6 +228,29 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     screen.getByText('Сколько бегаете?');
     screen.getByRole('heading', { name: 'Информация для участников' });
     screen.getByText('Сбор у входа в 7:20');
+  });
+
+  it('от 768 px статус в панели — полным текстом, отдельной строки полного статуса нет', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(min-width: 768px)',
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    fakeApi({
+      cardFor: () =>
+        json(
+          200,
+          card({
+            participation: 'confirmed',
+            actions: [{ code: 'join', enabled: false, reason: 'Вы уже участник' }],
+          }),
+        ),
+    });
+    renderCard();
+    const full = await screen.findByText('Набор открыт. Вы участник');
+    expect(full.closest('.status')).not.toBeNull();
+    expect(screen.queryByText('Вы участник')).toBeNull();
+    expect(document.querySelector('.event-card-full-status')).toBeNull();
   });
 
   it('отменённое мероприятие — статус с причиной', async () => {

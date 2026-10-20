@@ -24,6 +24,8 @@ const event = (patch: Partial<EventCardView> = {}): EventCardView => ({
   participation: null,
   participationReason: null,
   participantInfo: null,
+  capacity: null,
+  confirmedCount: 0,
   actions: [],
   ...patch,
 });

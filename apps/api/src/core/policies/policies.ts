@@ -55,10 +55,12 @@ export function canViewEvent(
 
 /** Записаться, подать заявку, встать в лист ожидания. Статус записи проверяет автомат. */
 export function canJoin(actor: Actor, event: PolicyEvent, now: Date): Decision {
+  // Сначала — открыта ли запись вообще: гостю на завершённом или отменённом мероприятии
+  // «войдите» обещало бы запись, которой после входа не будет
+  if (event.status !== 'published' || now >= event.endsAt) return deny('event_not_joinable');
   if (actor.role === 'guest') return loginFirst;
   if (actor.role !== 'user') return deny('users_only');
   if (isEventOrganizer(actor, event)) return deny('own_event');
-  if (event.status !== 'published' || now >= event.endsAt) return deny('event_not_joinable');
   return allow;
 }
 

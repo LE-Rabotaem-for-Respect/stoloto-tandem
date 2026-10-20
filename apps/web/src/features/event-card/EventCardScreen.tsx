@@ -1,5 +1,5 @@
 import type { Action } from '@tandem/domain';
-import { useId, useState } from 'react';
+import { useId, useState, useSyncExternalStore } from 'react';
 import type { KeyboardEvent } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { ApiRequestError } from '../../shared/api';
@@ -149,13 +149,29 @@ function Organizer({ organizer }: { organizer: EventCardView['organizer'] }) {
   );
 }
 
+// От 768 px панель действия — в потоке карточки, и статус в ней — полным текстом
+// (docs/design.md, «Первый экран карточки события»): строка полного статуса не нужна
+const WIDE = '(min-width: 768px)';
+
+function subscribeWide(onChange: () => void) {
+  const query = window.matchMedia?.(WIDE);
+  query?.addEventListener('change', onChange);
+  return () => query?.removeEventListener('change', onChange);
+}
+
+const useWide = () =>
+  useSyncExternalStore(subscribeWide, () => window.matchMedia?.(WIDE).matches ?? false);
+
 function CardBody({ event }: { event: EventCardView }) {
   const now = useClock();
   const { contrast } = useTheme();
   const id = useId();
   const main = primaryAction(event.actions);
   const others = secondaryActions(event.actions);
-  const status = cardStatus(event, main);
+  const narrow = cardStatus(event, main);
+  const wide = useWide();
+  const status =
+    wide && narrow.full ? { panel: { ...narrow.panel, text: narrow.full }, full: null } : narrow;
   const fullId = `${id}-full`;
   const panelId = `${id}-panel`;
   const place = `${event.city}, ${event.area}, ${event.placeText}`;

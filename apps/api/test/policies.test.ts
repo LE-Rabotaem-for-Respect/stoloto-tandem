@@ -103,6 +103,25 @@ describe('policies по таблице ТЗ 4.4', () => {
       expect(canJoin(user, finished, now)).toEqual(no('event_not_joinable'));
       expect(canJoin(user, ongoing, now)).toEqual(yes);
     });
+    it('гостю на закрытом для записи — причина статуса, а не «войдите»: после входа записи не будет', () => {
+      const finished = { ...userEvent, endsAt: new Date('2026-10-19T04:59:59Z') };
+      for (const event of [
+        finished,
+        ...(['cancelled', 'unpublished', 'deleted'] as const).map((status) => ({
+          ...userEvent,
+          status,
+        })),
+      ]) {
+        expect(canJoin(guest, event, now), event.status).toEqual(no('event_not_joinable'));
+        const [join] = eventActions(guest, { ...event, mode: 'free', hasSeats: true }, null, now);
+        expect(join, event.status).toEqual({
+          code: 'join',
+          enabled: false,
+          reason: 'Мероприятие недоступно для записи',
+          reasonCode: 'event_not_joinable',
+        });
+      }
+    });
   });
 
   describe('отменить свою запись или заявку', () => {

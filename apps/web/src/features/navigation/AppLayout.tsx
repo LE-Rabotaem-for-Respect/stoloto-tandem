@@ -132,10 +132,6 @@ function Account() {
 }
 
 /**
- * Высота прилипающей шапки — в `--app-top-height` для `scroll-padding-top`: она
- * меняется с шириной экрана, темой «Крупный текст» и длиной имени аккаунта.
- */
-/**
  * Высота нижней панели — в `--app-nav-height`: подпись в две строки и «Крупный текст»
  * делают её выше токена `--nav-height`. По ней прилипают к панели панель действия
  * карточки и `scroll-padding-bottom`. От 768 px панель — верхнее меню, высота — 0.
@@ -163,6 +159,10 @@ function useFixedNavHeight() {
   return ref;
 }
 
+/**
+ * Высота прилипающей шапки — в `--app-top-height` для `scroll-padding-top`: она
+ * меняется с шириной экрана, темой «Крупный текст» и длиной имени аккаунта.
+ */
 function useStickyTopHeight() {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
