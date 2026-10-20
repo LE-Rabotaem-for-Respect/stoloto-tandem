@@ -11,7 +11,10 @@ const json = (status: number, body?: unknown) =>
     headers: { 'Content-Type': 'application/json' },
   });
 
-function fakeStand(standId: string | null = 'stand-2') {
+function fakeStand(
+  standId: string | null = 'stand-2',
+  { demoMode = true, demoLogin = 'ok' }: { demoMode?: boolean; demoLogin?: 'ok' | 'missing' } = {},
+) {
   let me: unknown = null;
   const calls: { call: string; body?: unknown }[] = [];
   vi.stubGlobal(
@@ -23,13 +26,19 @@ function fakeStand(standId: string | null = 'stand-2') {
         case 'GET /api/clock':
           return json(200, {
             now: '2026-10-19T05:00:00Z',
-            demoMode: true,
+            demoMode,
             standId,
             lastResetAt: null,
           });
         case 'GET /api/me':
           return me ? json(200, me) : json(401, { code: 'unauthorized', message: 'Войдите' });
         case 'POST /api/auth/demo-login': {
+          if (demoLogin === 'missing') {
+            return json(404, {
+              code: 'demo_account_missing',
+              message: 'Демо-аккаунта нет в базе — сбросьте демо-данные',
+            });
+          }
           const { account } = JSON.parse(String(init?.body)) as { account: string };
           me = { id: 'u', role: 'user', name: account, email: `${account}@demo` };
           return json(200, me);
@@ -115,6 +124,25 @@ describe('страница /check «Как проверить» (ТЗ 4.6)', () 
     expect(calls).toContainEqual({ call: 'POST /api/auth/demo-login', body: { account: 'anna' } });
   });
 
+  it('демо-вход не удался — причина рядом с кнопкой, а не тишина', async () => {
+    fakeStand('stand-2', { demoLogin: 'missing' });
+    renderAt('/check');
+    const [button] = await screen.findAllByRole('button', { name: /^Войти как/ });
+    await userEvent.click(button as HTMLElement);
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Демо-аккаунта нет в базе — сбросьте демо-данные',
+    );
+    expect(screen.getByTestId('where').textContent).toBe('/check');
+  });
+
+  it('вне демо-режима демо-почт и пароля на странице нет', async () => {
+    fakeStand(null, { demoMode: false });
+    renderAt('/check');
+    await screen.findByText(/Сценарии проходят на демо-стенде/);
+    expect(screen.queryByText(/anna@demo/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Войти как/ })).toBeNull();
+  });
+
   it('фоновому участнику — почта и пароль: быстрого входа у него нет', async () => {
     fakeStand();
     renderAt('/check');
@@ -164,6 +192,13 @@ describe('маршруты /check — проверки ТЗ 4.7 не теряю�
       (item) => 'account' in item.who && item.who.account === 'anna',
     );
     expect(step?.expected).toMatch(/Падел-клуба Енисей/);
+  });
+
+  it('сценарий 2: степпер организации и шаг «Решение» — на экране своей организации', () => {
+    const steps = (route('2')?.steps ?? []).filter(
+      (item) => 'account' in item.who && ['padel', 'stolby'].includes(item.who.account),
+    );
+    expect(steps.map((item) => item.path)).toEqual(['/organization', '/create', '/organization']);
   });
 
   it('сценарий 6: «Ладья» видит баннер, а запись по прямой ссылке API отклоняет', () => {

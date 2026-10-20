@@ -67,7 +67,7 @@ export const CHECK_ROUTES: readonly CheckRoute[] = [
         who: { account: 'padel' },
         action: 'Входит',
         expected: 'Степпер организации на шаге «Проверка»',
-        path: '/profile',
+        path: '/organization',
       },
       {
         who: admin,
@@ -97,7 +97,7 @@ export const CHECK_ROUTES: readonly CheckRoute[] = [
         who: { account: 'stolby' },
         action: 'Входит',
         expected: 'Шаг «Решение»: «Отклонена» и причина, можно отправить снова',
-        path: '/profile',
+        path: '/organization',
       },
     ],
   },

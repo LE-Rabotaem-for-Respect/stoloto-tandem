@@ -1,7 +1,7 @@
 import { DEMO_ACCOUNTS, demoAccountEmail } from '@tandem/domain';
 import { Link, useNavigate } from 'react-router';
 import { useStandInfo } from '../../shared/clock';
-import { useDemoLogin } from '../auth';
+import { FormMessage, formError, useDemoLogin } from '../auth';
 import { Markdown } from './markdown';
 import {
   BACKGROUND_PEOPLE,
@@ -33,16 +33,23 @@ function SignIn({ step }: { step: CheckStep }) {
     );
   }
   return (
-    <button
-      type="button"
-      className="button check-sign-in"
-      disabled={demoLogin.isPending}
-      onClick={() =>
-        demoLogin.mutate({ account: who.account }, { onSuccess: () => navigate(step.path ?? '/') })
-      }
-    >
-      Войти как {whoName(who)}
-    </button>
+    <>
+      <button
+        type="button"
+        className="button check-sign-in"
+        disabled={demoLogin.isPending}
+        onClick={() =>
+          demoLogin.mutate(
+            { account: who.account },
+            { onSuccess: () => navigate(step.path ?? '/') },
+          )
+        }
+      >
+        Войти как {whoName(who)}
+      </button>
+      {/* Например, демо-данные не сброшены и аккаунта нет — как у быстрого входа */}
+      <FormMessage text={formError(demoLogin.error).message} />
+    </>
   );
 }
 
@@ -106,11 +113,16 @@ export function CheckPage() {
   return (
     <div className="check-page">
       <h1>Как проверить</h1>
-      <p>
-        Перед каждым сценарием — «Сбросить демо-данные» в демо-панели. Демо-аккаунты:{' '}
-        {DEMO_ACCOUNTS.map((account) => demoAccountEmail(account.key)).join(', ')}, пароль{' '}
-        {DEMO_PASSWORD}.
-      </p>
+      {demoMode ? (
+        <p>
+          Перед каждым сценарием — «Сбросить демо-данные» в демо-панели. Демо-аккаунты:{' '}
+          {DEMO_ACCOUNTS.map((account) => demoAccountEmail(account.key)).join(', ')}, пароль{' '}
+          {DEMO_PASSWORD}.
+        </p>
+      ) : (
+        // Вне демо-режима демо-аккаунтов нет: их почты и пароль только сбили бы с толку
+        <p>Сценарии проходят на демо-стенде: там есть демо-аккаунты и сброс данных.</p>
+      )}
       <p>
         Подробные шаги и демо-данные — <Link to="/check/scenarios">docs/scenarios.md</Link>.
       </p>
