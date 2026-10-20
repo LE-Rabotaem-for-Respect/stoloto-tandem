@@ -355,7 +355,7 @@ describe('действие гостя', () => {
     await screen.findByText('Кнопки нет');
 
     // Человек ушёл на главную, кнопка появилась, он вернулся «Назад»
-    await userEvent.click(screen.getByRole('link', { name: 'Спорт вместе' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Тандем' }));
     joinVisible = true;
     await userEvent.click(await screen.findByRole('button', { name: 'Назад' }));
     await screen.findByRole('button', { name: 'Записаться' });
