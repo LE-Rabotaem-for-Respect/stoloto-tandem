@@ -3,7 +3,19 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppProviders, AppRoutes, createQueryClient } from '../src/App';
-import { filterParams, hiddenFilterCount, readFilters } from '../src/features/feed/filters';
+import {
+  feedQuery,
+  filterParams,
+  hiddenFilterCount,
+  readFilters,
+} from '../src/features/feed/filters';
+
+const CURLING = { id: '3f0c2a8e-5b1d-4c7e-9a20-6d8e1f4b7c31', name: 'Кёрлинг на льду' };
+const SPORTS = [
+  CURLING,
+  { id: '9b7e4d12-0c3a-4f56-8e19-2a5d7c6b8f40', name: 'Кёрлинг' },
+  { id: '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f', name: 'Бег' },
+];
 
 const json = (status: number, body?: unknown) =>
   new Response(body === undefined ? null : JSON.stringify(body), {
@@ -41,6 +53,13 @@ function fakeApi(total = 1, fail: (offset: number, attempt: number) => boolean =
           standId: null,
           lastResetAt: null,
         });
+      }
+      if (pathname === '/api/sports') {
+        const q = (searchParams.get('q') ?? '').toLowerCase();
+        const items = SPORTS.filter((sport) => sport.name.toLowerCase().includes(q)).map(
+          (sport) => ({ ...sport, category: 'other', isCustom: true }),
+        );
+        return json(200, { items, exactMatch: false });
       }
       if (pathname === '/api/events') {
         feedRequests.push(searchParams);
@@ -107,6 +126,23 @@ describe('фильтры ленты в адресе', () => {
     expect(params.toString()).toBe(
       new URLSearchParams({ date: 'weekend', city: 'Красноярск' }).toString(),
     );
+  });
+
+  it('направление — id в api, название только в адресе; чужое id отбрасывается', () => {
+    const filters = readFilters(
+      new URLSearchParams({ sport: CURLING.id, sportName: CURLING.name, q: 'лёд' }),
+    );
+    expect(filters.sport).toEqual(CURLING);
+    expect(filterParams(filters).get('sportName')).toBe(CURLING.name);
+    expect(feedQuery(filters).get('sport')).toBe(CURLING.id);
+    expect(feedQuery(filters).has('sportName')).toBe(false);
+    expect(hiddenFilterCount(filters)).toBe(1);
+
+    for (const sport of ['curling', '1; DROP', `${CURLING.id}x`]) {
+      expect(readFilters(new URLSearchParams({ sport, sportName: 'x' })).sport).toBeUndefined();
+    }
+    const long = readFilters(new URLSearchParams({ sport: CURLING.id, sportName: 'к'.repeat(80) }));
+    expect(long.sport?.name).toHaveLength(50);
   });
 
   it('число на «Фильтрах» — только свёрнутые фильтры', () => {
@@ -194,6 +230,60 @@ describe('лента и поиск', { timeout: 15_000 }, () => {
     await user.click(screen.getByRole('radio', { name: 'Сегодня' }));
     await waitFor(() => expect(last()?.get('date')).toBe('today'));
     expect(screen.getByRole('radio', { name: 'Сегодня' })).toBe(document.activeElement);
+  });
+
+  it('фильтр по направлению: выбор из подсказок уходит в запрос, пустое поле его снимает', async () => {
+    const { last } = fakeApi();
+    const user = userEvent.setup();
+    renderFeed();
+    await user.click(await screen.findByText('Фильтры'));
+
+    const field = screen.getByRole('combobox', { name: 'Направление' });
+    await user.type(field, 'кёрл');
+    const list = await screen.findByRole('listbox', { name: 'Подсказки' });
+    expect(within(list).getAllByRole('option')).toHaveLength(2);
+    // Набранный текст без выбора фильтром не становится
+    expect(last()?.has('sport')).toBe(false);
+    await user.click(screen.getByRole('option', { name: 'Кёрлинг на льду' }));
+
+    await waitFor(() => expect(last()?.get('sport')).toBe(CURLING.id));
+    expect(last()?.has('sportName')).toBe(false);
+    expect(field).toHaveProperty('value', CURLING.name);
+    screen.getByText('Фильтры · 1');
+
+    await user.clear(field);
+    await waitFor(() => expect(last()?.has('sport')).toBe(false));
+  });
+
+  it('фильтр по направлению с клавиатуры: стрелка и Enter выбирают, форма не отправляется', async () => {
+    const { last } = fakeApi();
+    const user = userEvent.setup();
+    renderFeed();
+    await user.click(await screen.findByText('Фильтры'));
+
+    const field = screen.getByRole('combobox', { name: 'Направление' });
+    await user.type(field, 'кёрл');
+    await screen.findByRole('listbox', { name: 'Подсказки' });
+    await user.keyboard('{ArrowDown}{Enter}');
+    await waitFor(() => expect(last()?.get('sport')).toBe(SPORTS[1]?.id));
+    expect(field).toBe(document.activeElement);
+
+    // Не выбранный текст после ухода из поля возвращается к выбранному направлению
+    await user.type(field, ' что-то');
+    await user.tab();
+    expect(field).toHaveProperty('value', 'Кёрлинг');
+  });
+
+  it('направление из адреса: в запросе id, в поле — название', async () => {
+    const { last } = fakeApi();
+    const user = userEvent.setup();
+    renderFeed(`/?sport=${CURLING.id}&sportName=${encodeURIComponent(CURLING.name)}`);
+    await waitFor(() => expect(last()?.get('sport')).toBe(CURLING.id));
+    await user.click(screen.getByText('Фильтры · 1'));
+    expect(screen.getByRole('combobox', { name: 'Направление' })).toHaveProperty(
+      'value',
+      CURLING.name,
+    );
   });
 
   it('у каждого пункта «Уровня» своя подпись: «без фильтра» не путается с «Любой»', async () => {
