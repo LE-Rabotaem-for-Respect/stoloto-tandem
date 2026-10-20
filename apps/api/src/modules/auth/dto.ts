@@ -10,7 +10,7 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
-import { cleanLine, singleLine, visible } from '../../core/validation';
+import { cleanLine, plainLine, singleLine, visible } from '../../core/validation';
 
 const email = () =>
   Transform(({ value }: { value: unknown }) =>
@@ -33,7 +33,7 @@ export class RegisterDto {
   name!: string;
 
   @email()
-  @singleLine()
+  @plainLine()
   @MaxLength(254, { message: 'Слишком длинная почта' })
   @IsEmail({}, { message: 'Укажите почту, например anna@mail.ru' })
   email!: string;

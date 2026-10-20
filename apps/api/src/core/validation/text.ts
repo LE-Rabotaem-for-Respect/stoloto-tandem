@@ -1,5 +1,6 @@
 import {
   MULTI_LINE_TEXT,
+  PLAIN_TEXT,
   SINGLE_LINE_TEXT,
   VISIBLE_TEXT,
   cleanSingleLine,
@@ -30,6 +31,7 @@ export const trimText = () =>
 const HIDDEN_CHARS = 'В тексте есть недопустимые символы';
 export const singleLine = () => Matches(SINGLE_LINE_TEXT, { message: HIDDEN_CHARS });
 export const multiLine = () => Matches(MULTI_LINE_TEXT, { message: HIDDEN_CHARS });
+export const plainLine = () => Matches(PLAIN_TEXT, { message: HIDDEN_CHARS });
 
 const VISIBLE_OR_EMPTY = new RegExp(`^$|${VISIBLE_TEXT.source}`, 'u');
 

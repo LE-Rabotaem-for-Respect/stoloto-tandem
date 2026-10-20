@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MULTI_LINE_TEXT,
+  PLAIN_TEXT,
   SINGLE_LINE_TEXT,
   VISIBLE_TEXT,
   cleanSingleLine,
@@ -108,6 +109,22 @@ describe('разрешённые невидимые — только на сво
   ])('отклоняют: %s', (_, text) => {
     expect(SINGLE_LINE_TEXT.test(text)).toBe(false);
     expect(MULTI_LINE_TEXT.test(text)).toBe(false);
+  });
+});
+
+describe('PLAIN_TEXT: почта без единого невидимого символа', () => {
+  it('обычный адрес проходит', () => {
+    expect(PLAIN_TEXT.test('anna@mail.ru')).toBe(true);
+  });
+
+  it('мягкий перенос, соединитель и селектор не проходят даже на «своём» месте', () => {
+    for (const text of [
+      `an${char(0xad)}na@mail.ru`,
+      `${char(0x1f3c3)}${char(0x200d)}${char(0x1f3c3)}@mail.ru`,
+      `${char(0x2764, 0xfe0f)}@mail.ru`,
+    ]) {
+      expect(PLAIN_TEXT.test(text), JSON.stringify(text)).toBe(false);
+    }
   });
 });
 

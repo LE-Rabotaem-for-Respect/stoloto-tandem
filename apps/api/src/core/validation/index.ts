@@ -1,1 +1,1 @@
-export { cleanLine, multiLine, singleLine, trimText, visible } from './text';
+export { cleanLine, multiLine, plainLine, singleLine, trimText, visible } from './text';
