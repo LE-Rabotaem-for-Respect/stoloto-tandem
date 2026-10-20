@@ -103,6 +103,7 @@ function FeedFiltersForm({
         </label>
         <input
           id="feed-q"
+          maxLength={100}
           type="search"
           placeholder="Бег, шахматы, падел…"
           value={query}
@@ -150,11 +151,21 @@ function FeedFiltersForm({
           </div>
           <div className="field">
             <label htmlFor="feed-city">Город</label>
-            <input id="feed-city" value={city} onChange={(event) => setCity(event.target.value)} />
+            <input
+              id="feed-city"
+              maxLength={80}
+              value={city}
+              onChange={(event) => setCity(event.target.value)}
+            />
           </div>
           <div className="field">
             <label htmlFor="feed-area">Район</label>
-            <input id="feed-area" value={area} onChange={(event) => setArea(event.target.value)} />
+            <input
+              id="feed-area"
+              maxLength={120}
+              value={area}
+              onChange={(event) => setArea(event.target.value)}
+            />
           </div>
           <div className="field">
             <label htmlFor="feed-level">Уровень</label>
@@ -167,7 +178,7 @@ function FeedFiltersForm({
                 })
               }
             >
-              <option value="">Любой</option>
+              <option value="">Все уровни</option>
               {LEVEL_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}

@@ -181,6 +181,20 @@ describe('лента и поиск', { timeout: 15_000 }, () => {
     expect(screen.getByRole('radio', { name: 'Сегодня' })).toBe(document.activeElement);
   });
 
+  it('у каждого пункта «Уровня» своя подпись: «без фильтра» не путается с «Любой»', async () => {
+    const { last } = fakeApi();
+    const user = userEvent.setup();
+    renderFeed();
+    await user.click(await screen.findByText('Фильтры'));
+    const level = screen.getByLabelText('Уровень') as HTMLSelectElement;
+    const labels = Array.from(level.options).map((option) => option.text);
+    expect(labels).toEqual(['Все уровни', 'Новичок', 'Любитель', 'Опытный', 'Любой']);
+    await user.selectOptions(level, 'Любой');
+    await waitFor(() => expect(last()?.get('level')).toBe('any'));
+    await user.selectOptions(level, 'Все уровни');
+    await waitFor(() => expect(last()?.has('level')).toBe(false));
+  });
+
   it('фильтры из адреса: ссылкой можно поделиться', async () => {
     const { last } = fakeApi();
     renderFeed('/?date=weekend&mode=approval&level=pro');
