@@ -43,16 +43,20 @@ for stand in "$@"; do
   fi
 done
 
-# Compose для стенда: имя проекта и переменные — из stands/<стенд>.env. Переменные
-# стенда из окружения shell сбрасываются: иначе они перекрыли бы файл у всех стендов.
-# DEMO_RESET_INTERVAL_SECONDS=0, оставшийся после локального e2e, снял бы с открытых
-# стендов защиту сброса демо-данных
+# Compose для стенда: имя проекта и переменные — из stands/<стенд>.env, всё остальное —
+# значения по умолчанию из docker-compose.yml. Все переменные, которые читает
+# docker-compose.yml, из окружения shell сбрасываются: иначе они перекрыли бы файл у всех
+# стендов. DEMO_RESET_INTERVAL_SECONDS=0, оставшийся после локального e2e, снял бы с
+# открытых стендов защиту сброса демо-данных, WEB_BIND=127.0.0.1 закрыл бы их для
+# экспертов. Явный -f docker-compose.yml: COMPOSE_FILE из shell и
+# docker-compose.override.yml в папке выпуска на стенды не действуют
 compose() {
   stand=$1
   shift
   env -u STAND_ID -u WEB_PORT -u API_PORT -u DEMO_MODE -u SESSION_SECRET \
-    -u DEMO_RESET_INTERVAL_SECONDS \
-    docker compose -p "$stand" --env-file "stands/$stand.env" "$@"
+    -u DEMO_RESET_INTERVAL_SECONDS -u WEB_BIND -u SESSION_COOKIE_SECURE -u POSTGRES_PASSWORD \
+    -u COMPOSE_FILE -u COMPOSE_PROFILES -u COMPOSE_ENV_FILES -u COMPOSE_PROJECT_NAME \
+    docker compose -f docker-compose.yml -p "$stand" --env-file "stands/$stand.env" "$@"
 }
 
 for stand in "$@"; do
