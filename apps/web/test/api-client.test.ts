@@ -81,4 +81,17 @@ describe('возврат после входа', () => {
     expect(safeNext('/\r/evil.example')).toBe('/');
     expect(safeNext('/events/1?tab=faq#q2')).toBe('/events/1?tab=faq#q2');
   });
+
+  // Точки в пути браузер схлопывает: путь превращался в «//хост» — адрес чужого сайта
+  it('точечные сегменты не превращают путь в адрес чужого сайта', () => {
+    for (const value of [
+      '/.//evil.example',
+      '/a/..//evil.example',
+      '/%2e//evil.example',
+      '/x/../\\evil.example',
+    ]) {
+      expect(safeNext(value), value).toBe('/');
+    }
+    expect(safeNext('/events/../my')).toBe('/my');
+  });
 });

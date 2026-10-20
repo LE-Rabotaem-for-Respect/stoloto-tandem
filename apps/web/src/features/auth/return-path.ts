@@ -18,7 +18,9 @@ export function safeNext(value: string | null): string {
   } catch {
     return '/';
   }
-  if (url.origin !== origin) return '/';
+  // После схлопывания точек («/.//хост», «/a/..//хост») путь может начаться с «//»:
+  // такой адрес браузер и роутер считают адресом другого сайта
+  if (url.origin !== origin || url.pathname.startsWith('//')) return '/';
   return url.pathname + url.search + url.hash;
 }
 
