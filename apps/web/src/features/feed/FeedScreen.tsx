@@ -249,9 +249,26 @@ export function FeedScreen() {
   const [focusRequest, setFocusRequest] = useState<{ index: number } | null>(null);
   const focusIndex = focusRequest?.index ?? null;
   const focusTarget = useRef<HTMLAnchorElement>(null);
+  // Карточки нет (лента пуста) — фокус на заголовке, а не на body
+  const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    if (focusRequest) focusTarget.current?.focus();
+    if (focusRequest) (focusTarget.current ?? heading.current)?.focus();
   }, [focusRequest]);
+  // Фильтры на момент ответа: догрузка, начатая до смены фильтров, фокус не переносит —
+  // человек в это время уже на переключателях фильтров
+  const filtersKey = params.toString();
+  const currentFilters = useRef(filtersKey);
+  useEffect(() => {
+    currentFilters.current = filtersKey;
+  }, [filtersKey]);
+  // Ответ переносит фокус, только если фильтры те же и человек фокус потерял: нажатая кнопка
+  // исчезла или стала неактивной (фокус на body) или фокус всё ещё на ней. Ушёл в поиск или
+  // на другую карточку — фокус остаётся там
+  const mayMoveFocus = (asked: string, button: Element) => {
+    const active = document.activeElement;
+    const lost = !active || active === document.body || active === button;
+    return lost && currentFilters.current === asked;
+  };
   // «Повторить» после сбоя перечитывания уже загруженной ленты (например, после перемотки
   // демо-часов): ошибка ещё в состоянии, но запрос уже идёт. При первой загрузке без данных
   // запрос сам возвращается в «pending»
@@ -259,7 +276,9 @@ export function FeedScreen() {
 
   return (
     <div className="page">
-      <h1>Найти занятие</h1>
+      <h1 ref={heading} tabIndex={-1}>
+        Найти занятие
+      </h1>
       <FeedFiltersForm filters={filters} onChange={(next) => setParams(filterParams(next))} />
 
       {(feed.isPending || retrying) && <p role="status">Загрузка…</p>}
@@ -275,8 +294,14 @@ export function FeedScreen() {
             className="button"
             type="button"
             aria-disabled={retrying || undefined}
-            onClick={() => {
-              if (!retrying) void feed.refetch();
+            onClick={(click) => {
+              if (retrying) return;
+              // После успеха блок ошибки с кнопкой исчезает — фокус на первую карточку
+              const button = click.currentTarget;
+              const asked = filtersKey;
+              void feed.refetch().then((result) => {
+                if (!result.isError && mayMoveFocus(asked, button)) setFocusRequest({ index: 0 });
+              });
             }}
           >
             Повторить
@@ -316,10 +341,12 @@ export function FeedScreen() {
           className="button feed-next"
           type="button"
           disabled={feed.isFetchingNextPage}
-          onClick={() => {
+          onClick={(click) => {
             const first = items.length;
+            const button = click.currentTarget;
+            const asked = filtersKey;
             void feed.fetchNextPage().then((result) => {
-              if (!result.isError) setFocusRequest({ index: first });
+              if (!result.isError && mayMoveFocus(asked, button)) setFocusRequest({ index: first });
             });
           }}
         >
