@@ -65,7 +65,10 @@ interface WaitlistQueueProps {
 }
 
 /** Лист ожидания (P1): ряд фигурок, своя позиция залита тоном очереди и подписана. */
-export function WaitlistQueue({ size, position }: WaitlistQueueProps) {
+export function WaitlistQueue({ size, position: given }: WaitlistQueueProps) {
+  if (size < 1) return null;
+  // Позиция вне очереди — ошибка данных: не подсвечиваем ничью фигурку
+  const position = given !== undefined && given >= 1 && given <= size ? given : undefined;
   const people = visibleQueue(size, position);
   return (
     <div className="queue">
@@ -107,7 +110,7 @@ export function PriceBadge({ price }: { price: number }) {
         'Бесплатно'
       ) : (
         <>
-          {`${rubles.format(price)} ₽`}
+          {`${rubles.format(price)} ₽ `}
           <span className="condition-note">оплата на месте</span>
         </>
       )}
@@ -115,14 +118,29 @@ export function PriceBadge({ price }: { price: number }) {
   );
 }
 
-// Основы слов: «форма» и «форму», «вода» и «воды», «кроссовки»
-const BRING_ITEMS: readonly { icon: IconName; stems: readonly string[] }[] = [
-  { icon: 'action-uniform', stems: ['форм', 'футболк'] },
-  // Не «вод»: с него начинается и «водолазка»
-  { icon: 'action-water', stems: ['вода', 'воды', 'воду', 'водой', 'водичк', 'бутыл'] },
+interface BringWords {
+  icon: IconName;
+  /** Слово целиком, в любой из перечисленных форм: «форма» — но не «Формат». */
+  forms?: readonly string[];
+  /** Начало слова: «кроссовки», «кроссовках», «кедами». */
+  stems?: readonly string[];
+}
+
+const BRING_ITEMS: readonly BringWords[] = [
+  {
+    icon: 'action-uniform',
+    forms: ['форма', 'форму', 'формы', 'форме', 'формой'],
+    stems: ['футболк'],
+  },
+  // «вода» — формами: с «вод» начинаются и «водолазка», и «водительские»
+  {
+    icon: 'action-water',
+    forms: ['вода', 'воды', 'воду', 'воде', 'водой'],
+    stems: ['водичк', 'бутыл'],
+  },
   { icon: 'action-mat', stems: ['коврик'] },
   { icon: 'action-racket', stems: ['ракетк'] },
-  { icon: 'action-shoes', stems: ['обув', 'кроссовк', 'кеды', 'бутс'] },
+  { icon: 'action-shoes', stems: ['обув', 'кроссовк', 'кед', 'бутс'] },
 ];
 
 /** Пиктограмма частого предмета «Что взять с собой» или `null` — тогда только текст. */
@@ -131,8 +149,8 @@ export function bringItem(text: string): IconName | null {
     .toLowerCase()
     .replaceAll('ё', 'е')
     .split(/[^а-яa-z]+/);
-  const item = BRING_ITEMS.find(({ stems }) =>
-    words.some((word) => stems.some((stem) => word.startsWith(stem))),
+  const item = BRING_ITEMS.find(({ forms = [], stems = [] }) =>
+    words.some((word) => forms.includes(word) || stems.some((stem) => word.startsWith(stem))),
   );
   return item?.icon ?? null;
 }
@@ -160,7 +178,19 @@ const MAX_STEPS = 4;
 // после сокращения адреса («ул. Ленина, д. 5»); «18.50» без пробела не режется
 const SENTENCE_END =
   /(?<=[.!?])(?<!(?:^|[^\p{L}])(?:ул|пр|пер|пл|наб|бул|ш|д|корп|стр|г|им|см|т\.\s?е|т\.\s?к)\.)\s+(?=[\p{Lu}\d«"])/u;
-const LIST_MARKER = /^\s*(?:[-*•–—]|\d+[.)])\s*/;
+// Маркер списка — только с пробелом после: «18.50 — сбор» и «-1 градус» — не маркеры
+const LIST_MARKER = /^\s*(?:[-*•–—]|\d{1,2}[.)])\s+/;
+
+// Одна строка — по предложениям, а если предложение одно — по «;»
+function splitLine(line: string): string[] {
+  const parts = (separator: RegExp | string) =>
+    line
+      .split(separator)
+      .map((part) => part.trim())
+      .filter(Boolean);
+  const sentences = parts(SENTENCE_END);
+  return sentences.length > 1 ? sentences : parts(';');
+}
 
 /**
  * Шаги «Как всё пройдёт» из свободного текста организатора: по строкам, а если строка
@@ -171,13 +201,7 @@ export function howItGoesSteps(text: string): string[] {
     .split(/\r?\n/)
     .map((line) => line.replace(LIST_MARKER, '').trim())
     .filter(Boolean);
-  const steps =
-    lines.length === 1
-      ? (lines[0] ?? '')
-          .split(SENTENCE_END)
-          .map((part) => part.trim())
-          .filter(Boolean)
-      : lines;
+  const steps = lines.length === 1 ? splitLine(lines[0] ?? '') : lines;
   if (steps.length <= MAX_STEPS) return steps;
   return [...steps.slice(0, MAX_STEPS - 1), steps.slice(MAX_STEPS - 1).join(' ')];
 }

@@ -147,6 +147,9 @@
 }
 
 .bring-item {
+  min-width: 0;
+  /* Ссылка из текста организатора переносится, а не растягивает страницу */
+  overflow-wrap: anywhere;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -154,7 +157,7 @@
 
 /* Без пиктограммы — с маркером, чтобы строка не выглядела оборванной */
 .bring-item-text::before {
-  content: '•';
+  content: '•' / '';
   color: var(--color-ink-muted);
 }
 
@@ -167,6 +170,7 @@
 }
 
 .timeline-step {
+  overflow-wrap: anywhere;
   position: relative;
   min-height: calc(2rem * var(--text-scale));
   padding: 0 0 var(--space-4) calc(2.75rem * var(--text-scale));
@@ -216,6 +220,13 @@
 .date-leaf-off .leaf-month {
   background: var(--color-line);
   color: var(--color-ink-muted);
+}
+
+/* В контрасте линия белая: приглушённый месяц на ней не читался бы */
+[data-theme='contrast'] .date-leaf-off .leaf-month {
+  border-bottom: 2px solid var(--color-line-strong);
+  background: var(--color-surface);
+  color: var(--color-ink);
 }
 
 .date-leaf-off::after {

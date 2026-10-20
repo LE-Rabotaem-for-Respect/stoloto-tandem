@@ -193,3 +193,56 @@ describe('листок переноса', () => {
     expect(screen.getByText('Перенесено с 22.10 на 24.10')).toBeTruthy();
   });
 });
+
+describe('по ревью: время в начале строки, точка с запятой, словарь, очередь', () => {
+  it('время с точкой в начале строки — не номер пункта', () => {
+    expect(howItGoesSteps('18.50 — сбор у входа\n19.00 — разминка\n19.15 — игра')).toEqual([
+      '18.50 — сбор у входа',
+      '19.00 — разминка',
+      '19.15 — игра',
+    ]);
+    expect(howItGoesSteps('10.00 сбор\n10.15 разминка')).toEqual(['10.00 сбор', '10.15 разминка']);
+    expect(howItGoesSteps('-1 градус, одевайтесь теплее\nБег')).toEqual([
+      '-1 градус, одевайтесь теплее',
+      'Бег',
+    ]);
+    // Настоящие маркеры списка — с пробелом после них
+    expect(howItGoesSteps('1. Сбор\n2) Разминка\n- Игра')).toEqual(['Сбор', 'Разминка', 'Игра']);
+  });
+
+  it('одна строка без предложений делится по «;»', () => {
+    expect(howItGoesSteps('Сбор у входа; разминка; игра; чай')).toEqual([
+      'Сбор у входа',
+      'разминка',
+      'игра',
+      'чай',
+    ]);
+  });
+
+  it('словарь «Что взять»: формы слов, а не всё, что начинается так же', () => {
+    expect(bringItem('Формат встречи — свободный')).toBeNull();
+    expect(bringItem('формуляр')).toBeNull();
+    expect(bringItem('Спортивную форму')).toBe('action-uniform');
+    expect(bringItem('футболку')).toBe('action-uniform');
+    expect(bringItem('Приходите в кедах')).toBe('action-shoes');
+    expect(bringItem('кеды')).toBe('action-shoes');
+    expect(bringItem('бутсы')).toBe('action-shoes');
+  });
+
+  it('лист ожидания: позиция вне очереди не подсвечивается, пустая очередь не показывается', () => {
+    const { container, rerender } = render(<WaitlistQueue size={3} position={5} />);
+    expect(container.querySelectorAll('.queue-people i[data-me]')).toHaveLength(0);
+    expect(screen.getByText('В листе ожидания: 3')).toBeTruthy();
+    rerender(<WaitlistQueue size={3} position={0} />);
+    expect(container.querySelectorAll('.queue-people i[data-me]')).toHaveLength(0);
+    rerender(<WaitlistQueue size={0} />);
+    expect(container.innerHTML).toBe('');
+  });
+
+  it('стоимость: между суммой и пометкой есть пробел', () => {
+    render(<PriceBadge price={1500} />);
+    expect(screen.getByText(/оплата на месте/).closest('.condition-badge')?.textContent).toMatch(
+      /₽\s+оплата на месте/,
+    );
+  });
+});
