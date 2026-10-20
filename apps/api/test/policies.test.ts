@@ -14,6 +14,7 @@ import {
   canViewEvent,
   canViewParticipants,
   eventActions,
+  moderationActions,
   organizationActions,
   participationActions,
 } from '../src/core/policies';
@@ -530,5 +531,33 @@ describe('actions[]: профиль организации', () => {
     expect(organizationActions(orgApproved, { id: 'o-padel', status: 'draft' })).toEqual([]);
     expect(organizationActions(user, { id: 'o-padel', status: 'pending' })).toEqual([]);
     expect(organizationActions(guest, { id: 'o-padel', status: 'pending' })).toEqual([]);
+  });
+});
+
+describe('moderationActions — модерация мероприятия (ТЗ 2.10)', () => {
+  const codes = (actions: { code: string; enabled: boolean }[]) =>
+    actions.map(({ code, enabled }) => [code, enabled]);
+
+  it('только администратору: остальным — пустой список', () => {
+    for (const actor of [guest, user, author, orgApproved, orgPending]) {
+      expect(moderationActions(actor, userEvent, now)).toEqual([]);
+    }
+  });
+
+  it('опубликованное — снять и удалить; снятое — вернуть и удалить; удалённое — ничего', () => {
+    expect(codes(moderationActions(admin, userEvent, now))).toEqual([
+      ['unpublish_event', true],
+      ['delete_event', true],
+    ]);
+    expect(codes(moderationActions(admin, { ...userEvent, status: 'unpublished' }, now))).toEqual([
+      ['restore_event', true],
+      ['delete_event', true],
+    ]);
+    const deleted = moderationActions(admin, { ...userEvent, status: 'deleted' }, now);
+    expect(codes(deleted)).toEqual([
+      ['unpublish_event', false],
+      ['delete_event', false],
+    ]);
+    expect(deleted.every((action) => action.reason && action.reasonCode)).toBe(true);
   });
 });

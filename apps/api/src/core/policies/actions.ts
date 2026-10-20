@@ -52,7 +52,7 @@ export interface CardEvent extends PolicyEvent {
 }
 
 // Доступность кнопки до ввода: причину и новое время человек укажет в форме
-function eventAction(code: ActionCode, action: EventAction, event: CardEvent, now: Date): Action {
+function eventAction(code: ActionCode, action: EventAction, event: PolicyEvent, now: Date): Action {
   const result = eventMachine.check(event.status, action, {
     now,
     startsAt: event.startsAt,
@@ -94,18 +94,26 @@ export function eventActions(
     actions.push(eventAction('reschedule_event', 'reschedule', event, now));
     actions.push(eventAction('cancel_event', 'cancel', event, now));
   }
-  if (canModerate(actor).allowed) {
-    if (event.status === 'unpublished') {
-      actions.push(eventAction('restore_event', 'restore', event, now));
-    } else {
-      actions.push(eventAction('unpublish_event', 'unpublish', event, now));
-    }
-    actions.push(eventAction('delete_event', 'delete', event, now));
-  }
+  actions.push(...moderationActions(actor, event, now));
   if (canViewParticipants(actor, event).allowed) {
     actions.push({ code: 'view_participants', enabled: true });
   }
   return actions;
+}
+
+/**
+ * Модерация мероприятия (ТЗ 2.10) — только администратору: у снятого — «Вернуть»
+ * вместо «Снять», удалённое ни снять, ни удалить нельзя (решает автомат Event).
+ * Те же действия — в карточке и в строке поиска админки.
+ */
+export function moderationActions(actor: Actor, event: PolicyEvent, now: Date): Action[] {
+  if (!canModerate(actor).allowed) return [];
+  return [
+    event.status === 'unpublished'
+      ? eventAction('restore_event', 'restore', event, now)
+      : eventAction('unpublish_event', 'unpublish', event, now),
+    eventAction('delete_event', 'delete', event, now),
+  ];
 }
 
 /**
