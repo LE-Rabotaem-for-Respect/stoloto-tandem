@@ -403,3 +403,164 @@ describe('PATCH и DELETE своего сообщения', () => {
     expect(response.body.code).toBe('event_not_available');
   });
 });
+
+const moderate = (who: Account | null, eventId: string, messageId: string, body: object) =>
+  as(who, http().post(`/events/${eventId}/messages/${messageId}/moderation`)).send(body);
+
+describe('POST /events/:id/messages/:messageId/moderation', () => {
+  it('«Скрыть»: заглушка для всех, причину видит только автор; в шину — MessageHidden', async () => {
+    const event = await createEvent();
+    const question = (await post(anna, event.id, { text: 'Где раздевалка?' })).body;
+    const reply = (await post(organizer, event.id, { text: 'У входа', parentId: question.id }))
+      .body;
+    const published = vi.spyOn(app.get(EventBus), 'publish');
+
+    const response = await moderate(admin, event.id, question.id, {
+      action: 'hide',
+      reason: 'Оскорбление',
+    });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      status: 'hidden_by_moderator',
+      text: null,
+      placeholder: 'Скрыто модератором',
+    });
+    expect(published.mock.calls.flat()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'MessageHidden',
+          messageId: question.id,
+          eventId: event.id,
+          reason: 'Оскорбление',
+          actorId: admin.id,
+        }),
+      ]),
+    );
+    published.mockRestore();
+
+    const own = (await list(anna, event.id)).body[0];
+    expect(own).toMatchObject({
+      placeholder: 'Скрыто модератором',
+      moderationReason: 'Оскорбление',
+    });
+    const other = (await list(igor, event.id)).body[0];
+    expect(other).toMatchObject({ text: null, moderationReason: null });
+    // Ответы и мероприятие сохраняются
+    expect(other.replies).toEqual([expect.objectContaining({ id: reply.id, text: 'У входа' })]);
+    expect((await http().get(`/events/${event.id}`)).status).toBe(200);
+  });
+
+  it('«Удалить»: заглушка «Удалено модератором», восстановить нельзя', async () => {
+    const event = await createEvent();
+    const message = (await post(anna, event.id, { text: 'Реклама' })).body;
+    await moderate(admin, event.id, message.id, { action: 'hide', reason: 'Спам' });
+
+    const deleted = await moderate(admin, event.id, message.id, {
+      action: 'delete',
+      reason: 'Спам',
+    });
+    expect(deleted.status).toBe(200);
+    expect(deleted.body).toMatchObject({
+      status: 'deleted_by_moderator',
+      placeholder: 'Удалено модератором',
+      text: null,
+    });
+    // Удалённое не скрыть и не удалить повторно
+    for (const action of ['hide', 'delete']) {
+      const again = await moderate(admin, event.id, message.id, { action, reason: 'Ещё раз' });
+      expect(again.status, action).toBe(409);
+      expect(again.body.code, action).toBe('invalid_transition');
+    }
+    const stored = await prisma.message.findUniqueOrThrow({ where: { id: message.id } });
+    expect(stored).toMatchObject({ status: 'deleted_by_moderator', moderationReason: 'Спам' });
+  });
+
+  it('«Удалить» публикует MessageDeleted от модератора с причиной', async () => {
+    const event = await createEvent();
+    const message = (await post(anna, event.id, { text: 'Реклама' })).body;
+    const published = vi.spyOn(app.get(EventBus), 'publish');
+    await moderate(admin, event.id, message.id, { action: 'delete', reason: 'Спам' });
+    const deleted = published.mock.calls
+      .flat()
+      .filter((item) => (item as { type: string }).type === 'MessageDeleted');
+    published.mockRestore();
+    expect(deleted).toEqual([
+      expect.objectContaining({
+        messageId: message.id,
+        eventId: event.id,
+        by: 'moderator',
+        reason: 'Спам',
+        actorId: admin.id,
+      }),
+    ]);
+  });
+
+  it('одновременное скрытие одного сообщения: ровно один 200 и одно событие', async () => {
+    const event = await createEvent();
+    const message = (await post(anna, event.id, { text: 'Вопрос' })).body;
+    const published = vi.spyOn(app.get(EventBus), 'publish');
+    const responses = await Promise.all(
+      [1, 2].map(() => moderate(admin, event.id, message.id, { action: 'hide', reason: 'Спам' })),
+    );
+    const hidden = published.mock.calls
+      .flat()
+      .filter((item) => (item as { type: string }).type === 'MessageHidden');
+    published.mockRestore();
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(hidden).toHaveLength(1);
+  });
+
+  it('только администратор; гостю — 401, организатору и автору — 403', async () => {
+    const event = await createEvent();
+    const message = (await post(anna, event.id, { text: 'Вопрос' })).body;
+    const body = { action: 'hide', reason: 'Причина' };
+    expect((await moderate(null, event.id, message.id, body)).status).toBe(401);
+    expect((await moderate(organizer, event.id, message.id, body)).status).toBe(403);
+    expect((await moderate(anna, event.id, message.id, body)).status).toBe(403);
+    expect((await prisma.message.findUniqueOrThrow({ where: { id: message.id } })).status).toBe(
+      'visible',
+    );
+  });
+
+  it.each([
+    ['без причины', { action: 'hide', reason: '   ' }, 'reason', 'Укажите причину'],
+    [
+      'причина длиннее 500',
+      { action: 'hide', reason: 'п'.repeat(501) },
+      'reason',
+      'Причина — до 500 символов',
+    ],
+    [
+      'неизвестное действие',
+      { action: 'restore', reason: 'Причина' },
+      'action',
+      'Выберите: скрыть или удалить',
+    ],
+  ])('%s — 400 у поля', async (_, body, field, text) => {
+    const event = await createEvent();
+    const message = (await post(anna, event.id, { text: 'Вопрос' })).body;
+    const response = await moderate(admin, event.id, message.id, body);
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toEqual({ [field]: text });
+  });
+
+  it('сообщение другого мероприятия и несуществующее — 404', async () => {
+    const [first, second] = await Promise.all([createEvent(), createEvent()]);
+    const message = (await post(anna, first.id, { text: 'Вопрос' })).body;
+    const body = { action: 'hide', reason: 'Причина' };
+    expect((await moderate(admin, second.id, message.id, body)).status).toBe(404);
+    expect((await moderate(admin, first.id, randomUUID(), body)).status).toBe(404);
+  });
+
+  it('в actions[] администратора — «Скрыть» и «Удалить», у скрытого — только «Удалить»', async () => {
+    const event = await createEvent();
+    const message = (await post(anna, event.id, { text: 'Вопрос' })).body;
+    const codes = async () =>
+      (await list(admin, event.id)).body[0].actions.map((action: { code: string }) => action.code);
+    expect(await codes()).toEqual(['hide_message', 'moderate_delete_message']);
+    await moderate(admin, event.id, message.id, { action: 'hide', reason: 'Причина' });
+    expect(await codes()).toEqual(['moderate_delete_message']);
+    // Участнику действий модерации нет
+    expect((await list(igor, event.id)).body[0].actions).toEqual([]);
+  });
+});
