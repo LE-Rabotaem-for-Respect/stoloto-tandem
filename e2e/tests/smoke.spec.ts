@@ -2,6 +2,7 @@ import { expect, test } from '../support/fixtures';
 
 test('приложение открывается, API отвечает', async ({ page, request }) => {
   await page.goto('/');
+  await expect(page).toHaveTitle('Тандем');
   await expect(page.getByRole('navigation', { name: 'Основные разделы' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Найти' })).toBeVisible();
 
