@@ -26,14 +26,20 @@ export interface FeedFilters {
 const oneOf = <T extends string>(values: readonly T[], value: string | null): T | undefined =>
   values.find((item) => item === value);
 
+// Длина — как принимает api (EventFeedQuery): длинный текст из ссылки не даёт 400
+const clip = (value: string | null, max: number) =>
+  Array.from(value ?? '')
+    .slice(0, max)
+    .join('');
+
 /** Адрес → фильтры; неизвестные значения отбрасываются, а не уходят в api. */
 export function readFilters(params: URLSearchParams): FeedFilters {
   return {
-    q: params.get('q') ?? '',
+    q: clip(params.get('q'), 100),
     category: oneOf(SPORT_CATEGORIES, params.get('category')),
     date: oneOf(FEED_DATES, params.get('date')),
-    city: params.get('city') ?? '',
-    area: params.get('area') ?? '',
+    city: clip(params.get('city'), 80),
+    area: clip(params.get('area'), 120),
     level: oneOf(EVENT_LEVELS, params.get('level')),
     mode: oneOf(MODES, params.get('mode')),
   };

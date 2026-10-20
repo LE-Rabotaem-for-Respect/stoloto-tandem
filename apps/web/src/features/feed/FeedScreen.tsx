@@ -4,14 +4,14 @@ import {
   SPORT_CATEGORIES,
   SPORT_CATEGORY_TITLES,
 } from '@tandem/domain';
-import { useState } from 'react';
-import type { FormEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { FormEvent, Ref } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ApiRequestError } from '../../shared/api';
 import { useClock } from '../../shared/clock';
-import { coverUrl } from '../../shared/illustrations';
+import { coverAlt, coverUrl } from '../../shared/illustrations';
 import { useTheme } from '../../shared/theme';
-import { EmptyState, EventDate, ModeBadge } from '../../shared/ui';
+import { EmptyState, EventDate, Icon, ModeBadge } from '../../shared/ui';
 import { useFeed } from './api';
 import type { FeedItem } from './api';
 import {
@@ -29,17 +29,33 @@ const LEVEL_OPTIONS = EVENT_LEVELS.map((value) => ({ value, label: EVENT_LEVEL_T
  * Карточка в ленте (ТЗ 2.11): не больше 5 элементов — обложка направления, название,
  * листок даты со временем, район и бейдж режима. Вся карточка — ссылка на событие.
  */
-function FeedCard({ item, now }: { item: FeedItem; now: Date }) {
+const errorText = (error: unknown) =>
+  error instanceof ApiRequestError
+    ? error.message
+    : 'Не удалось загрузить ленту. Попробуйте ещё раз';
+
+function FeedCard({
+  item,
+  now,
+  linkRef,
+}: {
+  item: FeedItem;
+  now: Date;
+  linkRef?: Ref<HTMLAnchorElement>;
+}) {
   const { contrast } = useTheme();
   return (
     <li className="feed-card">
-      <Link className="feed-card-link" to={`/events/${item.id}`}>
+      <Link className="feed-card-link" to={`/events/${item.id}`} ref={linkRef}>
         <img
           className="feed-card-cover"
+          // Поля вписанного рисунка — фон группы; в «Контрасте» — фон темы: инверсия
+          // контурной обложки перекрасила бы и фон
+          style={contrast ? undefined : { background: `var(--cover-${item.sport.category})` }}
           src={coverUrl(item.sport.category, { contrast })}
-          alt=""
-          width={96}
-          height={96}
+          alt={coverAlt(item.sport.category)}
+          width={320}
+          height={180}
         />
         <div className="feed-card-body">
           <span className="feed-card-title">{item.title}</span>
@@ -130,7 +146,10 @@ function FeedFiltersForm({
       </fieldset>
 
       <details className="feed-more">
-        <summary>Фильтры{hidden > 0 && ` · ${hidden}`}</summary>
+        <summary>
+          <Icon name="action-filter" />
+          Фильтры{hidden > 0 && ` · ${hidden}`}
+        </summary>
         <div className="feed-more-fields">
           <div className="field">
             <label htmlFor="feed-category">Группа направлений</label>
@@ -222,6 +241,13 @@ export function FeedScreen() {
   const feed = useFeed(filters);
   const items = feed.data?.pages.flatMap((page) => page.items) ?? [];
   const total = feed.data?.pages[0]?.total ?? 0;
+  // После «Показать ещё» фокус — на первой новой карточке: кнопка могла исчезнуть, и
+  // обход Tab иначе начался бы с начала страницы
+  const [focusIndex, setFocusIndex] = useState<number | null>(null);
+  const focusTarget = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    if (focusIndex !== null) focusTarget.current?.focus();
+  }, [focusIndex]);
 
   return (
     <div className="page">
@@ -229,12 +255,15 @@ export function FeedScreen() {
       <FeedFiltersForm filters={filters} onChange={(next) => setParams(filterParams(next))} />
 
       {feed.isPending && <p role="status">Загрузка…</p>}
-      {feed.error && (
-        <p className="form-error" role="alert">
-          {feed.error instanceof ApiRequestError
-            ? feed.error.message
-            : 'Не удалось загрузить ленту. Попробуйте ещё раз'}
-        </p>
+      {feed.isError && !feed.isFetchNextPageError && (
+        <div className="feed-error">
+          <p className="form-error" role="alert">
+            {errorText(feed.error)}
+          </p>
+          <button className="button" type="button" onClick={() => void feed.refetch()}>
+            Повторить
+          </button>
+        </div>
       )}
       {feed.isSuccess && items.length === 0 && (
         <EmptyState
@@ -248,18 +277,33 @@ export function FeedScreen() {
             Найдено: {total}
           </p>
           <ul className="feed-list">
-            {items.map((item) => (
-              <FeedCard key={item.id} item={item} now={now} />
+            {items.map((item, index) => (
+              <FeedCard
+                key={item.id}
+                item={item}
+                now={now}
+                linkRef={index === focusIndex ? focusTarget : undefined}
+              />
             ))}
           </ul>
         </>
+      )}
+      {feed.isFetchNextPageError && (
+        <p className="form-error" role="alert">
+          {errorText(feed.error)}
+        </p>
       )}
       {feed.hasNextPage && (
         <button
           className="button feed-next"
           type="button"
           disabled={feed.isFetchingNextPage}
-          onClick={() => void feed.fetchNextPage()}
+          onClick={() => {
+            const first = items.length;
+            void feed.fetchNextPage().then((result) => {
+              if (!result.isError) setFocusIndex(first);
+            });
+          }}
         >
           Показать ещё
         </button>

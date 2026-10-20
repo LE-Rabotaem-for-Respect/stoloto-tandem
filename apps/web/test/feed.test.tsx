@@ -26,7 +26,8 @@ const item = (n: number) => ({
 });
 
 /** Api в памяти: лента из `total` событий страницами, гость. */
-function fakeApi(total = 1) {
+function fakeApi(total = 1, fail: (offset: number, attempt: number) => boolean = () => false) {
+  let attempt = 0;
   const feedRequests: URLSearchParams[] = [];
   vi.stubGlobal(
     'fetch',
@@ -45,6 +46,13 @@ function fakeApi(total = 1) {
         feedRequests.push(searchParams);
         const limit = Number(searchParams.get('limit'));
         const offset = Number(searchParams.get('offset'));
+        attempt += 1;
+        if (fail(offset, attempt)) {
+          return json(500, {
+            code: 'internal',
+            message: 'Что-то пошло не так. Попробуйте ещё раз',
+          });
+        }
         const count = Math.max(0, Math.min(limit, total - offset));
         const items = Array.from({ length: count }, (_, index) => item(offset + index + 1));
         return json(200, { items, total, limit, offset });
@@ -85,6 +93,13 @@ describe('фильтры ленты в адресе', () => {
       level: undefined,
       mode: 'free',
     });
+  });
+
+  it('длинные значения из адреса обрезаются до длины api', () => {
+    const filters = readFilters(
+      new URLSearchParams({ q: 'б'.repeat(120), city: 'к'.repeat(90), area: 'р'.repeat(130) }),
+    );
+    expect([filters.q.length, filters.city.length, filters.area.length]).toEqual([100, 80, 120]);
   });
 
   it('пустые и пробельные фильтры в адрес не пишутся', () => {
@@ -228,5 +243,42 @@ describe('лента и поиск', { timeout: 15_000 }, () => {
     await waitFor(() => expect(last()?.get('offset')).toBe('20'));
     await screen.findByRole('link', { name: /Событие 25/ });
     expect(screen.queryByRole('button', { name: 'Показать ещё' })).toBeNull();
+  });
+
+  it('ошибка ленты — «Повторить» загружает заново', async () => {
+    fakeApi(1, (_offset, attempt) => attempt === 1);
+    const user = userEvent.setup();
+    renderFeed();
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Что-то пошло не так. Попробуйте ещё раз',
+    );
+    await user.click(screen.getByRole('button', { name: 'Повторить' }));
+    await screen.findByRole('link', { name: /Пробежка 5 км на Татышеве/ });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('«Показать ещё»: фокус на первой новой карточке, ошибка — рядом с кнопкой', async () => {
+    fakeApi(45, (offset, attempt) => offset === 40 && attempt === 3);
+    const user = userEvent.setup();
+    renderFeed();
+    await screen.findByText('Найдено: 45');
+    await user.click(screen.getByRole('button', { name: 'Показать ещё' }));
+    await waitFor(() => expect(document.activeElement?.textContent).toContain('Событие 21'));
+    await user.click(screen.getByRole('button', { name: 'Показать ещё' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Что-то пошло не так. Попробуйте ещё раз',
+    );
+    // Загруженное остаётся, догрузить можно снова
+    expect(screen.getAllByRole('listitem').filter((li) => li.matches('.feed-card'))).toHaveLength(
+      40,
+    );
+    screen.getByRole('button', { name: 'Показать ещё' });
+  });
+
+  it('обложка — содержательная: alt — название группы', async () => {
+    fakeApi();
+    renderFeed();
+    const link = await screen.findByRole('link', { name: /Пробежка 5 км на Татышеве/ });
+    expect(link.querySelector('img')?.getAttribute('alt')).toBe('Выносливость');
   });
 });
