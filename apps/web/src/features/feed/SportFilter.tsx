@@ -1,5 +1,5 @@
 import { SPORT_NAME_MAX_LENGTH } from '@tandem/domain';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useSportSuggestions } from '../events/api';
 import type { FeedSport } from './filters';
@@ -64,6 +64,13 @@ export function SportFilter({ value, onChange }: SportFilterProps) {
 
   const listId = `${id}-list`;
   const optionId = (index: number) => `${id}-option-${index}`;
+
+  // Список стоит в потоке страницы: открытый и активный пункт — в видимой области, а не
+  // под нижней панелью (отступ под неё — scroll-padding-bottom в layout.css)
+  useEffect(() => {
+    if (listOpen)
+      document.getElementById(`${id}-option-${active}`)?.scrollIntoView?.({ block: 'nearest' });
+  }, [listOpen, active, id]);
 
   return (
     <div className="field sport-picker">
