@@ -2,7 +2,7 @@ import { EVENT_STATUS_VIEW, SPORT_CATEGORY_TITLES } from '@tandem/domain';
 import { Link, useParams } from 'react-router';
 import { ApiRequestError } from '../../shared/api';
 import { useClock } from '../../shared/clock';
-import { EmptyState, EventDate, StatusBadge } from '../../shared/ui';
+import { EmptyState, EventDate, Icon, StatusBadge } from '../../shared/ui';
 import { linkLabel } from '../../shared/links';
 import { useOrganization, useOrganizationEvents } from './api';
 
@@ -98,33 +98,51 @@ function PublicOrganization({ id }: { id: string }) {
   const label = data.website ? linkLabel(data.website) : null;
   return (
     <>
-      <h1>{data.name}</h1>
-      <p className="org-city">{data.city}</p>
-      <p className="org-description">{data.description}</p>
-      <h2>Направления</h2>
-      <ul className="org-sports-list">
-        {data.sports.map((sport) => (
-          <li key={sport.id} className="org-sport">
-            <span>{sport.name}</span>
-            <span className="org-sport-category">{SPORT_CATEGORY_TITLES[sport.category]}</span>
-          </li>
-        ))}
-      </ul>
-      <h2>Контакты</h2>
-      <p className="org-contacts">{data.contacts}</p>
-      {data.website && (
-        <p className="org-website">
-          {href && label ? (
-            <a href={href} target="_blank" rel="noopener noreferrer nofollow">
-              {label}
-            </a>
-          ) : (
-            data.website
-          )}
+      {/* Шапка — цветным блоком: название, город ярлыком, описание крупнее основного текста */}
+      <header className="org-hero">
+        <h1>{data.name}</h1>
+        <p className="org-city">
+          <Icon name="action-location" />
+          {data.city}
         </p>
-      )}
-      <h2>Мероприятия</h2>
-      <OrganizationEvents id={data.id} />
+        <p className="org-description">{data.description}</p>
+      </header>
+      <div className="org-columns">
+        <section className="org-section" aria-labelledby="org-sports-title">
+          <h2 id="org-sports-title">Направления</h2>
+          <ul className="org-sports-list">
+            {data.sports.map((sport) => (
+              <li key={sport.id} className="org-sport">
+                <span>{sport.name}</span>
+                <span className="org-sport-category">{SPORT_CATEGORY_TITLES[sport.category]}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className="org-section" aria-labelledby="org-contacts-title">
+          <h2 id="org-contacts-title">Контакты</h2>
+          <p className="org-contacts">
+            <Icon name="action-message" />
+            <span>{data.contacts}</span>
+          </p>
+          {data.website && (
+            <p className="org-website">
+              <Icon name="action-search" />
+              {href && label ? (
+                <a href={href} target="_blank" rel="noopener noreferrer nofollow">
+                  {label}
+                </a>
+              ) : (
+                data.website
+              )}
+            </p>
+          )}
+        </section>
+      </div>
+      <section className="org-section" aria-labelledby="org-events-title">
+        <h2 id="org-events-title">Мероприятия</h2>
+        <OrganizationEvents id={data.id} />
+      </section>
     </>
   );
 }

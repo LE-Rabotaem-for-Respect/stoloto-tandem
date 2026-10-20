@@ -5,7 +5,7 @@ import {
   SPORT_CATEGORY_TITLES,
 } from '@tandem/domain';
 import { useEffect, useRef, useState } from 'react';
-import type { FormEvent, Ref } from 'react';
+import type { CSSProperties, FormEvent, Ref } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ApiRequestError } from '../../shared/api';
 import { useClock } from '../../shared/clock';
@@ -26,6 +26,9 @@ import { SportFilter } from './SportFilter';
 
 const LEVEL_OPTIONS = EVENT_LEVELS.map((value) => ({ value, label: EVENT_LEVEL_TITLES[value] }));
 
+/** Карточки появляются «лесенкой» по 12: догруженная порция начинает лесенку заново. */
+const PAGE_STAGGER = 12;
+
 /**
  * Карточка в ленте (ТЗ 2.11): не больше 5 элементов — обложка направления, название,
  * листок даты со временем, район и бейдж режима. Вся карточка — ссылка на событие.
@@ -38,38 +41,52 @@ const errorText = (error: unknown) =>
 function FeedCard({
   item,
   now,
+  order,
   linkRef,
 }: {
   item: FeedItem;
   now: Date;
+  /** Номер в догруженной порции — задержка появления «лесенкой». */
+  order: number;
   linkRef?: Ref<HTMLAnchorElement>;
 }) {
   const { contrast } = useTheme();
   return (
-    <li className="feed-card">
+    <li className="feed-card" style={{ '--order': order } as CSSProperties}>
       <Link className="feed-card-link" to={`/events/${item.id}`} ref={linkRef}>
-        <img
-          className="feed-card-cover"
-          // Поля вписанного рисунка — фон группы; в «Контрасте» — фон темы: инверсия
-          // контурной обложки перекрасила бы и фон
-          style={contrast ? undefined : { background: `var(--cover-${item.sport.category})` }}
-          src={coverUrl(item.sport.category, { contrast })}
-          alt={coverAlt(item.sport.category)}
-          width={320}
-          height={180}
-        />
+        {/* Картинка — сверху во внутренней рамке, режим записи — в «вырезе» угла */}
+        <div className="feed-card-media">
+          <img
+            className="feed-card-cover"
+            // Поля вписанного рисунка — фон группы; в «Контрасте» — фон темы: инверсия
+            // контурной обложки перекрасила бы и фон
+            style={contrast ? undefined : { background: `var(--cover-${item.sport.category})` }}
+            src={coverUrl(item.sport.category, { contrast })}
+            alt={coverAlt(item.sport.category)}
+            width={320}
+            height={180}
+          />
+          <span className="feed-card-tag">
+            <ModeBadge mode={item.mode} />
+          </span>
+        </div>
         <div className="feed-card-body">
           <span className="feed-card-title">{item.title}</span>
-          <EventDate
-            startsAt={new Date(item.startsAt)}
-            endsAt={new Date(item.endsAt)}
-            now={now}
-            compact
-          />
           <div className="feed-card-meta">
-            <span className="feed-card-area">{item.area}</span>
-            <ModeBadge mode={item.mode} />
+            <EventDate
+              startsAt={new Date(item.startsAt)}
+              endsAt={new Date(item.endsAt)}
+              now={now}
+              compact
+            />
+            <span className="feed-card-go" aria-hidden="true">
+              <Icon name="action-back" />
+            </span>
           </div>
+          <span className="feed-card-area">
+            <Icon name="action-location" />
+            {item.area}
+          </span>
         </div>
       </Link>
     </li>
@@ -276,10 +293,21 @@ export function FeedScreen() {
 
   return (
     <div className="page">
-      <h1 ref={heading} tabIndex={-1}>
-        Найти занятие
-      </h1>
-      <FeedFiltersForm filters={filters} onChange={(next) => setParams(filterParams(next))} />
+      {/* Первый блок — яркий: градиент фисташки и денима, подпись от руки и поиск */}
+      <section className="feed-hero" aria-labelledby="feed-title">
+        <span className="feed-hero-blob feed-hero-blob-a" aria-hidden="true" />
+        <span className="feed-hero-blob feed-hero-blob-b" aria-hidden="true" />
+        <div className="feed-hero-text">
+          <p className="feed-hero-kicker" aria-hidden="true">
+            <span className="script-accent">вместе — веселее!</span>
+          </p>
+          <h1 id="feed-title" ref={heading} tabIndex={-1}>
+            Найти <em>занятие</em>
+          </h1>
+          <p className="feed-hero-lead">Компания для спорта рядом с&nbsp;вами.</p>
+        </div>
+        <FeedFiltersForm filters={filters} onChange={(next) => setParams(filterParams(next))} />
+      </section>
 
       {(feed.isPending || retrying) && <p role="status">Загрузка…</p>}
       {feed.isError && !feed.isFetchNextPageError && (
@@ -325,6 +353,7 @@ export function FeedScreen() {
                 key={item.id}
                 item={item}
                 now={now}
+                order={index % PAGE_STAGGER}
                 linkRef={index === focusIndex ? focusTarget : undefined}
               />
             ))}

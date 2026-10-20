@@ -19,8 +19,13 @@
   border: 2px solid var(--color-ink);
   border-radius: var(--radius-control);
   background: var(--color-surface);
+  box-shadow: 0 3px 0 var(--color-ink);
   overflow: hidden;
   text-align: center;
+}
+
+[data-theme='contrast'] .date-leaf {
+  box-shadow: none;
 }
 
 .date-leaf-compact {
@@ -35,8 +40,8 @@
   position: relative;
   width: 100%;
   padding: var(--space-2) 0 var(--space-1);
-  background: var(--color-marker);
-  color: var(--color-on-marker);
+  background: var(--color-sky);
+  color: var(--licorice);
   font-size: var(--fs-caption);
   font-weight: 700;
   line-height: 1;
@@ -66,7 +71,8 @@
   padding-top: var(--space-1);
   font-family: var(--font-display);
   font-size: var(--fs-display);
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: var(--tracking-display);
   line-height: 1.1;
 }
 
@@ -92,8 +98,9 @@
 }
 
 .when-time {
+  font-family: var(--font-display);
   font-size: var(--fs-lead);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .when-relative {
@@ -117,8 +124,28 @@
 .level-bars i {
   width: calc(0.75rem * var(--text-scale));
   border: 2px solid var(--color-line-strong);
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--color-surface);
+  transform-origin: bottom;
+  animation: bar-grow var(--motion-enter) var(--ease-spring) both;
+}
+
+.level-bars i:nth-child(2) {
+  animation-delay: 80ms;
+}
+
+.level-bars i:nth-child(3) {
+  animation-delay: 160ms;
+}
+
+@keyframes bar-grow {
+  from {
+    transform: scaleY(0.2);
+  }
+
+  to {
+    transform: none;
+  }
 }
 
 .level-bars i:nth-child(1) {
@@ -143,16 +170,32 @@
   line-height: 1;
 }
 
-/* Бейдж режима записи */
+/* Бейдж режима записи — «пилюля»: свободно — зелёная, по заявке — голубая */
 .mode-badge {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-green-soft);
   color: var(--color-ink);
   font-size: var(--fs-caption);
-  font-weight: 600;
-  line-height: 1;
+  font-weight: 700;
+  line-height: 1.2;
   white-space: nowrap;
+}
+
+.mode-badge[data-mode='approval'] {
+  background: var(--color-sky-soft);
+}
+
+[data-theme='contrast'] .mode-badge {
+  border: var(--border-width) solid var(--color-line);
+}
+
+[data-theme='contrast'] .leaf-month {
+  background: var(--color-marker);
+  color: var(--color-on-marker);
 }
 
 /* Статус: текст, пиктограмма и цвет */
@@ -164,6 +207,7 @@
   border: var(--border-width) solid currentColor;
   border-radius: var(--radius-control);
   font-weight: 600;
+  animation: pop-in var(--motion-base) var(--ease-out) both;
 }
 
 .status--ok {
@@ -275,6 +319,13 @@
   border: 2px solid var(--color-line-strong);
   border-radius: 50%;
   background: var(--color-surface);
+  transition:
+    background-color var(--motion-base) ease,
+    border-color var(--motion-base) ease;
+}
+
+.stepper li[data-state='current'] .step-dot {
+  animation: pop-in var(--motion-base) var(--ease-spring) both;
 }
 
 .step-label {
@@ -361,15 +412,23 @@
 .empty-state {
   display: grid;
   justify-items: center;
-  gap: var(--space-3);
-  padding: var(--space-5) var(--space-4);
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-4);
+  border: 2px dashed var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
   text-align: center;
+  animation: rise-in var(--motion-enter) var(--ease-out) both;
 }
 
 .empty-state-image {
   width: calc(10rem * var(--text-scale));
   height: auto;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-inner);
+}
+
+.empty-state p {
+  font-weight: 600;
 }
 
 [data-theme='contrast'] .empty-state-image {

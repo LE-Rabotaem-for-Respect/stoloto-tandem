@@ -48,10 +48,116 @@
   gap: var(--space-3);
 }
 
+/* Публичная страница: шапка — зелёный блок, разделы — карточки */
+.org-hero {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  padding: var(--space-6) var(--space-5);
+  border-radius: var(--radius-card);
+  background: var(--color-block);
+  color: var(--color-on-block);
+  box-shadow: var(--shadow-card);
+}
+
+[data-theme='contrast'] .org-hero {
+  border: var(--border-width) solid var(--color-line);
+}
+
+.org-hero h1 {
+  margin: 0;
+  color: var(--color-on-block);
+}
+
+.org-hero .org-city {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-block-accent);
+  color: var(--licorice);
+  font-weight: 700;
+}
+
+.org-hero .org-description {
+  max-width: 60ch;
+  margin: 0;
+  font-size: var(--fs-lead);
+}
+
+.org-columns {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .org-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.org-section {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: var(--border-width) solid var(--color-line);
+  border-radius: var(--radius-inner);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.org-section h2,
+.org-section p {
+  margin: 0;
+}
+
+/* Направления — ярлыками: название жирно, группа мелко */
+.org-section .org-sports-list {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.org-section .org-sport {
+  display: inline-flex;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-green-soft);
+  font-weight: 700;
+}
+
+.org-section .org-sport-category {
+  font-size: var(--fs-caption);
+  font-weight: 400;
+}
+
+.org-contacts,
+.org-website {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.org-contacts .icon,
+.org-website .icon {
+  margin-top: 0.1em;
+  color: var(--color-action);
+}
+
+/* Мероприятия организации — строки-карточки */
 .org-event {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-4);
   align-items: flex-start;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-2);
 }
 
 .org-event-text {
@@ -59,6 +165,17 @@
   gap: var(--space-1);
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.org-event-text > a {
+  font-family: var(--font-display);
+  font-size: var(--fs-lead);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.org-event-text > span:not([class]) {
+  color: var(--color-ink-muted);
 }
 
 .form-saved {

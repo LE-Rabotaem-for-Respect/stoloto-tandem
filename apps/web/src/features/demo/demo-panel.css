@@ -1,8 +1,8 @@
 /* Демо-панель: служебная полоса для проверяющих, не часть продукта */
 .demo-panel {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   border-bottom: 2px dashed var(--color-line-strong);
-  background: var(--color-surface);
+  background: var(--color-surface-2);
   color: var(--color-ink);
   font-size: var(--fs-body);
 }
@@ -64,21 +64,34 @@
 }
 
 .demo-tag {
-  padding: 0 var(--space-2);
-  border: 2px solid currentColor;
-  border-radius: 4px;
+  padding: 0 var(--space-3);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-pill);
+  background: var(--color-marker);
+  color: var(--color-on-marker);
   font-weight: 700;
 }
 
 .demo-button {
   min-height: var(--tap-min);
-  padding: 0 var(--space-3);
+  padding: 0 var(--space-4);
   border: 2px solid currentColor;
-  border-radius: 8px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: inherit;
   font: inherit;
   cursor: pointer;
+  transition:
+    background-color var(--motion-fast) ease,
+    transform var(--motion-fast) var(--ease-out);
+}
+
+.demo-button:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+
+.demo-button:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .demo-button:disabled {

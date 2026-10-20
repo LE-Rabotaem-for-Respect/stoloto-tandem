@@ -1,6 +1,8 @@
 import { useLayoutEffect, useRef } from 'react';
+import type { ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { IconName } from '../../shared/illustrations';
+import { useTheme } from '../../shared/theme';
 import { Icon } from '../../shared/ui/Icon';
 import {
   THEME_NOT_SAVED,
@@ -42,6 +44,7 @@ export const NAV_ITEMS: readonly {
 
 function ThemeSwitches() {
   const theme = useThemeSettings();
+  const { dark, toggleDark, contrast } = useTheme();
   return (
     <div className="theme-switches">
       <button
@@ -61,6 +64,18 @@ function ThemeSwitches() {
         <Icon name="action-contrast" />
         <span className="header-button-label">Контраст</span>
       </button>
+      {/* В «Высоком контрасте» своя палитра — тёмная схема там не действует */}
+      {!contrast && (
+        <button
+          className="header-button header-button-theme"
+          type="button"
+          aria-pressed={dark}
+          onClick={toggleDark}
+        >
+          <Icon name="action-theme" />
+          <span className="visually-hidden">Тёмная тема</span>
+        </button>
+      )}
     </div>
   );
 }
@@ -111,6 +126,9 @@ function Account() {
   return (
     <div className="account">
       <span className="account-name" title={who}>
+        <span className="account-avatar" aria-hidden="true">
+          {who.trim().charAt(0).toUpperCase()}
+        </span>
         <span className="visually-hidden">Вы вошли как </span>
         {who}
       </span>
@@ -180,6 +198,14 @@ function useStickyTopHeight() {
   return ref;
 }
 
+/**
+ * Содержимое мягко поднимается при загрузке. Без `key` по пути: пересоздание страницы
+ * при каждом переходе сбрасывало её состояние и ломало возврат гостя к действию после входа.
+ */
+function PageEnter({ children }: { children: ReactNode }) {
+  return <div className="page-enter">{children}</div>;
+}
+
 export function AppLayout() {
   usePendingActionRelay();
   useThemeFromAccount();
@@ -193,6 +219,7 @@ export function AppLayout() {
       <div className="app-top" ref={top}>
         <header className="app-header">
           <Link className="brand" to="/">
+            <span className="brand-mark" aria-hidden="true" />
             Тандем
           </Link>
           <ThemeSwitches />
@@ -223,7 +250,9 @@ export function AppLayout() {
       <main id="main" className="app-main" tabIndex={-1}>
         {/* В потоке страницы, а не в прилипающей шапке: не отнимает первый экран */}
         <ThemeSaveError />
-        <Outlet />
+        <PageEnter>
+          <Outlet />
+        </PageEnter>
       </main>
     </div>
   );
