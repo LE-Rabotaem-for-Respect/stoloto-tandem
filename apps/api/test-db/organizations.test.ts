@@ -12,6 +12,8 @@ import { OrganizationsService } from '../src/modules/organizations/organizations
 import { createSport, createUser, databaseUrl, prisma } from './db';
 
 let app: INestApplication;
+const char = (...codePoints: number[]) => String.fromCodePoint(...codePoints);
+
 const http = () => request(app.getHttpServer());
 
 beforeAll(async () => {
@@ -148,19 +150,23 @@ describe('профиль организации', () => {
   });
 
   it.each([
-    ['переворот текста в названии', { name: 'Клуб ‮Ладья' }, 'name'],
-    ['невидимый оператор внутри названия', { name: `Лад${'⁣'}ья` }, 'name'],
-    ['заполнитель хангыля вместо города', { city: 'ㅤ'.repeat(3) }, 'city'],
-    ['невидимый пробел в контактах', { contacts: `+7 900 ${'​'}000-00-00` }, 'contacts'],
-    ['изоляция направления в описании', { description: `Турниры ${'⁧'}для всех` }, 'description'],
+    ['переворот текста в названии', { name: `Клуб ${char(0x202e)}Ладья` }, 'name'],
+    ['невидимый оператор внутри названия', { name: `Лад${char(0x2063)}ья` }, 'name'],
+    ['заполнитель хангыля вместо города', { city: char(0x3164).repeat(3) }, 'city'],
+    ['невидимый пробел в контактах', { contacts: `+7 900 ${char(0x200b)}000-00-00` }, 'contacts'],
+    [
+      'изоляция направления в описании',
+      { description: `Турниры ${char(0x2067)}для всех` },
+      'description',
+    ],
     [
       'управляющий символ у представителя',
-      { representativeName: 'Иван\u0007 Петров' },
+      { representativeName: `Иван${char(7)} Петров` },
       'representativeName',
     ],
     [
       'разделитель строк в должности',
-      { representativeRole: `Тренер${' '}клуба` },
+      { representativeRole: `Тренер${char(0x2028)}клуба` },
       'representativeRole',
     ],
     ['перевод строки в названии', { name: 'Клуб\nЛадья' }, 'name'],
@@ -171,22 +177,30 @@ describe('профиль организации', () => {
     expect(response.body.fields).toHaveProperty(field);
   });
 
-  it('эмодзи и переводы строк в описании допустимы; переводы строк Windows — как обычные', async () => {
+  it('эмодзи, переводы строк в описании и контактах допустимы; переводы строк Windows — как обычные', async () => {
     const { cookie, id } = await organizationAccount();
     const chess = String.fromCodePoint(0x265f, 0xfe0f);
     const response = await http()
       .patch(`/organizations/${id}`)
       .set('Cookie', cookie)
-      .send({ name: `Ладья ${chess}`, description: 'Турниры\r\nи занятия' });
+      .send({
+        name: `Ладья ${chess}`,
+        description: 'Турниры\r\nи занятия',
+        contacts: '+7 900 000-00-00\r\nTelegram @ladya',
+      });
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       name: `Ладья ${chess}`,
       description: 'Турниры\nи занятия',
+      contacts: '+7 900 000-00-00\nTelegram @ladya',
     });
   });
 
   it('при регистрации организации имя и название проверяются тем же правилом', async () => {
-    for (const change of [{ organizationName: 'Клуб ‮Ладья' }, { name: `Иван${'⁣'}` }]) {
+    for (const change of [
+      { organizationName: `Клуб ${char(0x202e)}Ладья` },
+      { name: `Иван${char(0x2063)}` },
+    ]) {
       const response = await http()
         .post('/auth/register')
         .send({
