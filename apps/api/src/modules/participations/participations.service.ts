@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { participationMachine } from '@tandem/domain';
-import type { Action, ParticipationStatus } from '@tandem/domain';
+import { PARTICIPATION_GROUPS, participationGroup, participationMachine } from '@tandem/domain';
+import type { Action, ParticipationGroup, ParticipationStatus } from '@tandem/domain';
 import { isUUID } from 'class-validator';
 import { Clock } from '../../core/clock';
 import { ApiError } from '../../core/errors';
@@ -14,8 +14,15 @@ import {
   participationActions,
 } from '../../core/policies';
 import type { Actor } from '../../core/policies';
+import { EventsService } from '../events/events.service';
+import type { EventFeedItem } from '../events/events.service';
 import { ParticipationsRepository } from './participations.repository';
-import type { Db, JoinableEvent, ParticipantRow } from './participations.repository';
+import type {
+  Db,
+  JoinableEvent,
+  OwnParticipationRow,
+  ParticipantRow,
+} from './participations.repository';
 
 export interface ParticipationView {
   id: string;
@@ -33,6 +40,22 @@ export interface ParticipantView {
   createdAt: Date;
   decidedAt: Date | null;
   actions: Action[];
+}
+
+/** Запись в «Моих записях» (ТЗ 2.5): мероприятие строкой ленты и группа раздела. */
+export interface MyParticipationView {
+  id: string;
+  status: ParticipationStatus;
+  /** Причина отказа, если организатор её указал. */
+  decisionReason: string | null;
+  /** Позиция в листе ожидания; у других статусов — `null`. */
+  waitlistPosition: number | null;
+  group: ParticipationGroup;
+  event: EventFeedItem;
+}
+
+export interface MyParticipationsView {
+  items: MyParticipationView[];
 }
 
 export interface ParticipantsView {
@@ -53,6 +76,14 @@ function answerErrors(event: JoinableEvent, answer: string | undefined): ErrorFi
   return {};
 }
 
+// Группы по порядку показа; предстоящие и ждущие — от ближайшего, прошедшие — от последнего
+function myOrder(a: MyParticipationView, b: MyParticipationView): number {
+  const group = PARTICIPATION_GROUPS.indexOf(a.group) - PARTICIPATION_GROUPS.indexOf(b.group);
+  if (group !== 0) return group;
+  const time = a.event.startsAt.getTime() - b.event.startsAt.getTime();
+  return a.group === 'past' ? -time : time;
+}
+
 /**
  * Запись на мероприятие (ТЗ 2.4, 2.5, 4.3). Любое изменение занятости идёт здесь, в
  * транзакции с блокировкой строки события (DECISION-002): места считаются под блокировкой,
@@ -62,6 +93,7 @@ function answerErrors(event: JoinableEvent, answer: string | undefined): ErrorFi
 export class ParticipationsService {
   constructor(
     private readonly participations: ParticipationsRepository,
+    private readonly events: EventsService,
     private readonly clock: Clock,
     private readonly bus: EventBus,
   ) {}
@@ -149,6 +181,40 @@ export class ParticipationsService {
         return { id: active.id, eventId: event.id, status };
       }),
     );
+  }
+
+  /**
+   * «Мои записи» (ТЗ 2.5): по записи на мероприятие, группы «Предстоящие», «Ждут решения»,
+   * «Прошедшие». Записи бывают только у пользователя: у организации и администратора
+   * список пуст.
+   */
+  async mine(actor: Actor): Promise<MyParticipationsView> {
+    if (actor.role !== 'user') return { items: [] };
+    const rows = await this.participations.ofUser(actor.userId);
+    const events = await this.events.feedItemsFor(
+      actor,
+      new Map(rows.map((row) => [row.eventId, row.status])),
+    );
+    const items: MyParticipationView[] = [];
+    for (const row of rows) {
+      const event = events.get(row.eventId);
+      if (!event) continue;
+      items.push({
+        id: row.id,
+        status: row.status,
+        decisionReason: row.status === 'rejected' ? row.decisionReason : null,
+        waitlistPosition: await this.waitlistPosition(row),
+        group: participationGroup(row.status, event.displayStatus),
+        event,
+      });
+    }
+    return { items: items.sort(myOrder) };
+  }
+
+  private waitlistPosition(row: OwnParticipationRow): Promise<number | null> {
+    return row.status === 'waitlist'
+      ? this.participations.waitlistPosition(row)
+      : Promise.resolve(null);
   }
 
   /** Все, кто записан или подал заявку: им важны перенос, отмена и снятие (уведомления, ТЗ 3.3). */

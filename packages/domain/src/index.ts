@@ -4,6 +4,12 @@ export type { Action, ActionCode } from './actions';
 export { ERROR_CODES, ERROR_HTTP_STATUS, ERROR_MESSAGES, errorMessage } from './errors';
 export type { ErrorCode } from './errors';
 export { EVENT_DISPLAY_STATUSES, displayStatus } from './display-status';
+export {
+  PARTICIPATION_GROUPS,
+  PARTICIPATION_GROUP_TITLES,
+  participationGroup,
+} from './my-participations';
+export type { ParticipationGroup } from './my-participations';
 export type { DisplayStatusEvent, EventDisplayStatus } from './display-status';
 export {
   EVENT_STATUS_VIEW,

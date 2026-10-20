@@ -8,6 +8,7 @@ import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/configure-app';
 import { STAND_CONFIG } from '../src/core/config';
 import { EventBus } from '../src/core/event-bus';
+import type { ParticipationStatus } from '@tandem/domain';
 import type { Prisma } from '../src/generated/prisma/client';
 import { hashPassword } from '../src/modules/auth/password';
 import { ParticipationsRepository } from '../src/modules/participations/participations.repository';
@@ -405,5 +406,159 @@ describe('лимит мест', () => {
     const responses = await Promise.all([join(anna, event.id), join(anna, event.id)]);
     expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
     expect(await statuses(event.id, anna.id)).toEqual(['confirmed']);
+  });
+});
+
+describe('GET /me/participations: «Мои записи»', () => {
+  const mine = (who: Account) => http().get('/me/participations').set('Cookie', who.cookie);
+  const record = (eventId: string, userId: string, status: ParticipationStatus, extra = {}) =>
+    prisma.participation.create({
+      data: { eventId, userId, status, createdAt: new Date(), updatedAt: new Date(), ...extra },
+    });
+
+  it('гостю — 401', async () => {
+    expect((await http().get('/me/participations')).status).toBe(401);
+  });
+
+  it('группы, статусы и порядок: по записи на мероприятие, чужих записей нет', async () => {
+    const me = await account('user');
+    const soon = await createEvent({ title: 'Скоро', startsAt: inDays(1), endsAt: inDays(1, 2) });
+    const later = await createEvent({ title: 'Позже', startsAt: inDays(5), endsAt: inDays(5, 2) });
+    const request = await createEvent({ title: 'Заявка', mode: 'approval' });
+    const finished = await createEvent({
+      title: 'Было',
+      startsAt: inDays(-3),
+      endsAt: inDays(-3, 2),
+    });
+    const older = await createEvent({
+      title: 'Давно',
+      startsAt: inDays(-9),
+      endsAt: inDays(-9, 2),
+    });
+    const called = await createEvent({
+      title: 'Отменено',
+      status: 'cancelled',
+      statusReason: 'Дождь',
+    });
+    const rejected = await createEvent({ title: 'Отказ', mode: 'approval' });
+    const rejoined = await createEvent({
+      title: 'Снова',
+      startsAt: inDays(2),
+      endsAt: inDays(2, 2),
+    });
+
+    await record(later.id, me.id, 'confirmed');
+    await record(soon.id, me.id, 'confirmed');
+    await record(request.id, me.id, 'pending');
+    await record(finished.id, me.id, 'confirmed');
+    await record(older.id, me.id, 'confirmed');
+    await record(called.id, me.id, 'confirmed');
+    await record(rejected.id, me.id, 'rejected', { decisionReason: 'Группа набрана' });
+    await record(rejoined.id, me.id, 'cancelled');
+    await record(rejoined.id, me.id, 'confirmed');
+    await record(soon.id, igor.id, 'confirmed');
+
+    const response = await mine(me);
+    expect(response.status).toBe(200);
+    const items = response.body.items as {
+      status: string;
+      group: string;
+      decisionReason: string | null;
+      event: { title: string; displayStatus: string };
+    }[];
+    expect(items.map((item) => [item.group, item.event.title, item.status])).toEqual([
+      ['upcoming', 'Скоро', 'confirmed'],
+      ['upcoming', 'Снова', 'confirmed'],
+      ['upcoming', 'Отказ', 'rejected'],
+      ['upcoming', 'Позже', 'confirmed'],
+      ['pending', 'Заявка', 'pending'],
+      ['past', 'Отменено', 'confirmed'],
+      ['past', 'Было', 'confirmed'],
+      ['past', 'Давно', 'confirmed'],
+    ]);
+    expect(items.find((item) => item.status === 'rejected')?.decisionReason).toBe('Группа набрана');
+    expect(items.find((item) => item.event.title === 'Отменено')?.event.displayStatus).toBe(
+      'cancelled',
+    );
+    expect(items.find((item) => item.event.title === 'Было')?.event.displayStatus).toBe('finished');
+  });
+
+  it('строка — карточка ленты: направление, организатор, время; лишних полей нет', async () => {
+    const me = await account('user');
+    const event = await createEvent();
+    const row = await record(event.id, me.id, 'confirmed');
+    const response = await mine(me);
+    expect(response.body.items).toEqual([
+      {
+        id: row.id,
+        status: 'confirmed',
+        decisionReason: null,
+        waitlistPosition: null,
+        group: 'upcoming',
+        event: {
+          id: event.id,
+          title: 'Футбол в среду',
+          sport: expect.objectContaining({ id: sportId, category: 'endurance' }),
+          organizer: { kind: 'user', id: organizer.id, name: 'Аккаунт user' },
+          startsAt: event.startsAt.toISOString(),
+          endsAt: event.endsAt.toISOString(),
+          city: 'Красноярск',
+          area: 'Центральный',
+          mode: 'free',
+          level: 'any',
+          displayStatus: 'open',
+        },
+      },
+    ]);
+  });
+
+  it('отменённая запись видна, пока нет новой', async () => {
+    const me = await account('user');
+    const event = await createEvent();
+    await record(event.id, me.id, 'cancelled');
+    const response = await mine(me);
+    expect(response.body.items.map((item: { status: string }) => item.status)).toEqual([
+      'cancelled',
+    ]);
+  });
+
+  it('лист ожидания — с позицией в очереди', async () => {
+    const me = await account('user');
+    const event = await createEvent({ capacity: 1 });
+    const at = (minutes: number) => {
+      const time = new Date(Date.now() - 60 * 60_000 + minutes * 60_000);
+      return { createdAt: time, updatedAt: time };
+    };
+    await record(event.id, anna.id, 'confirmed', at(0));
+    await record(event.id, igor.id, 'waitlist', at(1));
+    await record(event.id, me.id, 'waitlist', at(2));
+    const response = await mine(me);
+    expect(response.body.items).toMatchObject([
+      { status: 'waitlist', waitlistPosition: 2, event: { displayStatus: 'full' } },
+    ]);
+  });
+
+  it('снятое модератором: видно записанному, после отказа — нет', async () => {
+    const me = await account('user');
+    const hidden = { status: 'unpublished' as const, statusReason: 'Проверка' };
+    const signed = await createEvent({ ...hidden, title: 'Записан' });
+    const refused = await createEvent({ ...hidden, title: 'Отказали', mode: 'approval' });
+    await record(signed.id, me.id, 'confirmed');
+    await record(refused.id, me.id, 'rejected');
+    const response = await mine(me);
+    expect(
+      response.body.items.map((item: { event: { title: string; displayStatus: string } }) => [
+        item.event.title,
+        item.event.displayStatus,
+      ]),
+    ).toEqual([['Записан', 'unpublished']]);
+  });
+
+  it('у организации и администратора записей нет — пустой список', async () => {
+    for (const who of [org, admin]) {
+      const response = await mine(who);
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ items: [] });
+    }
   });
 });
