@@ -203,7 +203,7 @@ describe('GET /events/:id/participants', () => {
     await accept(organizer, first);
     const response = await participants(organizer, event.id);
     expect(response.body.pending[0].actions).toEqual([
-      { code: 'accept_participation', enabled: false, reason: NO_SEATS },
+      { code: 'accept_participation', enabled: false, reason: NO_SEATS, reasonCode: 'no_seats' },
       { code: 'reject_participation', enabled: true },
     ]);
   });

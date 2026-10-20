@@ -1,3 +1,5 @@
+import type { ErrorCode } from './errors';
+
 /** Закрытый список действий, которые API отдаёт в `actions[]` (ТЗ 4.4). */
 export const ACTION_CODES = [
   'join',
@@ -32,5 +34,7 @@ export interface Action {
   code: ActionCode;
   enabled: boolean;
   reason?: string;
+  /** Код причины: по нему экран берёт короткую форму для панели действия (`shortErrorMessage`). */
+  reasonCode?: ErrorCode;
   requiresAuth?: boolean;
 }

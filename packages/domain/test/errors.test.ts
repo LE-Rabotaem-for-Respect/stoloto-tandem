@@ -4,8 +4,11 @@ import {
   ERROR_CODES,
   ERROR_HTTP_STATUS,
   ERROR_MESSAGES,
+  ERROR_SHORT_MESSAGES,
+  SHORT_MESSAGE_MAX_LENGTH,
   TRANSITION_ERROR_CODES,
   errorMessage,
+  shortErrorMessage,
 } from '../src';
 
 describe('errors: закрытый список кодов ошибок API', () => {
@@ -47,6 +50,24 @@ describe('errors: закрытый список кодов ошибок API', ()
       event_not_joinable: 409,
       internal: 500,
     });
+  });
+
+  it('причина для панели действия у каждого кода — не длиннее 28 знаков', () => {
+    expect(SHORT_MESSAGE_MAX_LENGTH).toBe(28);
+    for (const code of ERROR_CODES) {
+      expect([...shortErrorMessage(code)].length, code).toBeLessThanOrEqual(28);
+      expect(shortErrorMessage(code), code).toMatch(/^[А-ЯЁ][^a-zA-Z]*$/);
+    }
+  });
+
+  it('короткая форма — только у длинных текстов, иначе панель показывает полный', () => {
+    for (const [code, short] of Object.entries(ERROR_SHORT_MESSAGES)) {
+      const full = ERROR_MESSAGES[code as keyof typeof ERROR_MESSAGES];
+      expect([...full].length, code).toBeGreaterThan(28);
+      expect(short, code).not.toBe(full);
+    }
+    expect(shortErrorMessage('no_seats')).toBe('Мест нет');
+    expect(shortErrorMessage('event_not_joinable')).toBe('Запись закрыта');
   });
 
   it('errorMessage возвращает текст кода', () => {
