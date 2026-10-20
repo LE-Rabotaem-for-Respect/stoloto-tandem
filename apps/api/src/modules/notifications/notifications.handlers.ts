@@ -3,6 +3,10 @@ import type { NotificationPayload, NotificationType } from '@tandem/domain';
 import { Clock } from '../../core/clock';
 import { OnDomainEvent } from '../../core/event-bus';
 import type { DomainEvent } from '../../core/event-bus';
+import { EventsService } from '../events/events.service';
+import { MessagesService } from '../messages/messages.service';
+import { OrganizationsService } from '../organizations/organizations.service';
+import { ParticipationsService } from '../participations/participations.service';
 import { NotificationsRepository } from './notifications.repository';
 
 const eventLink = (eventId: string) => `/events/${eventId}`;
@@ -15,12 +19,16 @@ const eventLink = (eventId: string) => `/events/${eventId}`;
 export class NotificationHandlers {
   constructor(
     private readonly repository: NotificationsRepository,
+    private readonly events: EventsService,
+    private readonly participations: ParticipationsService,
+    private readonly messages: MessagesService,
+    private readonly organizations: OrganizationsService,
     private readonly clock: Clock,
   ) {}
 
   @OnDomainEvent('ParticipationRequested')
   async requested(event: DomainEvent<'ParticipationRequested'>) {
-    const target = await this.repository.eventTarget(event.eventId);
+    const target = await this.events.notificationTarget(event.eventId);
     if (!target) return;
     await this.notify([target.organizerUserId], event.actorId, 'participation_requested', {
       payload: { eventTitle: target.title },
@@ -37,9 +45,8 @@ export class NotificationHandlers {
 
   @OnDomainEvent('ParticipationRejected')
   async rejected(event: DomainEvent<'ParticipationRejected'>) {
-    const participation = await this.repository.participation(event.participationId);
     await this.toParticipant(event, 'participation_rejected', {
-      reason: participation?.decisionReason ?? undefined,
+      reason: event.reason ?? undefined,
     });
   }
 
@@ -52,8 +59,8 @@ export class NotificationHandlers {
   @OnDomainEvent('MessagePosted')
   async messagePosted(event: DomainEvent<'MessagePosted'>) {
     const [message, target] = await Promise.all([
-      this.repository.message(event.messageId),
-      this.repository.eventTarget(event.eventId),
+      this.messages.authorship(event.messageId),
+      this.events.notificationTarget(event.eventId),
     ]);
     if (!message || !target) return;
     const byOrganizer =
@@ -61,13 +68,13 @@ export class NotificationHandlers {
     const link = `${eventLink(event.eventId)}#discussion`;
     const payload = { eventTitle: target.title };
 
-    if (!message.parent && !byOrganizer) {
+    if (!message.parentAuthorUserId && !byOrganizer) {
       await this.notify([target.organizerUserId], event.actorId, 'question_posted', {
         payload,
         link,
       });
-    } else if (message.parent && byOrganizer) {
-      await this.notify([message.parent.authorUserId], event.actorId, 'answer_posted', {
+    } else if (message.parentAuthorUserId && byOrganizer) {
+      await this.notify([message.parentAuthorUserId], event.actorId, 'answer_posted', {
         payload,
         link,
       });
@@ -96,7 +103,7 @@ export class NotificationHandlers {
 
   @OnDomainEvent('OrganizationDecided')
   async organizationDecided(event: DomainEvent<'OrganizationDecided'>) {
-    const organization = await this.repository.organization(event.organizationId);
+    const organization = await this.organizations.owner(event.organizationId);
     if (!organization) return;
     await this.notify([organization.ownerUserId], event.actorId, 'organization_decided', {
       payload: {
@@ -113,7 +120,7 @@ export class NotificationHandlers {
     type: NotificationType,
     extra: NotificationPayload = {},
   ) {
-    const target = await this.repository.eventTarget(event.eventId);
+    const target = await this.events.notificationTarget(event.eventId);
     if (!target) return;
     await this.notify([event.userId], event.actorId, type, {
       payload: { eventTitle: target.title, ...extra },
@@ -128,8 +135,8 @@ export class NotificationHandlers {
     extra: NotificationPayload,
   ) {
     const [target, signedUp] = await Promise.all([
-      this.repository.eventTarget(event.eventId),
-      this.repository.signedUpUserIds(event.eventId),
+      this.events.notificationTarget(event.eventId),
+      this.participations.signedUpUserIds(event.eventId),
     ]);
     if (!target) return;
     await this.notify([...signedUp, target.organizerUserId], event.actorId, type, {

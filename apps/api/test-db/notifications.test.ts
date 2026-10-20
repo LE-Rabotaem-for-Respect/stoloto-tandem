@@ -123,6 +123,7 @@ describe('кто получает уведомления (ТЗ 3.3)', () => {
         ...base,
         participationId: rejected.id,
         userId: ksenia.id,
+        reason: 'Нужен опыт',
       }),
     );
     await handlers.confirmed(

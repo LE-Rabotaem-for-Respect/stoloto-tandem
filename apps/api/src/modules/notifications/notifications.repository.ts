@@ -10,65 +10,10 @@ export interface NewNotification {
   createdAt: Date;
 }
 
-/** Мероприятие глазами уведомлений: название и кто его организатор. */
-export interface EventTarget {
-  title: string;
-  /** Пользователь-организатор или представитель организации-организатора. */
-  organizerUserId: string;
-}
-
-const SIGNED_UP = ['pending', 'confirmed', 'waitlist'] as const;
-
+/** Только таблица уведомлений: данные других модулей — через их сервисы (DECISION-002). */
 @Injectable()
 export class NotificationsRepository {
   constructor(private readonly prisma: PrismaService) {}
-
-  async eventTarget(eventId: string): Promise<EventTarget | null> {
-    const event = await this.prisma.event.findUnique({
-      where: { id: eventId },
-      select: {
-        title: true,
-        organizerUserId: true,
-        organizerOrg: { select: { ownerUserId: true } },
-      },
-    });
-    const organizerUserId = event?.organizerUserId ?? event?.organizerOrg?.ownerUserId;
-    return event && organizerUserId ? { title: event.title, organizerUserId } : null;
-  }
-
-  /** Все, кто записан или подал заявку: им важны перенос, отмена и снятие. */
-  async signedUpUserIds(eventId: string): Promise<string[]> {
-    const rows = await this.prisma.participation.findMany({
-      where: { eventId, status: { in: [...SIGNED_UP] } },
-      select: { userId: true },
-    });
-    return rows.map((row) => row.userId);
-  }
-
-  participation(id: string) {
-    return this.prisma.participation.findUnique({
-      where: { id },
-      select: { userId: true, decisionReason: true },
-    });
-  }
-
-  message(id: string) {
-    return this.prisma.message.findUnique({
-      where: { id },
-      select: {
-        authorUserId: true,
-        asOrganizationId: true,
-        parent: { select: { authorUserId: true } },
-      },
-    });
-  }
-
-  organization(id: string) {
-    return this.prisma.organization.findUnique({
-      where: { id },
-      select: { name: true, ownerUserId: true },
-    });
-  }
 
   async create(notifications: NewNotification[]) {
     if (notifications.length === 0) return;

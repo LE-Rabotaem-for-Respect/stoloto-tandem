@@ -56,6 +56,22 @@ export class MessagesService {
     private readonly bus: EventBus,
   ) {}
 
+  /** Кто написал сообщение и на чьё оно ответ (уведомления о вопросах и ответах, ТЗ 3.3). */
+  async authorship(id: string): Promise<{
+    authorUserId: string;
+    asOrganizationId: string | null;
+    parentAuthorUserId: string | null;
+  } | null> {
+    const message = await this.messages.find(id);
+    if (!message) return null;
+    const parent = message.parentId ? await this.messages.find(message.parentId) : null;
+    return {
+      authorUserId: message.authorUserId,
+      asOrganizationId: message.asOrganizationId,
+      parentAuthorUserId: parent?.authorUserId ?? null,
+    };
+  }
+
   async list(actor: Actor, eventId: string): Promise<ThreadView[]> {
     const event = await this.visibleEvent(actor, eventId);
     const views = (await this.messages.list(event.id)).map((message) =>

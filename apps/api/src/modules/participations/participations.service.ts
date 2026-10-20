@@ -155,6 +155,11 @@ export class ParticipationsService {
    * (отклонённые и отменённые). Организатору — с действиями у заявок, администратору —
    * только просмотр.
    */
+  /** Все, кто записан или подал заявку: им важны перенос, отмена и снятие (уведомления, ТЗ 3.3). */
+  signedUpUserIds(eventId: string): Promise<string[]> {
+    return this.participations.signedUpUserIds(eventId);
+  }
+
   async participants(actor: Actor, eventId: string): Promise<ParticipantsView> {
     const event = isUUID(eventId) ? await this.participations.findEvent(eventId) : null;
     if (!event) throw new ApiError('event_not_available');
