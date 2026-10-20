@@ -32,6 +32,14 @@ const pending = {
   decisionReason: null,
   submittedAt: '2026-10-19T05:00:00Z',
   sports: [{ id: 's1', name: 'Падел' }],
+  actions: [{ code: 'review_organization', enabled: true }],
+};
+
+// Как api: решать можно только заявку на проверке
+const reviewed = {
+  code: 'review_organization',
+  enabled: false,
+  reason: 'Решение принимается только по заявке на проверке',
 };
 
 const event = {
@@ -49,8 +57,13 @@ const event = {
 type EventRow = Omit<typeof event, 'statusReason'> & { statusReason: string | null };
 
 /** api админки в памяти: решения меняют статусы, запросы записываются. */
-function fakeAdminApi(me: typeof adminMe = adminMe, eventRows: EventRow[] = [event]) {
-  const organizations = [{ ...pending }];
+function fakeAdminApi(
+  me: typeof adminMe = adminMe,
+  {
+    organizations = [{ ...pending }],
+    events: eventRows = [event],
+  }: { organizations?: (typeof pending)[]; events?: EventRow[] } = {},
+) {
   const events = eventRows.map((row) => ({ ...row }));
   const calls: { call: string; body?: unknown }[] = [];
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
@@ -83,6 +96,7 @@ function fakeAdminApi(me: typeof adminMe = adminMe, eventRows: EventRow[] = [eve
       Object.assign(organizations[0] ?? {}, {
         status: decision === 'approve' ? 'approved' : 'rejected',
         decisionReason: reason?.trim() ?? null,
+        actions: [reviewed],
       });
       return json(200, organizations[0]);
     }
@@ -208,6 +222,14 @@ describe('админка', () => {
     expect(screen.queryByRole('button', { name: 'Одобрить' })).toBeNull();
   });
 
+  it('кнопки решения — по actions[], а не по статусу заявки', async () => {
+    fakeAdminApi(adminMe, { organizations: [{ ...pending, actions: [reviewed] }] });
+    renderAt('/admin/organizations');
+    expect(await screen.findByText('Иван Петров, Тренер')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Одобрить' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Отклонить' })).toBeNull();
+  });
+
   it('«Отклонить» — сначала причина; без неё ошибка у поля', async () => {
     const calls = fakeAdminApi();
     renderAt('/admin/organizations');
@@ -277,7 +299,9 @@ describe('админка', () => {
   });
 
   it('«Снять с публикации» — только с причиной; после решения строка показывает статус и причину', async () => {
-    const calls = fakeAdminApi(adminMe, [{ ...event, status: 'published', statusReason: null }]);
+    const calls = fakeAdminApi(adminMe, {
+      events: [{ ...event, status: 'published', statusReason: null }],
+    });
     renderAt('/admin/events');
     await userEvent.click(await screen.findByRole('button', { name: 'Снять с публикации' }));
     const reason = screen.getByLabelText('Причина — её увидят организатор и записавшиеся');
@@ -303,10 +327,9 @@ describe('админка', () => {
   });
 
   it('удалённому — ни снятия, ни удаления; «Отмена» закрывает форму без запроса', async () => {
-    const calls = fakeAdminApi(adminMe, [
-      { ...event, id: 'e2', status: 'deleted', statusReason: 'Мошенничество' },
-      event,
-    ]);
+    const calls = fakeAdminApi(adminMe, {
+      events: [{ ...event, id: 'e2', status: 'deleted', statusReason: 'Мошенничество' }, event],
+    });
     renderAt('/admin/events');
     expect(await screen.findByText('Удалено', { selector: '.admin-status' })).toBeTruthy();
     expect(screen.getAllByRole('button', { name: 'Удалить' })).toHaveLength(1);

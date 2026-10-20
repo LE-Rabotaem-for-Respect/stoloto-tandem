@@ -65,6 +65,28 @@ describe('SINGLE_LINE_TEXT и MULTI_LINE_TEXT', () => {
   });
 });
 
+describe('комбинирующие знаки в однострочном тексте — по одному после буквы', () => {
+  it.each([
+    ['разложенная «й»: и + U+0306', `Хоккей на тра${char(0x438, 0x306)}ве`],
+    ['разложенная «ё»: е + U+0308', `Е${char(0x308)}лка`],
+    ['ударение над буквой', `Кубо${char(0x301)}к`],
+    ['keycap с селектором', `Шаг ${char(0x31, 0xfe0f, 0x20e3)}`],
+    ['keycap без селектора', `Шаг ${char(0x23, 0x20e3)}`],
+  ])('пропускают: %s', (_, text) => {
+    expect(SINGLE_LINE_TEXT.test(text)).toBe(true);
+  });
+
+  it.each([
+    ['рамка клавиши внутри слова', `Ку${char(0x20e3)}бок`],
+    ['два знака подряд над буквой («залго»)', `Кубо${char(0x301, 0x300)}к`],
+    ['знак после пробела', `Кубок ${char(0x301)}`],
+    ['знак в начале строки', `${char(0x301)}Кубок`],
+    ['знак после цифры', `Кубок 7${char(0x301)}`],
+  ])('отклоняют: %s', (_, text) => {
+    expect(SINGLE_LINE_TEXT.test(text)).toBe(false);
+  });
+});
+
 describe('normalizeLineBreaks', () => {
   it('переводы строк Windows и старых Mac становятся одним переводом строки', () => {
     expect(normalizeLineBreaks(`а${CR}${LF}б${CR}в${LF}г`)).toBe(`а${LF}б${LF}в${LF}г`);
@@ -143,6 +165,15 @@ describe('VISIBLE_TEXT: в однострочном поле есть буква
 });
 
 describe('cleanSingleLine', () => {
+  it('разложенная форма (macOS, iOS) приводится к NFC: «ё́» и вьетнамский проходят правило', () => {
+    for (const text of ['ё́лка', 'Nguyễn Thị']) {
+      const decomposed = text.normalize('NFD');
+      expect(SINGLE_LINE_TEXT.test(decomposed)).toBe(false);
+      expect(cleanSingleLine(decomposed)).toBe(text.normalize('NFC'));
+      expect(SINGLE_LINE_TEXT.test(cleanSingleLine(decomposed))).toBe(true);
+    }
+  });
+
   it('мягкий перенос в однострочном тексте убирается: название находится поиском', () => {
     expect(cleanSingleLine(`  Фут${char(0xad)}бол  `)).toBe('Футбол');
   });

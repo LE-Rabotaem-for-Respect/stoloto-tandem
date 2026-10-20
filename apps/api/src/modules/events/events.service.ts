@@ -26,16 +26,18 @@ import type { ErrorFields } from '../../core/errors';
 import { EventBus, domainEvent } from '../../core/event-bus';
 import {
   canCreateEvent,
+  canManageEvent,
   canModerate,
   canSeeParticipantInfo,
   canViewEvent,
   eventActions,
 } from '../../core/policies';
 import type { Actor } from '../../core/policies';
+import { EventTermsService } from '../participations/event-terms.service';
 import { SportsService } from '../sports/sports.service';
-import type { CreateEventDto, EventFeedQuery, FeedDate } from './events.dto';
+import type { CreateEventDto, EventFeedQuery, FeedDate, UpdateEventDto } from './events.dto';
 import { EventsRepository } from './events.repository';
-import type { EventWithCard } from './events.repository';
+import type { EditableFields, EventWithCard } from './events.repository';
 
 export interface EventCard {
   id: string;
@@ -178,6 +180,7 @@ export class EventsService {
   constructor(
     private readonly events: EventsRepository,
     private readonly sports: SportsService,
+    private readonly terms: EventTermsService,
     private readonly clock: Clock,
     private readonly bus: EventBus,
   ) {}
@@ -272,6 +275,76 @@ export class EventsService {
     // Запись — своя: причину отказа видит только тот, кому отказали
     const participationReason = own?.status === 'rejected' ? own.decisionReason : null;
     return { event, participation, participationReason };
+  }
+
+  /**
+   * Изменение после публикации (ТЗ 2.2): только организатор, только опубликованное и
+   * до начала. Режим записи и лимит мест проверяет модуль участия — он же блокирует
+   * строку мероприятия до конца транзакции (DECISION-002, «Лимит мест»): запись, которая
+   * идёт в это же время, дождётся изменения или пройдёт до него. После коммита —
+   * `EventUpdated` со списком изменённых полей; если ничего не изменилось — без события.
+   */
+  async update(actor: Actor, id: string, dto: UpdateEventDto): Promise<EventCard> {
+    await this.bus.afterCommit((emit) =>
+      this.events.transaction(async (tx) => {
+        const locked = await this.terms.lockForTermsChange(
+          id,
+          { mode: dto.mode, capacity: dto.capacity },
+          tx,
+        );
+        if (!locked) throw new ApiError('event_not_available');
+        const { event } = locked;
+        // Кому мероприятие не видно, тот не узнаёт и о нём: тот же ответ, что у карточки
+        const view = canViewEvent(actor, event, null);
+        if (!view.allowed) throw new ApiError(view.code);
+        const manage = canManageEvent(actor, event);
+        if (!manage.allowed) throw new ApiError(manage.code);
+        const now = this.clock.now();
+        eventMachine.nextState(event.status, 'edit', { now, startsAt: event.startsAt });
+
+        const fields: ErrorFields = { ...locked.fields };
+        const mode = dto.mode ?? event.mode;
+        // Вопрос к заявке остаётся только у режима «По заявке» (как при создании)
+        if (mode === 'free' && dto.applyQuestion) {
+          fields.applyQuestion = 'Вопрос к заявке — только для режима «По заявке»';
+        }
+        if (Object.keys(fields).length > 0) throw new ApiError('validation_failed', fields);
+
+        const current = await this.events.findEditable(event.id, tx);
+        const next: EditableFields = {
+          title: dto.title,
+          description: dto.description,
+          city: dto.city,
+          area: dto.area,
+          placeText: dto.placeText,
+          participantInfo: dto.participantInfo,
+          level: dto.level,
+          mode: dto.mode,
+          capacity: dto.capacity,
+          applyQuestion:
+            mode === 'free'
+              ? null
+              : dto.applyQuestion === undefined
+                ? undefined
+                : dto.applyQuestion || null,
+        };
+        const changed = (Object.keys(next) as (keyof EditableFields)[]).filter(
+          (field) => next[field] !== undefined && next[field] !== current[field],
+        );
+        if (changed.length === 0) return;
+
+        await this.events.update(event.id, next, tx);
+        emit(
+          domainEvent('EventUpdated', {
+            eventId: event.id,
+            fields: changed,
+            actorId: actor.role === 'guest' ? null : actor.userId,
+            occurredAt: now,
+          }),
+        );
+      }),
+    );
+    return this.card(actor, id);
   }
 
   /**
