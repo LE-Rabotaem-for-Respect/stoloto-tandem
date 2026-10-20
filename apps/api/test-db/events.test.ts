@@ -160,6 +160,15 @@ describe('POST /events', () => {
     expect(search.body.items).toEqual([expect.objectContaining({ id: response.body.sport.id })]);
   });
 
+  it('не строка в названии и городе — сообщение о поле, а не о символах', async () => {
+    const response = await post(anna, { ...validEvent(), title: 5, city: 5 });
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toMatchObject({
+      title: 'Укажите название',
+      city: 'Укажите город',
+    });
+  });
+
   it('эмодзи с соединителем и селектором начертания и мягкий перенос — допустимы', async () => {
     const runner = String.fromCodePoint(0x1f3c3, 0x200d, 0x2640, 0xfe0f);
     const softHyphen = String.fromCodePoint(0xad);
@@ -466,6 +475,29 @@ describe('GET /events/:id', () => {
     const missing = await get(anna, randomUUID());
     expect(missing.status).toBe(404);
     expect(missing.headers['cache-control']).toBe('no-store');
+  });
+
+  it('главная кнопка по статусу записи: «Отменить запись» или «Записаться»', async () => {
+    const id = (await post(igor, validEvent())).body.id as string;
+    const expected = {
+      pending: { code: 'leave', enabled: true },
+      confirmed: { code: 'leave', enabled: true },
+      waitlist: { code: 'leave', enabled: true },
+      cancelled: { code: 'join', enabled: true },
+      rejected: { code: 'join', enabled: false, reason: expect.stringMatching(/После отказа/) },
+    } as const;
+    for (const [status, action] of Object.entries(expected)) {
+      const viewer = await account('user');
+      await participation(id, viewer.id, status as keyof typeof expected);
+      const response = await get(viewer, id);
+      expect(response.status, status).toBe(200);
+      const codes = (response.body.actions as { code: string }[]).map((item) => item.code);
+      expect(response.body.actions[0], status).toEqual(action);
+      expect(
+        codes.filter((code) => code === 'join' || code === 'leave'),
+        status,
+      ).toHaveLength(1);
+    }
   });
 
   it('гость видит опубликованное мероприятие, запись предлагает после входа', async () => {

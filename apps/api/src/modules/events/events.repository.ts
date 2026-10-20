@@ -112,6 +112,10 @@ export class EventsRepository {
     return this.prisma.event.findUnique({ where: { id }, include: cardInclude });
   }
 
+  findCards(ids: string[]): Promise<EventWithCard[]> {
+    return this.prisma.event.findMany({ where: { id: { in: ids } }, include: cardInclude });
+  }
+
   /** Страница ленты: по дате начала, при равной — по id, чтобы страницы не перекрывались. */
   async feed(
     filter: FeedFilter,

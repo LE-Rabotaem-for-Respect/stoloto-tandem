@@ -44,11 +44,14 @@ for stand in "$@"; do
 done
 
 # Compose для стенда: имя проекта и переменные — из stands/<стенд>.env. Переменные
-# стенда из окружения shell сбрасываются: иначе они перекрыли бы файл у всех стендов
+# стенда из окружения shell сбрасываются: иначе они перекрыли бы файл у всех стендов.
+# DEMO_RESET_INTERVAL_SECONDS=0, оставшийся после локального e2e, снял бы с открытых
+# стендов защиту сброса демо-данных
 compose() {
   stand=$1
   shift
   env -u STAND_ID -u WEB_PORT -u API_PORT -u DEMO_MODE -u SESSION_SECRET \
+    -u DEMO_RESET_INTERVAL_SECONDS \
     docker compose -p "$stand" --env-file "stands/$stand.env" "$@"
 }
 

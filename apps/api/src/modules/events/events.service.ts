@@ -114,6 +114,22 @@ function organizerOf(event: EventWithCard): EventCard['organizer'] {
   throw new Error(`У мероприятия ${event.id} нет организатора`);
 }
 
+function feedItem(event: EventWithCard, now: Date, confirmed: number): EventFeedItem {
+  return {
+    id: event.id,
+    title: event.title,
+    sport: sportOf(event),
+    organizer: organizerOf(event),
+    startsAt: event.startsAt,
+    endsAt: event.endsAt,
+    city: event.city,
+    area: event.area,
+    mode: event.mode,
+    level: event.level,
+    displayStatus: displayStatus(event, now, confirmed),
+  };
+}
+
 @Injectable()
 export class EventsService {
   constructor(
@@ -277,23 +293,34 @@ export class EventsService {
     const confirmed = await this.events.confirmedCounts(events.map((event) => event.id));
 
     return {
-      items: events.map((event) => ({
-        id: event.id,
-        title: event.title,
-        sport: sportOf(event),
-        organizer: organizerOf(event),
-        startsAt: event.startsAt,
-        endsAt: event.endsAt,
-        city: event.city,
-        area: event.area,
-        mode: event.mode,
-        level: event.level,
-        displayStatus: displayStatus(event, now, confirmed.get(event.id) ?? 0),
-      })),
+      items: events.map((event) => feedItem(event, now, confirmed.get(event.id) ?? 0)),
       total,
       limit,
       offset,
     };
+  }
+
+  /**
+   * Мероприятия строками ленты для «Моих записей» (ТЗ 2.5): `participations` — статус записи
+   * человека по id мероприятия. Видимость — по правилу карточки: снятое модератором видно,
+   * пока человек записан или ждёт решения, а после отказа или отмены его в ответе нет.
+   */
+  async feedItemsFor(
+    actor: Actor,
+    participations: Map<string, ParticipationStatus>,
+  ): Promise<Map<string, EventFeedItem>> {
+    const ids = [...participations.keys()];
+    if (ids.length === 0) return new Map();
+    const now = this.clock.now();
+    const [events, confirmed] = await Promise.all([
+      this.events.findCards(ids),
+      this.events.confirmedCounts(ids),
+    ]);
+    return new Map(
+      events
+        .filter((event) => canViewEvent(actor, event, participations.get(event.id) ?? null).allowed)
+        .map((event) => [event.id, feedItem(event, now, confirmed.get(event.id) ?? 0)]),
+    );
   }
 
   /**

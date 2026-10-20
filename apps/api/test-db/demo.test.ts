@@ -286,6 +286,17 @@ describe('частота сброса', () => {
     now -= 3_600_000;
     expect((await request(app.getHttpServer()).post('/demo/reset')).status).toBe(200);
   });
+
+  it('сброс упал — 500, повтор сразу проходит: интервал считается от успешного сброса', async () => {
+    app = await startWithInterval(10, () => realNow);
+    vi.spyOn(app.get(DemoService), 'reset').mockRejectedValueOnce(new Error('база недоступна'));
+    const failed = await request(app.getHttpServer()).post('/demo/reset');
+    expect(failed.status).toBe(500);
+    const retry = await request(app.getHttpServer()).post('/demo/reset');
+    expect(retry.status).toBe(200);
+    // После успешного — снова интервал
+    expect((await request(app.getHttpServer()).post('/demo/reset')).status).toBe(429);
+  });
 });
 
 describe('вне DEMO_MODE', () => {

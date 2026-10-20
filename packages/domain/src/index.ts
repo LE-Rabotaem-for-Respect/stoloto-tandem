@@ -4,6 +4,12 @@ export type { Action, ActionCode } from './actions';
 export { ERROR_CODES, ERROR_HTTP_STATUS, ERROR_MESSAGES, errorMessage } from './errors';
 export type { ErrorCode } from './errors';
 export { EVENT_DISPLAY_STATUSES, displayStatus } from './display-status';
+export {
+  PARTICIPATION_GROUPS,
+  PARTICIPATION_GROUP_TITLES,
+  participationGroup,
+} from './my-participations';
+export type { ParticipationGroup } from './my-participations';
 export type { DisplayStatusEvent, EventDisplayStatus } from './display-status';
 export {
   EVENT_STATUS_VIEW,
@@ -54,6 +60,7 @@ export { EVENT_LEVELS, EVENT_LEVEL_TITLES } from './event-levels';
 export type { EventLevel } from './event-levels';
 export {
   MULTI_LINE_TEXT,
+  PLAIN_TEXT,
   SINGLE_LINE_TEXT,
   VISIBLE_TEXT,
   cleanSingleLine,

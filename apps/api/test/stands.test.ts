@@ -1,5 +1,7 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { delimiter, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadStandConfig } from '../src/core/config';
 import { loadAuthConfig } from '../src/modules/auth/auth-config';
@@ -24,6 +26,10 @@ const stands = readdirSync(standsDir)
 describe('стенды stand-1…3 (stands/*.env)', () => {
   it('три стенда', () => {
     expect(stands.map((stand) => stand.name)).toEqual(['stand-1', 'stand-2', 'stand-3']);
+  });
+
+  it.each(stands)('$name: интервал сброса задан в файле стенда — 10 секунд', ({ env }) => {
+    expect(env.DEMO_RESET_INTERVAL_SECONDS).toBe('10');
   });
 
   it.each(stands)(
@@ -63,5 +69,39 @@ describe('стенды stand-1…3 (stands/*.env)', () => {
       ({ env }) => loadAuthConfig({ ...env, SESSION_SECRET: secret }).cookieName,
     );
     expect(new Set(names).size).toBe(stands.length);
+  });
+});
+
+describe('scripts/stands.sh', () => {
+  // Вместо docker — скрипт, который печатает аргументы и переменные стенда из окружения
+  function run(env: Record<string, string>): string {
+    const bin = mkdtempSync(join(tmpdir(), 'stands-'));
+    try {
+      const docker = join(bin, 'docker');
+      writeFileSync(
+        docker,
+        [
+          '#!/bin/sh',
+          'printf "arg %s\\n" "$@"',
+          'env | grep -E "^(STAND_ID|DEMO_)" || true',
+          '',
+        ].join('\n'),
+      );
+      chmodSync(docker, 0o755);
+      return execFileSync('sh', [resolve(standsDir, '../scripts/stands.sh'), 'ps', 'stand-1'], {
+        env: { ...process.env, ...env, PATH: `${bin}${delimiter}${process.env.PATH ?? ''}` },
+        encoding: 'utf8',
+      });
+    } finally {
+      rmSync(bin, { recursive: true, force: true });
+    }
+  }
+
+  it('переменные стенда из shell не доходят до compose: значения — из stands/<стенд>.env', () => {
+    const output = run({ DEMO_RESET_INTERVAL_SECONDS: '0', STAND_ID: 'чужой', DEMO_MODE: 'false' });
+    expect(output.split(/\r?\n/)).toEqual(
+      expect.arrayContaining(['arg --env-file', 'arg stands/stand-1.env', 'arg ps']),
+    );
+    expect(output).not.toMatch(/^(STAND_ID|DEMO_MODE|DEMO_RESET_INTERVAL_SECONDS)=/m);
   });
 });

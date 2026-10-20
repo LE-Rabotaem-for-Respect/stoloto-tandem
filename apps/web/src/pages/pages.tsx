@@ -9,6 +9,7 @@ import {
   useMe,
 } from '../features/auth';
 import { NotificationCenter } from '../features/notifications';
+import { MyParticipations } from '../features/participations';
 
 function useReturnAfterSignIn() {
   const [params] = useSearchParams();
@@ -89,7 +90,10 @@ export const EventPage = () => (
 
 export const MyParticipationsPage = () => (
   <RequireAuth>
-    <Section title="Мои записи" text="Здесь будут ваши записи и заявки." />
+    <div className="page">
+      <h1>Мои записи</h1>
+      <MyParticipations />
+    </div>
   </RequireAuth>
 );
 
