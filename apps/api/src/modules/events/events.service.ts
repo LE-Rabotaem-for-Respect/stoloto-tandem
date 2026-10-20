@@ -56,6 +56,8 @@ export interface EventCard {
   displayStatus: EventDisplayStatus;
   /** Запись текущего пользователя; `null` — записи нет или вошёл не пользователь. */
   participation: ParticipationStatus | null;
+  /** Причина отказа по своей отклонённой заявке, если организатор её указал; остальным — `null`. */
+  participationReason: string | null;
   /** Только подтверждённым участникам, организатору и администратору; остальным — `null`. */
   participantInfo: string | null;
   actions: Action[];
@@ -214,14 +216,21 @@ export class EventsService {
   async viewable(
     actor: Actor,
     id: string,
-  ): Promise<{ event: EventWithCard; participation: ParticipationStatus | null }> {
+  ): Promise<{
+    event: EventWithCard;
+    participation: ParticipationStatus | null;
+    participationReason: string | null;
+  }> {
     const event = isUUID(id) ? await this.events.findCard(id) : null;
     if (!event) throw new ApiError('event_not_available');
-    const participation =
+    const own =
       actor.role === 'user' ? await this.events.viewerParticipation(id, actor.userId) : null;
+    const participation = own?.status ?? null;
     const view = canViewEvent(actor, event, participation);
     if (!view.allowed) throw new ApiError(view.code);
-    return { event, participation };
+    // Запись — своя: причину отказа видит только тот, кому отказали
+    const participationReason = own?.status === 'rejected' ? own.decisionReason : null;
+    return { event, participation, participationReason };
   }
 
   /**
@@ -230,7 +239,7 @@ export class EventsService {
    * Недоступное этому пользователю и несуществующее — одинаково «Мероприятие недоступно».
    */
   async card(actor: Actor, id: string): Promise<EventCard> {
-    const { event, participation } = await this.viewable(actor, id);
+    const { event, participation, participationReason } = await this.viewable(actor, id);
 
     const now = this.clock.now();
     const confirmedCount = await this.events.confirmedCount(id);
@@ -256,6 +265,7 @@ export class EventsService {
       statusReason: event.statusReason,
       displayStatus: displayStatus(event, now, confirmedCount),
       participation,
+      participationReason,
       participantInfo: seesInfo ? event.participantInfo : null,
       actions: eventActions(actor, { ...event, hasSeats }, participation, now),
     };
