@@ -2,6 +2,7 @@ import type { ErrorCode } from '@tandem/domain';
 import { describe, expect, it } from 'vitest';
 import {
   canCreateEvent,
+  canDecideParticipation,
   canEditOrganization,
   canEditMessage,
   canJoin,
@@ -11,7 +12,9 @@ import {
   canPostMessage,
   canSeeParticipantInfo,
   canViewEvent,
+  canViewParticipants,
   eventActions,
+  participationActions,
 } from '../src/core/policies';
 import type { Actor, Decision, PolicyEvent } from '../src/core/policies';
 
@@ -174,6 +177,41 @@ describe('policies по таблице ТЗ 4.4', () => {
     });
   });
 
+  describe('смотреть участников и заявки события', () => {
+    it('организатор и администратор — да, гость — после входа', () => {
+      expect(canViewParticipants(author, userEvent)).toEqual(yes);
+      expect(canViewParticipants(orgApproved, orgEvent)).toEqual(yes);
+      expect(canViewParticipants(admin, userEvent)).toEqual(yes);
+      expect(canViewParticipants(guest, userEvent)).toEqual(loginFirst);
+    });
+    it('участник и другая организация — нет', () => {
+      expect(canViewParticipants(user, userEvent)).toEqual(no('not_event_organizer'));
+      expect(canViewParticipants(orgPending, orgEvent)).toEqual(no('not_event_organizer'));
+    });
+  });
+
+  describe('решение по заявке', () => {
+    it('только организатор, у опубликованного и не завершившегося', () => {
+      expect(canDecideParticipation(author, userEvent, now)).toEqual(yes);
+      expect(canDecideParticipation(orgApproved, orgEvent, now)).toEqual(yes);
+    });
+    it('у администратора этого действия нет (ТЗ 2.4)', () => {
+      expect(canDecideParticipation(admin, userEvent, now)).toEqual(no('not_event_organizer'));
+      expect(canDecideParticipation(user, userEvent, now)).toEqual(no('not_event_organizer'));
+      expect(canDecideParticipation(guest, userEvent, now)).toEqual(loginFirst);
+    });
+    it('снятое, отменённое, удалённое и завершившееся — нельзя', () => {
+      for (const status of ['unpublished', 'cancelled', 'deleted'] as const) {
+        expect(canDecideParticipation(author, { ...userEvent, status }, now), status).toEqual(
+          no('event_not_joinable'),
+        );
+      }
+      expect(canDecideParticipation(author, userEvent, userEvent.endsAt)).toEqual(
+        no('event_not_joinable'),
+      );
+    });
+  });
+
   describe('писать в обсуждение', () => {
     it('гость — после входа', () => {
       expect(canPostMessage(guest, userEvent)).toEqual(loginFirst);
@@ -312,5 +350,47 @@ describe('actions[]: пример для карточки события', () =>
         }
       }
     }
+  });
+});
+
+describe('actions[]: заявка в «Участниках и заявках»', () => {
+  const item = (
+    actor: Actor,
+    status: Parameters<typeof participationActions>[2],
+    hasSeats = true,
+  ) => participationActions(actor, { ...userEvent, mode: 'approval', hasSeats }, status, now);
+
+  it('организатору у заявки — принять и отклонить', () => {
+    expect(item(author, 'pending')).toEqual([
+      { code: 'accept_participation', enabled: true },
+      { code: 'reject_participation', enabled: true },
+    ]);
+  });
+
+  it('мест нет — «Принять» неактивно с подсказкой из ТЗ 2.4', () => {
+    expect(item(author, 'pending', false)[0]).toEqual({
+      code: 'accept_participation',
+      enabled: false,
+      reason: 'Мест нет: увеличьте лимит или дождитесь отмены',
+    });
+  });
+
+  it('у администратора и чужих действий нет, у рассмотренных записей — тоже', () => {
+    expect(item(admin, 'pending')).toEqual([]);
+    expect(item(user, 'pending')).toEqual([]);
+    for (const status of ['confirmed', 'rejected', 'cancelled', 'waitlist'] as const) {
+      expect(item(author, status), status).toEqual([]);
+    }
+  });
+
+  it('у завершившегося мероприятия — неактивны с причиной', () => {
+    const finished = participationActions(
+      author,
+      { ...userEvent, mode: 'approval', hasSeats: true },
+      'pending',
+      userEvent.endsAt,
+    );
+    expect(finished.map((action) => action.enabled)).toEqual([false, false]);
+    expect(finished[0]?.reason).toBe('Мероприятие недоступно для записи');
   });
 });

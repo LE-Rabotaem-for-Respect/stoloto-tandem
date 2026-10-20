@@ -27,7 +27,13 @@ export interface DomainEventPayloads {
     via: 'join' | 'accept';
   };
   ParticipationWaitlisted: { participationId: string; eventId: string; userId: string };
-  ParticipationRejected: { participationId: string; eventId: string; userId: string };
+  /** `reason` — причина отказа, если организатор её указал: её показывает уведомление. */
+  ParticipationRejected: {
+    participationId: string;
+    eventId: string;
+    userId: string;
+    reason: string | null;
+  };
   ParticipationCancelled: { participationId: string; eventId: string; userId: string };
   ParticipationPromotedFromWaitlist: { participationId: string; eventId: string; userId: string };
   MessagePosted: { messageId: string; eventId: string; authorId: string };
