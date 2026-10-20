@@ -13,6 +13,7 @@ import {
   useAdminOrganizations,
   useAdminOverview,
   useDiscussion,
+  useModerateMessage,
   useOrganizationDecision,
 } from './api';
 import type { AdminEvent, AdminHiddenMessage, AdminOrganization, AdminSearch, Page } from './api';
@@ -411,6 +412,92 @@ function Organizations() {
   );
 }
 
+const MODERATION = {
+  hide: { code: 'hide_message', label: 'Скрыть', done: 'Сообщение скрыто' },
+  delete: { code: 'delete_message', label: 'Удалить', done: 'Сообщение удалено' },
+} as const;
+type ModerationAction = keyof typeof MODERATION;
+
+/**
+ * «Скрыть» и «Удалить» сообщение с причиной (ТЗ 2.7, 2.10): кнопки — по `actions[]` из api,
+ * причина обязательна, удалённое не восстанавливается — об этом сказано до подтверждения.
+ */
+function ModerateMessage({
+  eventId,
+  messageId,
+  codes,
+}: {
+  eventId: string;
+  messageId: string;
+  codes: readonly string[];
+}) {
+  const id = useId();
+  const moderate = useModerateMessage();
+  const [action, setAction] = useState<ModerationAction | null>(null);
+  const [reason, setReason] = useState('');
+  const available = (Object.keys(MODERATION) as ModerationAction[]).filter((key) =>
+    codes.includes(MODERATION[key].code),
+  );
+  if (available.length === 0) return null;
+  const error = moderate.error instanceof ApiRequestError ? moderate.error : null;
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!action) return;
+    moderate.mutate(
+      { eventId, messageId, action, reason },
+      {
+        onSuccess: () => {
+          setAction(null);
+          setReason('');
+        },
+      },
+    );
+  };
+
+  if (!action) {
+    return (
+      <div className="admin-moderation">
+        {available.map((key) => (
+          <button key={key} className="button" type="button" onClick={() => setAction(key)}>
+            {MODERATION[key].label}
+          </button>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <form className="admin-moderation-form" onSubmit={submit} noValidate>
+      <div className="field">
+        <label htmlFor={`${id}-reason`}>
+          Причина — {action === 'hide' ? 'её увидит автор' : 'удаление не отменить'}
+        </label>
+        <textarea
+          id={`${id}-reason`}
+          rows={2}
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          aria-invalid={error?.fields.reason ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+        />
+      </div>
+      {error && (
+        <p className="form-error" role="alert" id={`${id}-error`}>
+          {error.fields.reason ?? error.message}
+        </p>
+      )}
+      <div className="admin-moderation">
+        <button className="button button-primary" type="submit" disabled={moderate.isPending}>
+          {MODERATION[action].label}
+        </button>
+        <button className="button" type="button" onClick={() => setAction(null)}>
+          Отмена
+        </button>
+      </div>
+    </form>
+  );
+}
+
 /** Обсуждение мероприятия прямо в строке: экран карточки делается отдельно. */
 function Discussion({ eventId }: { eventId: string }) {
   const [open, setOpen] = useState(false);
@@ -439,12 +526,22 @@ function Discussion({ eventId }: { eventId: string }) {
                     <strong>{thread.author.name}</strong>
                     {thread.isOrganizer && ' (организатор)'}: {thread.text ?? thread.placeholder}
                   </p>
+                  <ModerateMessage
+                    eventId={eventId}
+                    messageId={thread.id}
+                    codes={thread.actions.map((action) => action.code)}
+                  />
                   {thread.replies.length > 0 && (
                     <ul>
                       {thread.replies.map((reply) => (
                         <li key={reply.id}>
                           <strong>{reply.author.name}</strong>
                           {reply.isOrganizer && ' (организатор)'}: {reply.text ?? reply.placeholder}
+                          <ModerateMessage
+                            eventId={eventId}
+                            messageId={reply.id}
+                            codes={reply.actions.map((action) => action.code)}
+                          />
                         </li>
                       ))}
                     </ul>
@@ -570,6 +667,11 @@ function HiddenMessageRow({ message }: { message: AdminHiddenMessage }) {
         )}
       </dl>
       <blockquote className="admin-quote">{message.text}</blockquote>
+      <ModerateMessage
+        eventId={message.eventId}
+        messageId={message.id}
+        codes={message.actions.map((action) => action.code)}
+      />
     </li>
   );
 }

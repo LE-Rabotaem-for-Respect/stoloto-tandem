@@ -8,7 +8,7 @@ import { EventBus, domainEvent } from '../../core/event-bus';
 import { canEditMessage, canModerate, canPostMessage, toAction } from '../../core/policies';
 import type { Actor, PolicyEvent } from '../../core/policies';
 import { EventsService } from '../events/events.service';
-import type { CreateMessageDto, EditMessageDto } from './messages.dto';
+import type { CreateMessageDto, EditMessageDto, ModerateMessageDto } from './messages.dto';
 import { MessagesRepository } from './messages.repository';
 import type { MessageRecord } from './messages.repository';
 
@@ -43,6 +43,8 @@ export interface AdminMessageItem {
   text: string;
   moderationReason: string | null;
   createdAt: Date;
+  /** Что администратор может сделать дальше: скрытое — только удалить. */
+  actions: Action[];
 }
 
 export interface ThreadView extends MessageView {
@@ -56,6 +58,20 @@ function isFromOrganizer(
 ): boolean {
   if (event.organizerOrgId) return message.asOrganizationId === event.organizerOrgId;
   return message.asOrganizationId === null && message.authorUserId === event.organizerUserId;
+}
+
+// Администратору — «Скрыть» видимое и «Удалить» видимое или скрытое (автомат сообщения);
+// удалённое не восстанавливается
+function moderationActions(actor: Actor, status: MessageStatus): Action[] {
+  if (!canModerate(actor).allowed) return [];
+  const actions: Action[] = [];
+  if (messageMachine.canTransition(status, 'hide', { reason: 'в форме' })) {
+    actions.push({ code: 'hide_message', enabled: true });
+  }
+  if (messageMachine.canTransition(status, 'delete_by_moderator', { reason: 'в форме' })) {
+    actions.push({ code: 'delete_message', enabled: true });
+  }
+  return actions;
 }
 
 /**
@@ -98,6 +114,7 @@ export class MessagesService {
         text: message.text,
         moderationReason: message.moderationReason,
         createdAt: message.createdAt,
+        actions: moderationActions(actor, message.status),
       })),
       total,
       ...page,
@@ -237,6 +254,58 @@ export class MessagesService {
     return this.view(actor, event, updated);
   }
 
+  /**
+   * Модерация (ТЗ 2.7, 2.10): «Скрыть» — заглушка «Скрыто модератором», автор видит
+   * причину; «Удалить» — заглушка «Удалено модератором», без восстановления. Мероприятие и
+   * остальное обсуждение, в том числе ответы, сохраняются. Переход — по автомату сообщения.
+   */
+  async moderate(
+    actor: Actor,
+    eventId: string,
+    messageId: string,
+    dto: ModerateMessageDto,
+  ): Promise<MessageView> {
+    const decision = canModerate(actor);
+    if (!decision.allowed) throw new ApiError(decision.code);
+    const event = await this.visibleEvent(actor, eventId);
+    const message = isUUID(messageId) ? await this.messages.find(messageId) : null;
+    if (!message || message.eventId !== event.id) throw new ApiError('not_found');
+    const status = messageMachine.nextState(
+      message.status,
+      dto.action === 'hide' ? 'hide' : 'delete_by_moderator',
+      { reason: dto.reason },
+    );
+    const now = this.clock.now();
+    const actorId = actor.role === 'guest' ? null : actor.userId;
+    const updated = await this.bus.afterCommit(async (emit) => {
+      const result = await this.messages.update(message.id, message.status, {
+        status,
+        moderationReason: dto.reason,
+      });
+      if (!result) throw new ApiError('conflict');
+      emit(
+        dto.action === 'hide'
+          ? domainEvent('MessageHidden', {
+              messageId: message.id,
+              eventId: event.id,
+              reason: dto.reason,
+              actorId,
+              occurredAt: now,
+            })
+          : domainEvent('MessageDeleted', {
+              messageId: message.id,
+              eventId: event.id,
+              by: 'moderator',
+              reason: dto.reason,
+              actorId,
+              occurredAt: now,
+            }),
+      );
+      return result;
+    });
+    return this.view(actor, event, updated);
+  }
+
   // Обсуждение видят те же, кому видна карточка: правило одно — в EventsService (ТЗ 2.10)
   private async visibleEvent(actor: Actor, eventId: string): Promise<DiscussionEvent> {
     return (await this.events.viewable(actor, eventId)).event;
@@ -272,7 +341,9 @@ export class MessagesService {
       createdAt: message.createdAt,
       editedAt: visible ? message.editedAt : null,
       edited: visible && message.editedAt !== null,
-      actions: ownActions ? [toAction('edit_message', edit), toAction('delete_message', edit)] : [],
+      actions: ownActions
+        ? [toAction('edit_message', edit), toAction('delete_message', edit)]
+        : moderationActions(actor, message.status),
     };
   }
 }
