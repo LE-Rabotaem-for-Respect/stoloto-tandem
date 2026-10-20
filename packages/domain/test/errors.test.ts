@@ -53,6 +53,10 @@ describe('errors: закрытый список кодов ошибок API', ()
     expect(errorMessage('event_not_joinable')).toBe('Мероприятие недоступно для записи');
     expect(errorMessage('unauthorized')).toBe('Войдите, чтобы продолжить');
   });
+
+  it('отклонённая заявка — причина неактивной «Подать заявку» как в docs/scenarios.md, сценарий 4', () => {
+    expect(errorMessage('rejected_final')).toBe('Заявка отклонена, подать её повторно нельзя');
+  });
 });
 
 describe('actions: закрытый список действий для actions[]', () => {
