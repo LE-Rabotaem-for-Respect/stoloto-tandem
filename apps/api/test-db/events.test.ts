@@ -477,6 +477,29 @@ describe('GET /events/:id', () => {
     expect(missing.headers['cache-control']).toBe('no-store');
   });
 
+  it('главная кнопка по статусу записи: «Отменить запись» или «Записаться»', async () => {
+    const id = (await post(igor, validEvent())).body.id as string;
+    const expected = {
+      pending: { code: 'leave', enabled: true },
+      confirmed: { code: 'leave', enabled: true },
+      waitlist: { code: 'leave', enabled: true },
+      cancelled: { code: 'join', enabled: true },
+      rejected: { code: 'join', enabled: false, reason: expect.stringMatching(/После отказа/) },
+    } as const;
+    for (const [status, action] of Object.entries(expected)) {
+      const viewer = await account('user');
+      await participation(id, viewer.id, status as keyof typeof expected);
+      const response = await get(viewer, id);
+      expect(response.status, status).toBe(200);
+      const codes = (response.body.actions as { code: string }[]).map((item) => item.code);
+      expect(response.body.actions[0], status).toEqual(action);
+      expect(
+        codes.filter((code) => code === 'join' || code === 'leave'),
+        status,
+      ).toHaveLength(1);
+    }
+  });
+
   it('гость видит опубликованное мероприятие, запись предлагает после входа', async () => {
     const response = await get(null, eventId);
     expect(response.status).toBe(200);

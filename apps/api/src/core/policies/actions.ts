@@ -9,6 +9,7 @@ import type {
 import {
   canDecideParticipation,
   canJoin,
+  canLeave,
   canManageEvent,
   canModerate,
   canPostMessage,
@@ -53,9 +54,13 @@ export function eventActions(
   participation: ViewerParticipation,
   now: Date,
 ): Action[] {
-  const join = canJoin(actor, event, now);
   const actions: Action[] = [];
-  if (join.allowed) {
+  // Записавшемуся главная кнопка — «Отменить запись», а не неактивная «Записаться» (ТЗ 2.2)
+  const cancel = participationMachine.check(participation, 'cancel', event);
+  const join = canJoin(actor, event, now);
+  if (cancel.ok) {
+    actions.push(toAction('leave', canLeave(actor, event, now)));
+  } else if (join.allowed) {
     const check = participationMachine.check(participation, 'join', event);
     actions.push(check.ok ? toAction('join', join) : disabled('join', check.error.message));
   } else {
