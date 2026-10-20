@@ -1,6 +1,5 @@
-import { SPORT_CATEGORIES } from '@tandem/domain';
-import type { SportCategory } from '@tandem/domain';
-import type { EventLevel } from '../../shared/ui';
+import { EVENT_LEVELS, SPORT_CATEGORIES } from '@tandem/domain';
+import type { EventLevel, SportCategory } from '@tandem/domain';
 
 export const FEED_DATES = ['today', 'tomorrow', 'weekend'] as const;
 export type FeedDate = (typeof FEED_DATES)[number];
@@ -11,7 +10,6 @@ export const FEED_DATE_TITLES: Record<FeedDate, string> = {
   weekend: 'Выходные',
 };
 
-const LEVELS: readonly EventLevel[] = ['beginner', 'amateur', 'advanced', 'any'];
 const MODES = ['free', 'approval'] as const;
 
 /** Фильтры ленты (ТЗ 2.8): живут в адресе страницы — ссылкой можно поделиться. */
@@ -36,7 +34,7 @@ export function readFilters(params: URLSearchParams): FeedFilters {
     date: oneOf(FEED_DATES, params.get('date')),
     city: params.get('city') ?? '',
     area: params.get('area') ?? '',
-    level: oneOf(LEVELS, params.get('level')),
+    level: oneOf(EVENT_LEVELS, params.get('level')),
     mode: oneOf(MODES, params.get('mode')),
   };
 }

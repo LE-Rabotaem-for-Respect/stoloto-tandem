@@ -1,4 +1,9 @@
-import { SPORT_CATEGORIES, SPORT_CATEGORY_TITLES } from '@tandem/domain';
+import {
+  EVENT_LEVELS,
+  EVENT_LEVEL_TITLES,
+  SPORT_CATEGORIES,
+  SPORT_CATEGORY_TITLES,
+} from '@tandem/domain';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -7,7 +12,6 @@ import { useClock } from '../../shared/clock';
 import { coverUrl } from '../../shared/illustrations';
 import { useTheme } from '../../shared/theme';
 import { EmptyState, EventDate, ModeBadge } from '../../shared/ui';
-import type { EventLevel } from '../../shared/ui';
 import { useFeed } from './api';
 import type { FeedItem } from './api';
 import {
@@ -19,12 +23,7 @@ import {
 } from './filters';
 import type { FeedFilters } from './filters';
 
-const LEVEL_OPTIONS: { value: EventLevel; label: string }[] = [
-  { value: 'beginner', label: 'Новичок' },
-  { value: 'amateur', label: 'Любитель' },
-  { value: 'advanced', label: 'Опытный' },
-  { value: 'any', label: 'Любой уровень' },
-];
+const LEVEL_OPTIONS = EVENT_LEVELS.map((value) => ({ value, label: EVENT_LEVEL_TITLES[value] }));
 
 /**
  * Карточка в ленте (ТЗ 2.11): не больше 5 элементов — обложка направления, название,

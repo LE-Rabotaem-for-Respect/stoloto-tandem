@@ -1,7 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import type { EventDisplayStatus, SportCategory } from '@tandem/domain';
+import type { EventDisplayStatus, EventLevel, SportCategory } from '@tandem/domain';
 import { apiRequest } from '../../shared/api';
-import type { EventLevel } from '../../shared/ui';
 import { filterParams } from './filters';
 import type { FeedFilters } from './filters';
 
