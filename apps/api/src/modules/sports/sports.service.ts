@@ -38,6 +38,7 @@ export interface AdminSport extends SportItem {
 
 const DEFAULT_LIMIT = 10;
 const NOT_FOUND = 'Направление не найдено';
+const ALREADY_HIDDEN = 'Направление уже объединено или скрыто — обновите список';
 
 const toItem = ({ id, name, category, isCustom }: SportItem): SportItem => ({
   id,
@@ -132,26 +133,32 @@ export class SportsService {
    * Имя другого направления занять нельзя — такие дубли объединяют.
    */
   async rename(id: string, input: string): Promise<AdminSport> {
-    const sport = await this.existing(id);
     const { name, normalizedName } = validName(input, 'name');
-    const owner = await this.sports.findByName(normalizedName);
-    if (owner && owner.id !== id) {
-      throw new ApiError('validation_failed', {
-        name: `Такое направление уже есть: «${owner.name}». Объедините с ним`,
-      });
-    }
-    const changed = await this.sports.update(id, {
-      name,
-      normalizedName,
-      aliases: unique([...sport.aliases, sport.normalizedName], normalizedName),
+    return this.locked(id, async (sport, tx) => {
+      const owner = await this.sports.findByName(normalizedName, tx);
+      if (owner && owner.id !== id) {
+        throw new ApiError('validation_failed', {
+          name: `Такое направление уже есть: «${owner.name}». Объедините с ним`,
+        });
+      }
+      const changed = await this.sports.update(
+        id,
+        {
+          name,
+          normalizedName,
+          aliases: unique([...sport.aliases, sport.normalizedName], normalizedName),
+        },
+        tx,
+      );
+      return toAdminSport(changed);
     });
-    return toAdminSport(changed);
   }
 
   /** Пользовательское — в основной список, в выбранную группу (ТЗ 2.3). */
   async promote(id: string, category: SportCategory): Promise<AdminSport> {
-    await this.existing(id);
-    return toAdminSport(await this.sports.update(id, { isCustom: false, category }));
+    return this.locked(id, async (_sport, tx) =>
+      toAdminSport(await this.sports.update(id, { isCustom: false, category }, tx)),
+    );
   }
 
   /**
@@ -159,8 +166,9 @@ export class SportsService {
    * остаются и показываются в группе «Другое» (ТЗ 2.3).
    */
   async hide(id: string): Promise<AdminSport> {
-    await this.existing(id);
-    return toAdminSport(await this.sports.update(id, { status: 'hidden' }));
+    return this.locked(id, async (_sport, tx) =>
+      toAdminSport(await this.sports.update(id, { status: 'hidden' }, tx)),
+    );
   }
 
   /**
@@ -183,6 +191,11 @@ export class SportsService {
       const target = locked.find((sport) => sport.id === targetId);
       if (!source) throw new ApiError('not_found', undefined, NOT_FOUND);
       if (!target) throw new ApiError('validation_failed', { targetId: NOT_FOUND });
+      // Источник мог объединить или скрыть запрос, который держал блокировку раньше:
+      // его имена уже стали алиасами другого направления
+      if (source.status !== 'active') {
+        throw new ApiError('conflict', undefined, ALREADY_HIDDEN);
+      }
       if (target.status !== 'active') {
         throw new ApiError('validation_failed', {
           targetId: 'Скрытое направление не может принять дубль',
@@ -206,9 +219,15 @@ export class SportsService {
     });
   }
 
-  private async existing(id: string): Promise<Sport> {
-    const sport = await this.sports.findById(id);
-    if (!sport) throw new ApiError('not_found', undefined, NOT_FOUND);
-    return sport;
+  /**
+   * Изменение одного направления под блокировкой строки: строка читается заново, поэтому
+   * одновременное объединение или переименование не теряет записанные им алиасы.
+   */
+  private locked<T>(id: string, work: (sport: Sport, tx: Db) => Promise<T>): Promise<T> {
+    return this.sports.transaction(async (tx) => {
+      const [sport] = await this.sports.lock([id], tx);
+      if (!sport) throw new ApiError('not_found', undefined, NOT_FOUND);
+      return work(sport, tx);
+    });
   }
 }

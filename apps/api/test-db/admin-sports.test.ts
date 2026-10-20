@@ -366,3 +366,86 @@ describe('основной список и скрытие', () => {
     expect(card.body.sport).toMatchObject({ name: 'Другое', category: 'other' });
   });
 });
+
+describe('одновременные изменения каталога', () => {
+  const merge = (cookie: string, id: string, targetId: string) =>
+    http().post(`/admin/sports/${id}/merge`).set('Cookie', cookie).send({ targetId });
+
+  it('уже объединённый дубль второй раз не объединяется — 409, алиас у одного направления', async () => {
+    const cookie = await admin();
+    const source = await sport('Пинг-понг');
+    const first = await sport('Настольный теннис');
+    const second = await sport('Теннис за столом');
+
+    expect((await merge(cookie, source.id, first.id)).status).toBe(200);
+    const again = await merge(cookie, source.id, second.id);
+    expect(again.status).toBe(409);
+    expect(again.body.message).toBe('Направление уже объединено или скрыто — обновите список');
+    const untouched = await prisma.sport.findUniqueOrThrow({ where: { id: second.id } });
+    expect(untouched.aliases).toEqual([]);
+  });
+
+  it('объединения A→B и A→C одновременно: проходит одно, имя A ведёт к одному направлению', async () => {
+    const cookie = await admin();
+    for (let round = 0; round < 5; round += 1) {
+      const source = await sport(`Дубль ${round}`);
+      const left = await sport(`Цель левая ${round}`);
+      const right = await sport(`Цель правая ${round}`);
+
+      const statuses = (
+        await Promise.all([merge(cookie, source.id, left.id), merge(cookie, source.id, right.id)])
+      )
+        .map((response) => response.status)
+        .sort();
+      expect(statuses).toEqual([200, 409]);
+
+      const owners = await prisma.sport.findMany({
+        where: { status: 'active', aliases: { has: source.normalizedName } },
+      });
+      expect(owners).toHaveLength(1);
+      const suggestions = await http().get('/sports').query({ q: source.normalizedName });
+      expect(suggestions.body.exactMatch).toBe(true);
+      expect(suggestions.body.items).toHaveLength(1);
+    }
+  });
+
+  it('переименование цели во время объединения не теряет алиас дубля', async () => {
+    const cookie = await admin();
+    for (let round = 0; round < 5; round += 1) {
+      const source = await sport(`Скандинавская ходьба ${round}`);
+      const target = await sport(`Северная ходьба ${round}`);
+      const renamed = `Ходьба с палками ${round} ${tag}`;
+
+      const [merged, rename] = await Promise.all([
+        merge(cookie, source.id, target.id),
+        http()
+          .post(`/admin/sports/${target.id}/rename`)
+          .set('Cookie', cookie)
+          .send({ name: renamed }),
+      ]);
+      expect([merged.status, rename.status]).toEqual([200, 200]);
+
+      const result = await prisma.sport.findUniqueOrThrow({ where: { id: target.id } });
+      expect(result.name).toBe(renamed);
+      expect(result.aliases).toEqual(
+        expect.arrayContaining([source.normalizedName, target.normalizedName]),
+      );
+    }
+  });
+
+  it('цепочка A→B→C: имена A и B ведут к C, мероприятие A — на C', async () => {
+    const cookie = await admin();
+    const a = await sport('Бадминтон уличный');
+    const b = await sport('Бадминтон на улице');
+    const c = await sport('Бадминтон');
+    const event = await eventOn(a.id);
+
+    expect((await merge(cookie, a.id, b.id)).status).toBe(200);
+    expect((await merge(cookie, b.id, c.id)).status).toBe(200);
+
+    const result = await prisma.sport.findUniqueOrThrow({ where: { id: c.id } });
+    expect(result.aliases).toEqual(expect.arrayContaining([a.normalizedName, b.normalizedName]));
+    const moved = await prisma.event.findUniqueOrThrow({ where: { id: event.id } });
+    expect(moved.sportId).toBe(c.id);
+  });
+});

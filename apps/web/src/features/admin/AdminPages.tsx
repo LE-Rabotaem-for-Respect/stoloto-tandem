@@ -4,6 +4,7 @@ import {
   ORGANIZATION_STATUS_VIEW,
   SPORT_CATEGORIES,
   SPORT_CATEGORY_TITLES,
+  SPORT_NAME_MAX_LENGTH,
 } from '@tandem/domain';
 import type { EventStatus, OrganizationStatus, SportCategory, StatusTone } from '@tandem/domain';
 import { useId, useState } from 'react';
@@ -645,7 +646,7 @@ function MergeTarget({
         <input
           id={`${id}-q`}
           value={text}
-          maxLength={40}
+          maxLength={SPORT_NAME_MAX_LENGTH}
           onChange={(change) => setText(change.target.value)}
         />
       </div>
@@ -722,7 +723,7 @@ function SportActions({ sport }: { sport: AdminSport }) {
           <input
             id={`${id}-name`}
             value={name}
-            maxLength={40}
+            maxLength={SPORT_NAME_MAX_LENGTH}
             required
             {...invalid}
             onChange={(input) => setName(input.target.value)}

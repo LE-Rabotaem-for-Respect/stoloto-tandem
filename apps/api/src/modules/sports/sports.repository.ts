@@ -112,9 +112,14 @@ export class SportsRepository {
     return (tx ?? this.prisma).sport.findUnique({ where: { id } });
   }
 
-  /** Направления под блокировкой строк: два объединения с одним направлением идут по очереди. */
+  /**
+   * Направления под блокировкой строк до конца транзакции: изменения одного направления
+   * идут по очереди и читают его заново. Порядок блокировки — по `id` (DECISION-002),
+   * чтобы встречные объединения не ждали друг друга.
+   */
   async lock(ids: readonly string[], tx: Db): Promise<Sport[]> {
-    await tx.$queryRaw`SELECT "id" FROM "sports" WHERE "id" = ANY (${[...ids]}::uuid[]) FOR UPDATE`;
+    await tx.$queryRaw`
+      SELECT "id" FROM "sports" WHERE "id" = ANY (${[...ids]}::uuid[]) ORDER BY "id" FOR UPDATE`;
     return tx.sport.findMany({ where: { id: { in: [...ids] } } });
   }
 
