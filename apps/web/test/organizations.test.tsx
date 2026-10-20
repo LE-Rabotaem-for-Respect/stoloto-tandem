@@ -211,11 +211,17 @@ describe('своя организация: /organization', () => {
     renderApp('/organization');
 
     expect((await stepper()).getAttribute('aria-label')).toBe('Путь организации: шаг 1 из 4');
-    await user.type(screen.getByLabelText('Чем занимается организация'), 'Падел для начинающих');
-    await user.type(screen.getByLabelText('Город'), 'Красноярск');
-    await user.type(screen.getByLabelText('Контакты'), '+7 391 000-00-10');
-    await user.type(screen.getByLabelText('Представитель'), 'Ольга');
-    await user.type(screen.getByLabelText('Роль представителя'), 'Тренер');
+    // Вставкой, а не посимвольно: восемьдесят нажатий с перерисовкой формы на медленном
+    // runner'е не укладывались в 5 секунд теста; проверяется то же самое
+    const fill = async (label: string, text: string) => {
+      await user.click(screen.getByLabelText(label));
+      await user.paste(text);
+    };
+    await fill('Чем занимается организация', 'Падел для начинающих');
+    await fill('Город', 'Красноярск');
+    await fill('Контакты', '+7 391 000-00-10');
+    await fill('Представитель', 'Ольга');
+    await fill('Роль представителя', 'Тренер');
     await user.type(screen.getByLabelText('Найти направление'), 'пад');
     await user.click(await screen.findByRole('button', { name: /Добавить «Падел»/ }));
     expect(screen.getByRole('button', { name: 'Убрать «Падел»' })).toBeTruthy();
