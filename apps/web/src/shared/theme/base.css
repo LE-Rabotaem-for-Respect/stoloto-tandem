@@ -137,8 +137,10 @@ a {
 }
 
 .field input,
-.field select,
-.field textarea {
+.field textarea,
+.field select {
+  /* Поле сжимается по сетке: у даты и времени своя ширина по содержимому */
+  min-width: 0;
   min-height: var(--tap-min);
   padding: var(--space-2) var(--space-3);
   border: var(--border-width) solid var(--color-line-strong);
