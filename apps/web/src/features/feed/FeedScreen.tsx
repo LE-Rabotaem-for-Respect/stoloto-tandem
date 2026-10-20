@@ -42,7 +42,7 @@ function FeedCard({ item, now }: { item: FeedItem; now: Date }) {
           width={96}
           height={96}
         />
-        <span className="feed-card-body">
+        <div className="feed-card-body">
           <span className="feed-card-title">{item.title}</span>
           <EventDate
             startsAt={new Date(item.startsAt)}
@@ -50,11 +50,11 @@ function FeedCard({ item, now }: { item: FeedItem; now: Date }) {
             now={now}
             compact
           />
-          <span className="feed-card-meta">
+          <div className="feed-card-meta">
             <span className="feed-card-area">{item.area}</span>
             <ModeBadge mode={item.mode} />
-          </span>
-        </span>
+          </div>
+        </div>
       </Link>
     </li>
   );
@@ -71,11 +71,29 @@ function FeedFiltersForm({
   const [query, setQuery] = useState(filters.q);
   const [city, setCity] = useState(filters.city);
   const [area, setArea] = useState(filters.area);
+
+  // Адрес изменился снаружи («Назад» в браузере) — поля берут значения из него. Форма не
+  // пересоздаётся: фокус, открытые «Фильтры» и набранный текст остаются на месте
+  const [fromAddress, setFromAddress] = useState(filters);
+  if (
+    fromAddress.q !== filters.q ||
+    fromAddress.city !== filters.city ||
+    fromAddress.area !== filters.area
+  ) {
+    setFromAddress(filters);
+    setQuery(filters.q);
+    setCity(filters.city);
+    setArea(filters.area);
+  }
+
+  // Любое изменение фильтра забирает и набранный, но ещё не применённый текст
+  const apply = (patch: Partial<FeedFilters>) =>
+    onChange({ ...filters, q: query, city, area, ...patch });
   const hidden = hiddenFilterCount(filters);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    onChange({ ...filters, q: query, city, area });
+    apply({});
   };
 
   return (
@@ -104,7 +122,7 @@ function FeedFiltersForm({
               type="radio"
               name="date"
               checked={filters.date === date}
-              onChange={() => onChange({ ...filters, q: query, date })}
+              onChange={() => apply({ date })}
             />
             {date ? FEED_DATE_TITLES[date] : 'Любой день'}
           </label>
@@ -120,10 +138,7 @@ function FeedFiltersForm({
               id="feed-category"
               value={filters.category ?? ''}
               onChange={(event) =>
-                onChange({
-                  ...filters,
-                  category: SPORT_CATEGORIES.find((item) => item === event.target.value),
-                })
+                apply({ category: SPORT_CATEGORIES.find((item) => item === event.target.value) })
               }
             >
               <option value="">Все группы</option>
@@ -148,8 +163,7 @@ function FeedFiltersForm({
               id="feed-level"
               value={filters.level ?? ''}
               onChange={(event) =>
-                onChange({
-                  ...filters,
+                apply({
                   level: LEVEL_OPTIONS.find((item) => item.value === event.target.value)?.value,
                 })
               }
@@ -168,8 +182,7 @@ function FeedFiltersForm({
               id="feed-mode"
               value={filters.mode ?? ''}
               onChange={(event) =>
-                onChange({
-                  ...filters,
+                apply({
                   mode:
                     event.target.value === 'free' || event.target.value === 'approval'
                       ? event.target.value
@@ -203,12 +216,7 @@ export function FeedScreen() {
   return (
     <div className="page">
       <h1>Найти занятие</h1>
-      {/* key — чтобы поля формы взяли значения из адреса после «Назад» в браузере */}
-      <FeedFiltersForm
-        key={params.toString()}
-        filters={filters}
-        onChange={(next) => setParams(filterParams(next))}
-      />
+      <FeedFiltersForm filters={filters} onChange={(next) => setParams(filterParams(next))} />
 
       {feed.isPending && <p role="status">Загрузка…</p>}
       {feed.error && (

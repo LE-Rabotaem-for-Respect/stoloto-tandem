@@ -2,6 +2,7 @@
 
 .feed-filters {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   margin-bottom: var(--space-4);
 }
@@ -11,8 +12,11 @@
   gap: var(--space-2);
 }
 
+/* Поле поиска сжимается: без width у type=search своя ширина и при крупном
+   тексте вытолкнула бы «Найти» за край экрана */
 .feed-search input {
-  flex: 1;
+  flex: 1 1 0;
+  width: 100%;
   min-width: 0;
   min-height: var(--tap-min);
   padding: var(--space-2) var(--space-3);
@@ -64,6 +68,18 @@
 .feed-more-fields {
   display: grid;
   gap: var(--space-3);
+}
+
+.feed-more-fields input,
+.feed-more-fields select {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
 }
 
 .feed-total {

@@ -111,6 +111,9 @@ describe('лента и поиск', { timeout: 15_000 }, () => {
     expect(link.getAttribute('href')).toBe('/events/e1');
     const card = within(link);
     expect(link.querySelector('img.feed-card-cover')).not.toBeNull();
+    // Листок даты: число, месяц и день недели для чтецов, время рядом
+    card.getByText('Среда, 21 октября');
+    expect(link.querySelector('.date-leaf')).not.toBeNull();
     card.getByText('07:30–08:30');
     card.getByText('Остров Татышев');
     card.getByText('Свободно');
@@ -129,6 +132,8 @@ describe('лента и поиск', { timeout: 15_000 }, () => {
 
     await user.type(await screen.findByRole('searchbox'), 'бег{Enter}');
     await waitFor(() => expect(last()?.get('q')).toBe('бег'));
+    // Форма не пересоздаётся: фокус остаётся в поиске
+    expect(screen.getByRole('searchbox')).toBe(document.activeElement);
     await user.click(screen.getByRole('radio', { name: 'Завтра' }));
     await waitFor(() => expect(last()?.get('date')).toBe('tomorrow'));
     expect(last()?.get('q')).toBe('бег');
@@ -152,6 +157,28 @@ describe('лента и поиск', { timeout: 15_000 }, () => {
     await waitFor(() => expect(last()?.get('area')).toBe('Центральный'));
     expect(last()?.get('level')).toBe('beginner');
     screen.getByText('Фильтры · 3');
+  });
+
+  it('смена фильтра не сворачивает «Фильтры», не сбрасывает фокус и набранный текст', async () => {
+    const { last } = fakeApi();
+    const user = userEvent.setup();
+    renderFeed();
+
+    await user.click(await screen.findByText('Фильтры'));
+    const more = screen.getByText('Фильтры').closest('details');
+    await user.type(screen.getByLabelText('Город'), 'Дивногорск');
+    const mode = screen.getByLabelText('Запись');
+    await user.selectOptions(mode, 'По заявке');
+
+    await waitFor(() => expect(last()?.get('mode')).toBe('approval'));
+    expect(last()?.get('city')).toBe('Дивногорск');
+    expect((screen.getByLabelText('Город') as HTMLInputElement).value).toBe('Дивногорск');
+    expect(more?.open).toBe(true);
+    expect(mode).toBe(document.activeElement);
+
+    await user.click(screen.getByRole('radio', { name: 'Сегодня' }));
+    await waitFor(() => expect(last()?.get('date')).toBe('today'));
+    expect(screen.getByRole('radio', { name: 'Сегодня' })).toBe(document.activeElement);
   });
 
   it('фильтры из адреса: ссылкой можно поделиться', async () => {
