@@ -11,6 +11,7 @@ import {
 } from '../features/auth';
 import { EventCardScreen } from '../features/event-card';
 import { CreateEventForm } from '../features/events';
+import { FeedScreen } from '../features/feed';
 import { NotificationCenter } from '../features/notifications';
 import { MyParticipations } from '../features/participations';
 
@@ -83,9 +84,7 @@ function Section({ title, text }: { title: string; text: string }) {
   );
 }
 
-export const FeedPage = () => (
-  <Section title="Найти занятие" text="Здесь будет лента мероприятий с поиском и фильтрами." />
-);
+export const FeedPage = () => <FeedScreen />;
 
 export const EventPage = () => <EventCardScreen />;
 

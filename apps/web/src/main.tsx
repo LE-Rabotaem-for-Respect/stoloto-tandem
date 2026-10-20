@@ -7,6 +7,7 @@ import './shared/ui/conditions.css';
 import './features/navigation/layout.css';
 import './features/event-card/event-card.css';
 import './features/events/events.css';
+import './features/feed/feed.css';
 import './features/participations/participations.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
