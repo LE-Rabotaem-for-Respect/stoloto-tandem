@@ -1,6 +1,6 @@
 import { TIME_ZONE } from '@tandem/domain';
 import type { Action, ActionCode } from '@tandem/domain';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useLocation } from 'react-router';
 import { ApiRequestError } from '../../shared/api';
@@ -25,6 +25,21 @@ function errorText(error: unknown): string | undefined {
   if (!error) return undefined;
   if (!(error instanceof ApiRequestError)) return 'Не получилось. Попробуйте ещё раз';
   return error.fields.text ?? error.fields.parentId ?? error.message;
+}
+
+/**
+ * Фокус обратно на элемент, когда открытая форма или подтверждение закрылись (`open` из
+ * true в false): с клавиатуры и диктором не нужно заново искать место в карточке (как в
+ * «Сбросить демо-данные»).
+ */
+function useFocusReturn<T extends HTMLElement>(open: boolean) {
+  const ref = useRef<T>(null);
+  const wasOpen = useRef(open);
+  useEffect(() => {
+    if (wasOpen.current && !open) ref.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
+  return ref;
 }
 
 const allowed = (message: MessageView, code: ActionCode) =>
@@ -53,6 +68,7 @@ function MessageForm({
   controls,
   onSubmit,
   cancellable = true,
+  focusOnOpen = true,
 }: {
   label: string;
   submitText: string;
@@ -60,14 +76,20 @@ function MessageForm({
   controls: Controls;
   onSubmit: (text: string) => void;
   cancellable?: boolean;
+  /** Фокус в поле при появлении формы: после «Изменить», «Ответить», отправки вопроса. */
+  focusOnOpen?: boolean;
 }) {
   const [text, setText] = useState(initial);
+  const form = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (focusOnOpen) form.current?.querySelector('textarea')?.focus();
+  }, [focusOnOpen]);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSubmit(text);
   };
   return (
-    <form className="discussion-form" onSubmit={submit}>
+    <form className="discussion-form" ref={form} onSubmit={submit}>
       <TextAreaField
         label={label}
         value={text}
@@ -99,8 +121,19 @@ function Message({ message, controls }: { message: MessageView; controls: Contro
   const { open, setOpen } = controls;
   const editing = open?.kind === 'edit' && open.messageId === message.id;
   const deleting = open?.kind === 'delete' && open.messageId === message.id;
+  // После правки, удаления или отмены фокус — на сообщении, с которого начали
+  const article = useFocusReturn<HTMLElement>(editing || deleting);
+  const cancelDelete = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (deleting) cancelDelete.current?.focus();
+  }, [deleting]);
   return (
-    <article className="message" aria-label={`Сообщение: ${message.author.name}`}>
+    <article
+      className="message"
+      ref={article}
+      tabIndex={-1}
+      aria-label={`Сообщение: ${message.author.name}`}
+    >
       <p className="message-meta">
         <span className="message-author">{message.author.name}</span>
         {message.isOrganizer && <span className="message-organizer">Организатор</span>}
@@ -140,7 +173,12 @@ function Message({ message, controls }: { message: MessageView; controls: Contro
             >
               Удалить
             </button>
-            <button className="button" type="button" onClick={() => setOpen(null)}>
+            <button
+              className="button"
+              type="button"
+              ref={cancelDelete}
+              onClick={() => setOpen(null)}
+            >
               Отмена
             </button>
           </div>
@@ -152,6 +190,7 @@ function Message({ message, controls }: { message: MessageView; controls: Contro
             <button
               className="button"
               type="button"
+              disabled={controls.pending}
               onClick={() => setOpen({ kind: 'edit', messageId: message.id })}
             >
               Изменить
@@ -161,6 +200,7 @@ function Message({ message, controls }: { message: MessageView; controls: Contro
             <button
               className="button"
               type="button"
+              disabled={controls.pending}
               onClick={() => setOpen({ kind: 'delete', messageId: message.id })}
             >
               Удалить
@@ -183,6 +223,8 @@ function Thread({
   controls: Controls;
 }) {
   const replying = controls.open?.kind === 'reply' && controls.open.threadId === thread.id;
+  // После ответа или отмены фокус — снова на «Ответить»
+  const replyButton = useFocusReturn<HTMLButtonElement>(replying);
   return (
     <li className="thread">
       <Message message={thread} controls={controls} />
@@ -209,6 +251,8 @@ function Thread({
             <button
               className="button"
               type="button"
+              ref={replyButton}
+              disabled={controls.pending}
               onClick={() => controls.setOpen({ kind: 'reply', threadId: thread.id })}
             >
               Ответить
@@ -235,7 +279,9 @@ export function Discussion({ eventId, post }: { eventId: string; post: Action | 
   const controls: Controls = {
     open,
     setOpen: (next) => {
-      change.reset();
+      // Идущий запрос не сбрасывается: иначе его onSuccess не сработает и, например,
+      // отправленный вопрос останется в поле
+      if (!change.isPending) change.reset();
       setOpenState(next);
     },
     send: (body) =>
@@ -289,6 +335,8 @@ export function Discussion({ eventId, post }: { eventId: string; post: Action | 
           submitText="Отправить"
           controls={askControls}
           cancellable={false}
+          // После отправки — в очищенное поле; при первом показе фокус не забирается
+          focusOnOpen={askKey > 0}
           onSubmit={(text) => {
             setOpenState({ kind: 'ask' });
             change.mutate(

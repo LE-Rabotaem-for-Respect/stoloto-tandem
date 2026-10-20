@@ -278,6 +278,47 @@ describe('обсуждение в карточке мероприятия', () =
     expect(await discussion.findAllByText('Сообщение удалено автором')).toHaveLength(2);
   });
 
+  it('фокус: в поле формы и на «Отмена» подтверждения, после — обратно к сообщению и «Ответить»', async () => {
+    fakeApi();
+    renderCard();
+    const discussion = await section();
+    const mine = (await discussion.findByText('Можно прийти без команды?')).closest(
+      'article',
+    ) as HTMLElement;
+
+    await userEvent.click(within(mine).getByRole('button', { name: 'Изменить' }));
+    expect(document.activeElement).toBe(within(mine).getByLabelText('Изменить сообщение'));
+    await userEvent.click(within(mine).getByRole('button', { name: 'Отмена' }));
+    expect(document.activeElement).toBe(mine);
+
+    await userEvent.click(within(mine).getByRole('button', { name: 'Удалить' }));
+    expect(document.activeElement).toBe(within(mine).getByRole('button', { name: 'Отмена' }));
+    await userEvent.click(within(mine).getByRole('button', { name: 'Отмена' }));
+    expect(document.activeElement).toBe(mine);
+
+    await userEvent.click(discussion.getByRole('button', { name: 'Ответить' }));
+    expect(document.activeElement).toBe(discussion.getByLabelText('Ответ: Анна'));
+    await userEvent.click(discussion.getByRole('button', { name: 'Отмена' }));
+    expect(document.activeElement).toBe(discussion.getByRole('button', { name: 'Ответить' }));
+  });
+
+  it('после отправки вопроса фокус — в очищенном поле', async () => {
+    fakeApi();
+    renderCard();
+    const discussion = await section();
+    await userEvent.type(
+      await discussion.findByLabelText('Ваш вопрос организатору и участникам'),
+      'Есть ли раздевалка?',
+    );
+    await userEvent.click(discussion.getByRole('button', { name: 'Отправить' }));
+    expect(await discussion.findByText('Есть ли раздевалка?')).toBeTruthy();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        discussion.getByLabelText('Ваш вопрос организатору и участникам'),
+      ),
+    );
+  });
+
   it('гость читает обсуждение, а написать — через вход с возвратом к карточке', async () => {
     fakeApi({ signedIn: false });
     renderCard();
