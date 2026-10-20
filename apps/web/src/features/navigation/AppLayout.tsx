@@ -135,6 +135,34 @@ function Account() {
  * Высота прилипающей шапки — в `--app-top-height` для `scroll-padding-top`: она
  * меняется с шириной экрана, темой «Крупный текст» и длиной имени аккаунта.
  */
+/**
+ * Высота нижней панели — в `--app-nav-height`: подпись в две строки и «Крупный текст»
+ * делают её выше токена `--nav-height`. По ней прилипают к панели панель действия
+ * карточки и `scroll-padding-bottom`. От 768 px панель — верхнее меню, высота — 0.
+ */
+function useFixedNavHeight() {
+  const ref = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const nav = ref.current;
+    if (!nav) return;
+    const root = document.documentElement.style;
+    const update = () => {
+      const fixed = getComputedStyle(nav).position === 'fixed';
+      const height = fixed ? Math.ceil(nav.getBoundingClientRect().height) : 0;
+      root.setProperty('--app-nav-height', `${height}px`);
+    };
+    update();
+    window.addEventListener('resize', update);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    observer?.observe(nav);
+    return () => {
+      window.removeEventListener('resize', update);
+      observer?.disconnect();
+    };
+  }, []);
+  return ref;
+}
+
 function useStickyTopHeight() {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -156,6 +184,7 @@ export function AppLayout() {
   usePendingActionRelay();
   useThemeFromAccount();
   const top = useStickyTopHeight();
+  const nav = useFixedNavHeight();
   return (
     <div className="app">
       <a className="skip-link" href="#main">
@@ -170,7 +199,7 @@ export function AppLayout() {
           <Account />
         </header>
         <ThemeSaveError />
-        <nav className="main-nav" aria-label="Основные разделы">
+        <nav className="main-nav" aria-label="Основные разделы" ref={nav}>
           <ul>
             {NAV_ITEMS.map((item) => (
               <li key={item.to}>

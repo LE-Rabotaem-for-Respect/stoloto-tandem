@@ -9,6 +9,7 @@ import {
   safeNext,
   useMe,
 } from '../features/auth';
+import { EventCardScreen } from '../features/event-card';
 import { CreateEventForm } from '../features/events';
 import { FeedScreen } from '../features/feed';
 import { NotificationCenter } from '../features/notifications';
@@ -73,21 +74,9 @@ export function RegisterPage() {
   );
 }
 
-/** Раздел, наполнение которого появится вместе со своим модулем. */
-function Section({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="page">
-      <h1>{title}</h1>
-      <p>{text}</p>
-    </div>
-  );
-}
-
 export const FeedPage = () => <FeedScreen />;
 
-export const EventPage = () => (
-  <Section title="Мероприятие" text="Здесь будет карточка мероприятия." />
-);
+export const EventPage = () => <EventCardScreen />;
 
 export const MyParticipationsPage = () => (
   <RequireAuth>

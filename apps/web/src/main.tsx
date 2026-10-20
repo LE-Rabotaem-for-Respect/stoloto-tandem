@@ -5,6 +5,7 @@ import './shared/theme/base.css';
 import './shared/ui/graphics.css';
 import './shared/ui/conditions.css';
 import './features/navigation/layout.css';
+import './features/event-card/event-card.css';
 import './features/events/events.css';
 import './features/feed/feed.css';
 import './features/participations/participations.css';

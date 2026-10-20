@@ -614,12 +614,14 @@ describe('экран входа и прилипающая шапка', () => {
   });
 
   it('фокус не прячется под шапкой: отступ прокрутки — по её фактической высоте', async () => {
-    let notify: () => void = () => undefined;
+    // Наблюдателей несколько (шапка и нижняя панель) — уведомляем всех
+    const callbacks: (() => void)[] = [];
+    const notify = () => callbacks.forEach((callback) => callback());
     vi.stubGlobal(
       'ResizeObserver',
       class {
         constructor(callback: () => void) {
-          notify = callback;
+          callbacks.push(callback);
         }
         observe() {}
         disconnect() {}
