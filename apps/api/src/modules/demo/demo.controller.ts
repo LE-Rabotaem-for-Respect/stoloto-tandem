@@ -24,7 +24,7 @@ export class DemoController {
   @Public()
   @HttpCode(200)
   async reset() {
-    const lastResetAt = await this.demo.reset();
+    const lastResetAt = await this.demo.requestReset();
     return { lastResetAt: lastResetAt.toISOString() };
   }
 
