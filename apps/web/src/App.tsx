@@ -5,6 +5,7 @@ import {
   AdminEventsPage,
   AdminMessagesPage,
   AdminOrganizationsPage,
+  AdminSportsPage,
   AdminOverviewPage,
 } from './features/admin/AdminPages';
 import { CheckPage, ScenariosPage } from './features/check';
@@ -46,6 +47,7 @@ export function AppRoutes() {
         <Route path="admin/organizations" element={<AdminOrganizationsPage />} />
         <Route path="admin/events" element={<AdminEventsPage />} />
         <Route path="admin/messages" element={<AdminMessagesPage />} />
+        <Route path="admin/sports" element={<AdminSportsPage />} />
         <Route path="organization" element={<OrganizationPage />} />
         <Route path="organizations/:id" element={<PublicOrganizationPage />} />
         <Route path="check" element={<CheckPage />} />

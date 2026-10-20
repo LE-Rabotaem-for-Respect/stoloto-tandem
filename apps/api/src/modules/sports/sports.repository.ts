@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { SportCategory } from '@tandem/domain';
 import { escapeLike } from '../../core/prisma/like';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import type { Prisma, Sport } from '../../generated/prisma/client';
+import type { Prisma, Sport, SportStatus } from '../../generated/prisma/client';
 
 /** Клиент базы: обычный или транзакции, в которой вызван метод. */
 export type Db = Prisma.TransactionClient;
@@ -21,6 +21,13 @@ export interface NewSportRecord {
   normalizedName: string;
   category: SportCategory;
   createdById: string;
+}
+
+export interface AdminSportFilter {
+  /** Запрос, нормализованный как имена направлений. */
+  normalizedText?: string;
+  status?: SportStatus;
+  custom?: boolean;
 }
 
 @Injectable()
@@ -72,6 +79,87 @@ export class SportsRepository {
 
   findActiveById(id: string, tx?: Db): Promise<Sport | null> {
     return (tx ?? this.prisma).sport.findFirst({ where: { id, status: 'active' } });
+  }
+
+  /** Каталог для администратора: все статусы, по имени или прежнему имени, по алфавиту. */
+  async adminSearch(
+    filter: AdminSportFilter,
+    page: { offset: number; limit: number },
+  ): Promise<{ sports: Sport[]; total: number }> {
+    const where: Prisma.SportWhereInput = {
+      ...(filter.status && { status: filter.status }),
+      ...(filter.custom !== undefined && { isCustom: filter.custom }),
+      ...(filter.normalizedText && {
+        OR: [
+          { normalizedName: { contains: escapeLike(filter.normalizedText) } },
+          { aliases: { has: filter.normalizedText } },
+        ],
+      }),
+    };
+    const [sports, total] = await Promise.all([
+      this.prisma.sport.findMany({
+        where,
+        orderBy: [{ normalizedName: 'asc' }],
+        skip: page.offset,
+        take: page.limit,
+      }),
+      this.prisma.sport.count({ where }),
+    ]);
+    return { sports, total };
+  }
+
+  findById(id: string, tx?: Db): Promise<Sport | null> {
+    return (tx ?? this.prisma).sport.findUnique({ where: { id } });
+  }
+
+  /**
+   * Направления под блокировкой строк до конца транзакции: изменения одного направления
+   * идут по очереди и читают его заново. Порядок блокировки — по `id` (DECISION-002),
+   * чтобы встречные объединения не ждали друг друга.
+   */
+  async lock(ids: readonly string[], tx: Db): Promise<Sport[]> {
+    await tx.$queryRaw`
+      SELECT "id" FROM "sports" WHERE "id" = ANY (${[...ids]}::uuid[]) ORDER BY "id" FOR UPDATE`;
+    return tx.sport.findMany({ where: { id: { in: [...ids] } } });
+  }
+
+  update(id: string, data: Prisma.SportUpdateInput, tx?: Db): Promise<Sport> {
+    return (tx ?? this.prisma).sport.update({ where: { id }, data });
+  }
+
+  transaction<T>(work: (tx: Db) => Promise<T>): Promise<T> {
+    return this.prisma.$transaction(work);
+  }
+
+  /**
+   * Ссылки на направление в данных пользователя — «Мои направления», аксессуары
+   * Хелфигочи, запросы «Ищу компанию» — при объединении (DECISION-003). У этих таблиц
+   * пока нет своего модуля. Где у человека уже есть целевое, старая строка удаляется.
+   */
+  async moveUserReferences(fromId: string, toId: string, tx: Db): Promise<void> {
+    const sportUsers = await tx.userSport.findMany({
+      where: { sportId: toId },
+      select: { userId: true },
+    });
+    await tx.userSport.deleteMany({
+      where: { sportId: fromId, userId: { in: sportUsers.map((row) => row.userId) } },
+    });
+    await tx.userSport.updateMany({ where: { sportId: fromId }, data: { sportId: toId } });
+
+    const accessories = await tx.userAccessory.findMany({
+      where: { sportId: toId },
+      select: { userId: true, accessoryId: true },
+    });
+    if (accessories.length > 0) {
+      await tx.userAccessory.deleteMany({
+        where: {
+          sportId: fromId,
+          OR: accessories.map(({ userId, accessoryId }) => ({ userId, accessoryId })),
+        },
+      });
+    }
+    await tx.userAccessory.updateMany({ where: { sportId: fromId }, data: { sportId: toId } });
+    await tx.companyRequest.updateMany({ where: { sportId: fromId }, data: { sportId: toId } });
   }
 
   /**

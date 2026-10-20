@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Action, EventStatus, OrganizationStatus } from '@tandem/domain';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Action, EventStatus, OrganizationStatus, SportCategory } from '@tandem/domain';
 import { apiRequest } from '../../shared/api';
 
 export interface AdminOverview {
@@ -45,6 +45,17 @@ export interface AdminHiddenMessage {
   text: string;
   moderationReason: string | null;
   createdAt: string;
+}
+
+/** Направление каталога: прежние имена, статус и сколько на нём мероприятий. */
+export interface AdminSport {
+  id: string;
+  name: string;
+  category: SportCategory;
+  isCustom: boolean;
+  status: 'active' | 'hidden';
+  aliases: string[];
+  eventCount: number;
 }
 
 /** Сообщение обсуждения так, как его отдаёт `GET /events/:id/messages`. */
@@ -138,5 +149,56 @@ export function useOrganizationDecision() {
         body,
       }),
     onSuccess: () => client.invalidateQueries({ queryKey: ADMIN_KEY }),
+  });
+}
+
+/**
+ * Фильтр каталога в адресе — одним словом (`main`, `custom`, `hidden`), как статус у
+ * других списков; api ждёт пару «статус + пользовательское».
+ */
+const SPORT_FILTERS: Record<string, Record<string, string>> = {
+  main: { status: 'active', custom: 'false' },
+  custom: { status: 'active', custom: 'true' },
+  hidden: { status: 'hidden' },
+};
+
+export function useAdminSports(search: AdminSearch) {
+  const { status, ...rest } = search;
+  const params = { ...rest, ...(status ? SPORT_FILTERS[status] : {}) };
+  return useQuery({
+    queryKey: [...ADMIN_KEY, 'sports', search],
+    queryFn: () => apiRequest<Page<AdminSport>>(`/admin/sports${query(params)}`),
+  });
+}
+
+/** Подсказки для «Объединить с…»: только видимые направления, как в формах. */
+export function useSportSuggestions(text: string) {
+  return useQuery({
+    enabled: text.trim().length >= 2,
+    queryKey: ['sports', text],
+    queryFn: () =>
+      apiRequest<{ items: { id: string; name: string }[] }>(
+        `/sports?q=${encodeURIComponent(text)}&limit=8`,
+      ),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export type SportChange =
+  | { id: string; action: 'rename'; name: string }
+  | { id: string; action: 'merge'; targetId: string }
+  | { id: string; action: 'promote'; category: SportCategory }
+  | { id: string; action: 'hide' };
+
+/**
+ * Изменение каталога. Обновляется всё: у мероприятий меняется направление в карточках
+ * и ленте, а подсказки направлений во всех формах — свои.
+ */
+export function useSportChange() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action, ...body }: SportChange) =>
+      apiRequest<AdminSport>(`/admin/sports/${id}/${action}`, { method: 'POST', body }),
+    onSuccess: () => client.invalidateQueries(),
   });
 }
