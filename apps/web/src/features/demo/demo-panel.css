@@ -1,0 +1,95 @@
+/* Демо-панель: служебная полоса для проверяющих, не часть продукта */
+.demo-panel {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 2px dashed var(--color-line-strong);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--fs-body);
+}
+
+.demo-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+/* Строка «Демо · стенд · время» и «Инструменты» — только на мобильном */
+.demo-bar {
+  display: none;
+}
+
+/* На мобильном панель свёрнута в одну строку: первый экран — под содержимое */
+@media (max-width: 767px) {
+  .demo-panel {
+    padding-block: var(--space-1);
+  }
+
+  .demo-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .demo-summary {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-weight: 600;
+  }
+
+  .demo-toggle {
+    flex: none;
+  }
+
+  .demo-panel:not([data-open]) .demo-tools {
+    display: none;
+  }
+
+  .demo-panel[data-open] .demo-tools {
+    margin-top: var(--space-2);
+  }
+}
+
+.demo-status,
+.demo-actions,
+.demo-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.demo-tag {
+  padding: 0 var(--space-2);
+  border: 2px solid currentColor;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.demo-button {
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border: 2px solid currentColor;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.demo-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.demo-button-danger {
+  font-weight: 700;
+}
+
+.demo-note {
+  margin: 0;
+}

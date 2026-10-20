@@ -240,6 +240,8 @@
 
 .stepper li {
   position: relative;
+  /* Длинная причина решения без пробелов не раздвигает степпер */
+  min-width: 0;
   display: grid;
   justify-items: center;
   gap: var(--space-1);
@@ -281,6 +283,7 @@
 
 .step-note {
   font-weight: 400;
+  overflow-wrap: anywhere;
 }
 
 .stepper li[data-state='done'] {

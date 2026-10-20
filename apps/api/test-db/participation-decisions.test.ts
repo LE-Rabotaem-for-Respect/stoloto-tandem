@@ -203,7 +203,7 @@ describe('GET /events/:id/participants', () => {
     await accept(organizer, first);
     const response = await participants(organizer, event.id);
     expect(response.body.pending[0].actions).toEqual([
-      { code: 'accept_participation', enabled: false, reason: NO_SEATS },
+      { code: 'accept_participation', enabled: false, reason: NO_SEATS, reasonCode: 'no_seats' },
       { code: 'reject_participation', enabled: true },
     ]);
   });
@@ -411,6 +411,15 @@ describe('POST /participations/:id/reject', () => {
       expect(response.status).toBe(400);
       expect(Object.keys(response.body.fields)).toEqual(['reason']);
     }
+    expect(await statusOf(id)).toBe('pending');
+  });
+
+  it('причина не строкой — сообщение о поле, а не о символах', async () => {
+    const event = await createEvent();
+    const id = await apply(anna, event.id);
+    const response = await reject(organizer, id, { reason: 5 });
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toEqual({ reason: 'Причина — текст' });
     expect(await statusOf(id)).toBe('pending');
   });
 

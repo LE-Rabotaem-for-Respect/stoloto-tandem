@@ -57,6 +57,8 @@ export interface EventCard {
   displayStatus: EventDisplayStatus;
   /** Запись текущего пользователя; `null` — записи нет или вошёл не пользователь. */
   participation: ParticipationStatus | null;
+  /** Причина отказа по своей отклонённой заявке, если организатор её указал; остальным — `null`. */
+  participationReason: string | null;
   /** Только подтверждённым участникам, организатору и администратору; остальным — `null`. */
   participantInfo: string | null;
   actions: Action[];
@@ -133,6 +135,22 @@ function organizerOf(event: EventWithCard): EventCard['organizer'] {
   if (org) return { kind: 'organization', id: org.id, name: org.name };
   if (user) return { kind: 'user', id: user.id, name: user.name };
   throw new Error(`У мероприятия ${event.id} нет организатора`);
+}
+
+function feedItem(event: EventWithCard, now: Date, confirmed: number): EventFeedItem {
+  return {
+    id: event.id,
+    title: event.title,
+    sport: sportOf(event),
+    organizer: organizerOf(event),
+    startsAt: event.startsAt,
+    endsAt: event.endsAt,
+    city: event.city,
+    area: event.area,
+    mode: event.mode,
+    level: event.level,
+    displayStatus: displayStatus(event, now, confirmed),
+  };
 }
 
 @Injectable()
@@ -219,14 +237,21 @@ export class EventsService {
   async viewable(
     actor: Actor,
     id: string,
-  ): Promise<{ event: EventWithCard; participation: ParticipationStatus | null }> {
+  ): Promise<{
+    event: EventWithCard;
+    participation: ParticipationStatus | null;
+    participationReason: string | null;
+  }> {
     const event = isUUID(id) ? await this.events.findCard(id) : null;
     if (!event) throw new ApiError('event_not_available');
-    const participation =
+    const own =
       actor.role === 'user' ? await this.events.viewerParticipation(id, actor.userId) : null;
+    const participation = own?.status ?? null;
     const view = canViewEvent(actor, event, participation);
     if (!view.allowed) throw new ApiError(view.code);
-    return { event, participation };
+    // Запись — своя: причину отказа видит только тот, кому отказали
+    const participationReason = own?.status === 'rejected' ? own.decisionReason : null;
+    return { event, participation, participationReason };
   }
 
   /**
@@ -235,7 +260,7 @@ export class EventsService {
    * Недоступное этому пользователю и несуществующее — одинаково «Мероприятие недоступно».
    */
   async card(actor: Actor, id: string): Promise<EventCard> {
-    const { event, participation } = await this.viewable(actor, id);
+    const { event, participation, participationReason } = await this.viewable(actor, id);
 
     const now = this.clock.now();
     const confirmedCount = await this.events.confirmedCount(id);
@@ -261,6 +286,7 @@ export class EventsService {
       statusReason: event.statusReason,
       displayStatus: displayStatus(event, now, confirmedCount),
       participation,
+      participationReason,
       participantInfo: seesInfo ? event.participantInfo : null,
       actions: eventActions(actor, { ...event, hasSeats }, participation, now),
     };
@@ -285,6 +311,7 @@ export class EventsService {
         sportText: text && normalizeSportName(text),
         sportId: query.sport,
         category: query.category,
+        organizationId: query.organization,
         startsFrom: range?.from,
         startsBefore: range?.to,
         city: query.city || undefined,
@@ -297,19 +324,7 @@ export class EventsService {
     const confirmed = await this.events.confirmedCounts(events.map((event) => event.id));
 
     return {
-      items: events.map((event) => ({
-        id: event.id,
-        title: event.title,
-        sport: sportOf(event),
-        organizer: organizerOf(event),
-        startsAt: event.startsAt,
-        endsAt: event.endsAt,
-        city: event.city,
-        area: event.area,
-        mode: event.mode,
-        level: event.level,
-        displayStatus: displayStatus(event, now, confirmed.get(event.id) ?? 0),
-      })),
+      items: events.map((event) => feedItem(event, now, confirmed.get(event.id) ?? 0)),
       total,
       limit,
       offset,
@@ -362,6 +377,50 @@ export class EventsService {
 
   private weekAgo(): Date {
     return new Date(this.clock.now().getTime() - 7 * 24 * 60 * 60 * 1000);
+  }
+
+  /**
+   * Мероприятия строками ленты для «Моих записей» (ТЗ 2.5): `participations` — статус записи
+   * человека по id мероприятия. Видимость — по правилу карточки: снятое модератором видно,
+   * пока человек записан или ждёт решения, а после отказа или отмены его в ответе нет.
+   */
+  async feedItemsFor(
+    actor: Actor,
+    participations: Map<string, ParticipationStatus>,
+  ): Promise<Map<string, EventFeedItem>> {
+    const ids = [...participations.keys()];
+    if (ids.length === 0) return new Map();
+    const now = this.clock.now();
+    const [events, confirmed] = await Promise.all([
+      this.events.findCards(ids),
+      this.events.confirmedCounts(ids),
+    ]);
+    return new Map(
+      events
+        .filter((event) => canViewEvent(actor, event, participations.get(event.id) ?? null).allowed)
+        .map((event) => [event.id, feedItem(event, now, confirmed.get(event.id) ?? 0)]),
+    );
+  }
+
+  /**
+   * Мероприятие глазами уведомлений (ТЗ 3.3): название и аккаунт организатора —
+   * пользователь или представитель организации. Права не проверяются: вызывают
+   * обработчики доменных событий, а не маршруты.
+   */
+  async notificationTarget(id: string): Promise<{ title: string; organizerUserId: string } | null> {
+    const event = await this.events.findOrganizerOf(id);
+    const organizerUserId = event?.organizerUserId ?? event?.organizerOrg?.ownerUserId;
+    return event && organizerUserId ? { title: event.title, organizerUserId } : null;
+  }
+
+  /** Кто организатор мероприятия — пользователь или организация (для других модулей). */
+  async organizerOf(
+    id: string,
+  ): Promise<{ organizerUserId: string | null; organizerOrgId: string | null } | null> {
+    const event = await this.events.findOrganizerOf(id);
+    return (
+      event && { organizerUserId: event.organizerUserId, organizerOrgId: event.organizerOrgId }
+    );
   }
 
   private startsRange(query: EventFeedQuery, now: Date): Partial<TimeRange> | undefined {

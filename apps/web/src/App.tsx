@@ -8,6 +8,7 @@ import {
   AdminOverviewPage,
 } from './features/admin/AdminPages';
 import { AppLayout } from './features/navigation/AppLayout';
+import { OrganizationPage, PublicOrganizationPage } from './features/organizations';
 import {
   CreateEventPage,
   EventPage,
@@ -44,6 +45,8 @@ export function AppRoutes() {
         <Route path="admin/organizations" element={<AdminOrganizationsPage />} />
         <Route path="admin/events" element={<AdminEventsPage />} />
         <Route path="admin/messages" element={<AdminMessagesPage />} />
+        <Route path="organization" element={<OrganizationPage />} />
+        <Route path="organizations/:id" element={<PublicOrganizationPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

@@ -156,6 +156,8 @@ describe('метки доступа маршрутов приложения', ()
         'EventsController.feed',
         'EventsController.card',
         'HealthController.check',
+        'NotificationsController.list',
+        'NotificationsController.read',
         'OrganizationsController.view',
         'OrganizationsController.update',
         'OrganizationsController.submit',
