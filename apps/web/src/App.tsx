@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
 import {
   AdminEventsPage,
+  AdminMessagesPage,
   AdminOrganizationsPage,
   AdminOverviewPage,
 } from './features/admin/AdminPages';
@@ -42,6 +43,7 @@ export function AppRoutes() {
         <Route path="admin" element={<AdminOverviewPage />} />
         <Route path="admin/organizations" element={<AdminOrganizationsPage />} />
         <Route path="admin/events" element={<AdminEventsPage />} />
+        <Route path="admin/messages" element={<AdminMessagesPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

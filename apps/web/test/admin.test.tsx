@@ -84,7 +84,49 @@ function fakeAdminApi(me: typeof adminMe = adminMe) {
       return json(200, organizations[0]);
     }
     if (call.startsWith('GET /api/admin/events')) {
-      return json(200, { items: [event], total: 1, limit: 20, offset: 0 });
+      // 45 строк — чтобы было куда листать
+      const offset = Number(new URL(url, 'http://x').searchParams.get('offset') ?? 0);
+      return json(200, { items: [event], total: 45, limit: 20, offset });
+    }
+    if (call.startsWith('GET /api/admin/messages')) {
+      return json(200, {
+        items: [
+          {
+            id: 'm1',
+            eventId: 'e1',
+            eventTitle: 'Турнир по паделу',
+            author: { kind: 'user', id: 'u2', name: 'Пётр' },
+            text: 'Купите абонемент со скидкой',
+            moderationReason: 'Реклама',
+            createdAt: '2026-10-19T05:00:00Z',
+          },
+        ],
+        total: 1,
+        limit: 20,
+        offset: 0,
+      });
+    }
+    if (call === 'GET /api/events/e1/messages') {
+      return json(200, [
+        {
+          id: 't1',
+          author: { name: 'Анна' },
+          isOrganizer: false,
+          text: 'Нужна своя ракетка?',
+          placeholder: null,
+          createdAt: '2026-10-19T05:00:00Z',
+          replies: [
+            {
+              id: 't2',
+              author: { name: 'Падел-клуб' },
+              isOrganizer: true,
+              text: 'Дадим на месте',
+              placeholder: null,
+              createdAt: '2026-10-19T06:00:00Z',
+            },
+          ],
+        },
+      ]);
     }
     return json(404, { code: 'not_found', message: 'Не найдено' });
   });
@@ -119,11 +161,15 @@ describe('админка', () => {
     fakeAdminApi();
     renderAt('/admin');
     const tiles = within(await screen.findByRole('list', { name: 'Обзор' })).getAllByRole('link');
-    expect(tiles.map((tile) => [tile.textContent, tile.getAttribute('href')])).toEqual([
-      ['3Заявки организаций ждут решения', '/admin/organizations?status=pending'],
-      ['1События сняты за неделю', '/admin/events?status=unpublished'],
-      ['2Скрытые сообщения', '/admin/events'],
+    expect(
+      tiles.map((tile) => [tile.getAttribute('aria-label'), tile.getAttribute('href')]),
+    ).toEqual([
+      ['Заявки организаций ждут решения: 3', '/admin/organizations?status=pending'],
+      ['События сняты за неделю: 1', '/admin/events?status=unpublished&period=week'],
+      ['Скрытые сообщения: 2', '/admin/messages'],
     ]);
+    // Есть что разбирать — плитка заявок в тоне «ждёт»
+    expect(tiles[0]?.className).toContain('admin-tile--wait');
   });
 
   it('«Одобрить» отправляет решение, заявка показывает новый статус', async () => {
@@ -189,9 +235,34 @@ describe('админка', () => {
     expect(screen.getByRole('link', { name: 'Падел-клуб' }).getAttribute('href')).toBe(
       '/admin/organizations?q=%D0%9F%D0%B0%D0%B4%D0%B5%D0%BB-%D0%BA%D0%BB%D1%83%D0%B1',
     );
-    expect(screen.getByRole('link', { name: 'Обсуждение' }).getAttribute('href')).toBe(
-      '/events/e1#discussion',
+
+    // Обсуждение — прямо в строке мероприятия
+    await userEvent.click(screen.getByRole('button', { name: 'Обсуждение' }));
+    expect(await screen.findByText(/Нужна своя ракетка\?/)).toBeTruthy();
+    expect(screen.getByText(/Дадим на месте/)).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Скрыть обсуждение' }).getAttribute('aria-expanded'),
+    ).toBe('true');
+  });
+
+  it('списки листаются по 20: смещение — в адресе', async () => {
+    const calls = fakeAdminApi();
+    renderAt('/admin/events');
+    expect(await screen.findByText('Найдено: 45, показаны 1–1')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Назад' }).hasAttribute('disabled')).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Дальше' }));
+    await waitFor(() =>
+      expect(calls.map(({ call }) => call)).toContain('GET /api/admin/events?offset=20'),
     );
+  });
+
+  it('скрытые сообщения: текст, причина, автор и мероприятие', async () => {
+    fakeAdminApi();
+    renderAt('/admin/messages');
+    expect(await screen.findByText('Купите абонемент со скидкой')).toBeTruthy();
+    expect(screen.getByText('Реклама')).toBeTruthy();
+    expect(screen.getByText('Пётр')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Турнир по паделу' })).toBeTruthy();
   });
 
   it('в профиле администратора — ссылка на админку', async () => {
