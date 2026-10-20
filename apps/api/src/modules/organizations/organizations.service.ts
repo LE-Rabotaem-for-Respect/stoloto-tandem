@@ -4,6 +4,7 @@ import type { OrganizationStatus } from '@tandem/domain';
 import { Clock } from '../../core/clock';
 import { ApiError } from '../../core/errors';
 import { EventBus, domainEvent } from '../../core/event-bus';
+import type { Prisma } from '../../generated/prisma/client';
 import { canEditOrganization, canModerate } from '../../core/policies';
 import type { Actor, Decision } from '../../core/policies';
 import type { UpdateOrganizationDto } from './dto';
@@ -172,6 +173,11 @@ export class OrganizationsService {
     allowOrThrow(canModerate(actor));
     const { organizations, total } = await this.repository.adminSearch(filter, page);
     return { items: organizations.map(toOwnView), total, ...page };
+  }
+
+  /** Направления организаций при объединении дублей — в транзакции объединения. */
+  moveSport(fromId: string, toId: string, tx: Prisma.TransactionClient): Promise<void> {
+    return this.repository.moveSport(fromId, toId, tx);
   }
 
   /** Заявки, которые ждут решения администратора (обзор админки). */
