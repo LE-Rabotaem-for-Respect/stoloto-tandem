@@ -170,11 +170,38 @@ describe('профиль организации', () => {
       'representativeRole',
     ],
     ['перевод строки в названии', { name: 'Клуб\nЛадья' }, 'name'],
+    ['название из одних точек', { name: '...' }, 'name'],
+    ['город из одного тире', { city: '—' }, 'city'],
+    [
+      'переворот текста в ссылке на сайт',
+      { website: `https://ladya.ru/${char(0x202e)}abc` },
+      'website',
+    ],
   ])('%s — 400 с полем', async (_, change, field) => {
     const { cookie, id } = await organizationAccount();
     const response = await http().patch(`/organizations/${id}`).set('Cookie', cookie).send(change);
     expect(response.status).toBe(400);
     expect(response.body.fields).toHaveProperty(field);
+  });
+
+  it('мягкий перенос в названии и городе убирается: организация находится по слову', async () => {
+    const { cookie, id } = await organizationAccount();
+    const response = await http()
+      .patch(`/organizations/${id}`)
+      .set('Cookie', cookie)
+      .send({ name: `Лад${char(0xad)}ья`, city: `Красно${char(0xad)}ярск` });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ name: 'Ладья', city: 'Красноярск' });
+  });
+
+  it('не строка — сообщение о поле, а не о символах', async () => {
+    const { cookie, id } = await organizationAccount();
+    const response = await http()
+      .patch(`/organizations/${id}`)
+      .set('Cookie', cookie)
+      .send({ name: 5, city: 5 });
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toEqual({ name: 'Укажите название', city: 'Укажите город' });
   });
 
   it('эмодзи, переводы строк в описании и контактах допустимы; переводы строк Windows — как обычные', async () => {
@@ -200,6 +227,9 @@ describe('профиль организации', () => {
     for (const change of [
       { organizationName: `Клуб ${char(0x202e)}Ладья` },
       { name: `Иван${char(0x2063)}` },
+      { organizationName: '...' },
+      // Почта с невидимым символом выглядела бы как чужая и стала бы отдельным аккаунтом
+      { email: `an${char(0x200b)}na-${randomUUID()}@example.ru` },
     ]) {
       const response = await http()
         .post('/auth/register')

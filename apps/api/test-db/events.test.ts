@@ -160,6 +160,15 @@ describe('POST /events', () => {
     expect(search.body.items).toEqual([expect.objectContaining({ id: response.body.sport.id })]);
   });
 
+  it('не строка в названии и городе — сообщение о поле, а не о символах', async () => {
+    const response = await post(anna, { ...validEvent(), title: 5, city: 5 });
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toMatchObject({
+      title: 'Укажите название',
+      city: 'Укажите город',
+    });
+  });
+
   it('эмодзи с соединителем и селектором начертания и мягкий перенос — допустимы', async () => {
     const runner = String.fromCodePoint(0x1f3c3, 0x200d, 0x2640, 0xfe0f);
     const softHyphen = String.fromCodePoint(0xad);

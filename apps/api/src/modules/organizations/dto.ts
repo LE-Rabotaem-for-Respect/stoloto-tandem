@@ -9,7 +9,7 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
-import { multiLine, singleLine, trimLine, trimText } from '../../core/validation';
+import { cleanLine, multiLine, singleLine, trimText, visible } from '../../core/validation';
 
 /**
  * Профиль организации (ТЗ 2.9). Все поля необязательны: правка частичная,
@@ -17,37 +17,40 @@ import { multiLine, singleLine, trimLine, trimText } from '../../core/validation
  */
 export class UpdateOrganizationDto {
   @IsOptional()
-  @trimLine()
-  @IsString({ message: 'Укажите название' })
-  @Length(2, 120, { message: 'Название — от 2 до 120 символов' })
+  @cleanLine()
+  @visible({ allowEmpty: true })
   @singleLine()
+  @Length(2, 120, { message: 'Название — от 2 до 120 символов' })
+  @IsString({ message: 'Укажите название' })
   name?: string;
 
   @IsOptional()
   @trimText()
-  @IsString({ message: 'Расскажите, чем занимается организация' })
-  @MaxLength(2000, { message: 'Описание — не длиннее 2000 символов' })
   @multiLine()
+  @MaxLength(2000, { message: 'Описание — не длиннее 2000 символов' })
+  @IsString({ message: 'Расскажите, чем занимается организация' })
   description?: string;
 
   @IsOptional()
-  @trimLine()
-  @IsString({ message: 'Укажите город' })
-  @MaxLength(80, { message: 'Город — не длиннее 80 символов' })
+  @cleanLine()
+  @visible({ allowEmpty: true })
   @singleLine()
+  @MaxLength(80, { message: 'Город — не длиннее 80 символов' })
+  @IsString({ message: 'Укажите город' })
   city?: string;
 
   // Телефон, мессенджер и часы работы — можно с новой строки
   @IsOptional()
   @trimText()
-  @IsString({ message: 'Укажите контакты' })
-  @MaxLength(300, { message: 'Контакты — не длиннее 300 символов' })
   @multiLine()
+  @MaxLength(300, { message: 'Контакты — не длиннее 300 символов' })
+  @IsString({ message: 'Укажите контакты' })
   contacts?: string;
 
   /** Пустая строка — сайта нет. */
   @IsOptional()
-  @trimLine()
+  @cleanLine()
+  @singleLine()
   @ValidateIf((dto: UpdateOrganizationDto) => dto.website !== '')
   @IsUrl(
     { require_protocol: true, protocols: ['http', 'https'] },
@@ -57,17 +60,17 @@ export class UpdateOrganizationDto {
   website?: string;
 
   @IsOptional()
-  @trimLine()
-  @IsString({ message: 'Укажите, кто представитель' })
-  @MaxLength(120, { message: 'Имя представителя — не длиннее 120 символов' })
+  @cleanLine()
   @singleLine()
+  @MaxLength(120, { message: 'Имя представителя — не длиннее 120 символов' })
+  @IsString({ message: 'Укажите, кто представитель' })
   representativeName?: string;
 
   @IsOptional()
-  @trimLine()
-  @IsString({ message: 'Укажите роль представителя' })
-  @MaxLength(120, { message: 'Роль — не длиннее 120 символов' })
+  @cleanLine()
   @singleLine()
+  @MaxLength(120, { message: 'Роль — не длиннее 120 символов' })
+  @IsString({ message: 'Укажите роль представителя' })
   representativeRole?: string;
 
   @IsOptional()
