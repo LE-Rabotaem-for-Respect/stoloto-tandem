@@ -1,4 +1,4 @@
-import '@fontsource-variable/golos-text';
+import '@fontsource-variable/jost';
 import '@fontsource-variable/unbounded';
 import '@fontsource-variable/caveat';
 import './shared/theme/tokens.css';

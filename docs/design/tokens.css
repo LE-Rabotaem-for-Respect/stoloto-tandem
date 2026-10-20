@@ -229,11 +229,11 @@
 :root,
 [data-theme],
 [data-text] {
-  /* Шрифты: широкий гротеск Unbounded для заголовков, Golos — для текста, рукописный — для
-     акцентов. Все три раздаются вместе с приложением — на любом устройстве одинаковые */
-  --font-text: 'Golos Text Variable', 'Golos Text', 'Segoe UI', Roboto, Arial, sans-serif;
-  --font-display:
-    'Unbounded Variable', 'Unbounded', 'Golos Text Variable', 'Segoe UI', Arial, sans-serif;
+  /* Шрифты: широкий гротеск Unbounded для заголовков, геометрический Jost — для текста,
+     рукописный — для акцентов. Все три раздаются вместе с приложением — на любом устройстве
+     одинаковые */
+  --font-text: 'Jost Variable', 'Jost', 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-display: 'Unbounded Variable', 'Unbounded', 'Jost Variable', 'Segoe UI', Arial, sans-serif;
   --font-script: 'Caveat Variable', 'Caveat', 'Segoe Script', cursive;
 
   /* Размеры в rem (уважают настройку шрифта браузера), умножены на масштаб темы.
