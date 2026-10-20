@@ -1,0 +1,59 @@
+.org-sports-list,
+.org-sports-found,
+.org-events {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.org-sport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+.org-sports-found .choice-option {
+  justify-content: space-between;
+  width: 100%;
+  text-align: start;
+}
+
+.org-sport-category,
+.org-sports-empty,
+.org-city {
+  color: var(--color-ink-muted);
+}
+
+.org-description,
+.org-contacts {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.org-form-actions,
+.org-approved {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.org-event {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.org-event-text {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.form-saved {
+  margin: 0;
+}

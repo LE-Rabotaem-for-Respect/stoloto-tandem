@@ -122,7 +122,9 @@ function Profile() {
         {me.data.organization && (
           <>
             <dt>Организация</dt>
-            <dd>{me.data.organization.name}</dd>
+            <dd>
+              <Link to="/organization">{me.data.organization.name}</Link>
+            </dd>
           </>
         )}
       </dl>
