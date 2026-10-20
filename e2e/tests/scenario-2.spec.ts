@@ -59,20 +59,18 @@ test('сценарий 2: допуск организации, публикац�
   });
   await page.getByRole('button', { name: 'Опубликовать' }).click();
   await expect(page).toHaveURL(/\/events\/[0-9a-f-]{36}$/);
-  const eventId = page.url().split('/').pop();
-  const published = await (await page.request.get(`/api/events/${eventId}`)).json();
-  expect(published).toMatchObject({
-    status: 'published',
-    organizer: { kind: 'organization', name: PADEL },
-  });
+  await expect(page.locator('.event-card-action')).toContainText('Набор открыт');
+  await expect(page.locator('.event-card-organizer')).toContainText(PADEL);
 
-  // 6. Анна находит событие в ленте; на странице клуба оно в списке мероприятий
+  // 6. Анна находит событие в ленте → карточка → ссылка на организатора
   await switchAccount(page, 'Анна');
   await navLink(page, 'Найти').click();
   await page.getByRole('searchbox', { name: 'Поиск по названию и направлению' }).fill('падел');
   await page.getByRole('button', { name: 'Найти', exact: true }).click();
-  await expect(page.getByRole('link', { name: /Падел для начинающих/ })).toBeVisible();
-  await page.goto(`/organizations/${published.organizer.id}`);
+  await page.getByRole('link', { name: /Падел для начинающих/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Падел для начинающих' })).toBeVisible();
+  await page.locator('.event-card-organizer').getByRole('link', { name: PADEL }).click();
+  await expect(page).toHaveURL(/\/organizations\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { level: 1, name: PADEL })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Падел для начинающих' })).toBeVisible();
 
