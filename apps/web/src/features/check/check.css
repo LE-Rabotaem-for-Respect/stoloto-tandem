@@ -1,0 +1,80 @@
+.check-page {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 72rem;
+}
+
+.check-page h1,
+.check-page h2,
+.check-page p {
+  margin: 0;
+}
+
+.check-route,
+.check-stands {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.check-note {
+  font-style: italic;
+}
+
+.check-steps {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: 1.5em;
+}
+
+.check-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.check-who {
+  font-weight: 700;
+}
+
+.check-expected {
+  padding: 0 var(--space-2);
+  border-left: 3px solid currentColor;
+}
+
+.check-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.check-credentials {
+  font-family: monospace;
+}
+
+.check-document table {
+  border-collapse: collapse;
+}
+
+.check-document th,
+.check-document td {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid currentColor;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-table {
+  overflow-x: auto;
+}
+
+/* Ссылки «Открыть экран», стенды, документ и «назад» — с областью нажатия не меньше 44 px (ТЗ 2.8) */
+.check-tools a,
+.check-stands a,
+.check-page > p a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+}

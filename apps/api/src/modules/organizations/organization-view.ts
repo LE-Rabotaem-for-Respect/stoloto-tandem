@@ -1,3 +1,4 @@
+import type { Action } from '@tandem/domain';
 import type { OrganizationStatus, SportCategory } from '../../generated/prisma/client';
 import type { OrganizationRecord } from './organizations.repository';
 
@@ -25,6 +26,8 @@ export interface OwnOrganizationView extends PublicOrganizationView {
   status: OrganizationStatus;
   decisionReason: string | null;
   submittedAt: string | null;
+  /** Правка, отправка на проверку, создание мероприятия, решение по заявке (DECISION-002). */
+  actions: Action[];
 }
 
 export function toPublicView(organization: OrganizationRecord): PublicOrganizationView {
@@ -39,7 +42,10 @@ export function toPublicView(organization: OrganizationRecord): PublicOrganizati
   };
 }
 
-export function toOwnView(organization: OrganizationRecord): OwnOrganizationView {
+export function toOwnView(
+  organization: OrganizationRecord,
+  actions: Action[],
+): OwnOrganizationView {
   return {
     ...toPublicView(organization),
     representativeName: organization.representativeName,
@@ -47,5 +53,6 @@ export function toOwnView(organization: OrganizationRecord): OwnOrganizationView
     status: organization.status,
     decisionReason: organization.decisionReason,
     submittedAt: organization.submittedAt?.toISOString() ?? null,
+    actions,
   };
 }

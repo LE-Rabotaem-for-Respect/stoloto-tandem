@@ -1,23 +1,47 @@
 import { useLayoutEffect, useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { IconName } from '../../shared/illustrations';
-import { useTheme } from '../../shared/theme';
 import { Icon } from '../../shared/ui/Icon';
-import { loginPath, returnPath, useLogout, useMe, usePendingActionRelay } from '../auth';
+import {
+  THEME_NOT_SAVED,
+  loginPath,
+  returnPath,
+  useLogout,
+  useMe,
+  usePendingActionRelay,
+  useThemeFromAccount,
+  useThemeSaveFailed,
+  useThemeSettings,
+} from '../auth';
 import { DemoPanel } from '../demo';
 import { UnreadBadge } from '../notifications';
 
 /** Пять пунктов (ТЗ 2.8): нижняя панель на мобильном, верхнее меню на компьютере. */
-export const NAV_ITEMS: readonly { to: string; label: string; icon: IconName }[] = [
+// Мягкий перенос: слово, которое не помещается в пятую часть ширины, переносится по
+// слогам с дефисом (docs/design.md, «Нижняя панель»)
+const SHY = String.fromCharCode(0xad);
+
+export const NAV_ITEMS: readonly {
+  to: string;
+  label: string;
+  icon: IconName;
+  /** Подпись с местами переноса — только для показа; имя ссылки — `label`. */
+  hyphenated?: string;
+}[] = [
   { to: '/', label: 'Найти', icon: 'action-search' },
   { to: '/my', label: 'Мои записи', icon: 'action-calendar' },
   { to: '/create', label: 'Создать', icon: 'action-create' },
-  { to: '/notifications', label: 'Уведомления', icon: 'action-notify' },
-  { to: '/profile', label: 'Профиль', icon: 'action-profile' },
+  {
+    to: '/notifications',
+    label: 'Уведомления',
+    icon: 'action-notify',
+    hyphenated: `Уведом${SHY}ле${SHY}ния`,
+  },
+  { to: '/profile', label: 'Профиль', icon: 'action-profile', hyphenated: `Про${SHY}филь` },
 ];
 
 function ThemeSwitches() {
-  const theme = useTheme();
+  const theme = useThemeSettings();
   return (
     <div className="theme-switches">
       <button
@@ -38,6 +62,21 @@ function ThemeSwitches() {
         <span className="header-button-label">Контраст</span>
       </button>
     </div>
+  );
+}
+
+/**
+ * Сбой сохранения оформления в аккаунт — под шапкой, где переключатели. В профиле то же
+ * сообщение стоит у «Оформления», второй раз его не повторяем.
+ */
+function ThemeSaveError() {
+  const failed = useThemeSaveFailed();
+  const { pathname } = useLocation();
+  if (!failed || pathname === '/profile') return null;
+  return (
+    <p className="form-error theme-save-error" role="alert">
+      {THEME_NOT_SAVED}
+    </p>
   );
 }
 
@@ -143,6 +182,7 @@ function useStickyTopHeight() {
 
 export function AppLayout() {
   usePendingActionRelay();
+  useThemeFromAccount();
   const top = useStickyTopHeight();
   const nav = useFixedNavHeight();
   return (
@@ -164,7 +204,14 @@ export function AppLayout() {
               <li key={item.to}>
                 <NavLink to={item.to} end={item.to === '/'} className="main-nav-link">
                   <Icon name={item.icon} />
-                  <span>{item.label}</span>
+                  {item.hyphenated ? (
+                    <>
+                      <span aria-hidden="true">{item.hyphenated}</span>
+                      <span className="visually-hidden">{item.label}</span>
+                    </>
+                  ) : (
+                    <span>{item.label}</span>
+                  )}
                   {item.to === '/notifications' && <UnreadBadge />}
                 </NavLink>
               </li>
@@ -174,6 +221,8 @@ export function AppLayout() {
       </div>
       <DemoPanel />
       <main id="main" className="app-main" tabIndex={-1}>
+        {/* В потоке страницы, а не в прилипающей шапке: не отнимает первый экран */}
+        <ThemeSaveError />
         <Outlet />
       </main>
     </div>

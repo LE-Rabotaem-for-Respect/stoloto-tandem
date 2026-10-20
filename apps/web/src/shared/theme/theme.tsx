@@ -28,6 +28,8 @@ export function applyThemeSettings(settings: ThemeSettings, root: HTMLElement) {
 interface ThemeContextValue extends ThemeSettings {
   toggleLargeText(): void;
   toggleContrast(): void;
+  /** Настройки целиком — например, сохранённые в аккаунте. */
+  setSettings(settings: ThemeSettings): void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -53,7 +55,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     [],
   );
   const value = useMemo(
-    () => ({ ...settings, toggleLargeText, toggleContrast }),
+    () => ({ ...settings, toggleLargeText, toggleContrast, setSettings }),
     [settings, toggleLargeText, toggleContrast],
   );
   return <ThemeContext value={value}>{children}</ThemeContext>;

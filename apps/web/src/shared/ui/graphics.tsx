@@ -21,13 +21,20 @@ import { Icon } from './Icon';
 const isIcon = (name: string): name is IconName => (ICONS as readonly string[]).includes(name);
 
 /** Отрывной листок: месяц, число, день недели. Читается как «Среда, 21 октября». */
-export function DateLeaf({ date, compact = false }: { date: Date; compact?: boolean }) {
+interface DateLeafProps {
+  date: Date;
+  compact?: boolean;
+  /** Прежняя дата переноса: листок перечёркнут и приглушён. */
+  off?: boolean;
+}
+
+export function DateLeaf({ date, compact = false, off = false }: DateLeafProps) {
   const parts = leafParts(date);
+  const className = ['date-leaf', compact && 'date-leaf-compact', off && 'date-leaf-off']
+    .filter(Boolean)
+    .join(' ');
   return (
-    <time
-      className={compact ? 'date-leaf date-leaf-compact' : 'date-leaf'}
-      dateTime={date.toISOString()}
-    >
+    <time className={className} dateTime={date.toISOString()}>
       <span className="visually-hidden">{parts.spoken}</span>
       <span className="leaf-month" aria-hidden="true">
         {parts.month}

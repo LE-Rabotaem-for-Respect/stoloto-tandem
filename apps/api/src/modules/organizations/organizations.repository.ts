@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { OrganizationStatus, Prisma } from '../../generated/prisma/client';
+import { escapeLike } from '../../core/prisma/like';
 import { PrismaService } from '../../core/prisma/prisma.service';
 
 const withSports = {
@@ -30,6 +31,41 @@ export interface StatusChange {
 export class OrganizationsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Админка: заявки на проверке — по времени отправки (кто раньше отправил, тот выше),
+   * остальные — по названию.
+   */
+  async adminSearch(
+    filter: { text?: string; status?: OrganizationStatus; id?: string },
+    page: { offset: number; limit: number },
+  ): Promise<{ organizations: OrganizationRecord[]; total: number }> {
+    const where: Prisma.OrganizationWhereInput = {
+      ...(filter.id && { id: filter.id }),
+      ...(filter.status && { status: filter.status }),
+      ...(filter.text && {
+        name: { contains: escapeLike(filter.text), mode: 'insensitive' as const },
+      }),
+    };
+    const [organizations, total] = await Promise.all([
+      this.prisma.organization.findMany({
+        where,
+        include: withSports,
+        orderBy:
+          filter.status === 'pending'
+            ? [{ submittedAt: 'asc' }, { id: 'asc' }]
+            : [{ name: 'asc' }, { id: 'asc' }],
+        skip: page.offset,
+        take: page.limit,
+      }),
+      this.prisma.organization.count({ where }),
+    ]);
+    return { organizations, total };
+  }
+
+  countByStatus(status: OrganizationStatus): Promise<number> {
+    return this.prisma.organization.count({ where: { status } });
+  }
+
   find(id: string): Promise<OrganizationRecord | null> {
     return this.prisma.organization.findUnique({ where: { id }, include: withSports });
   }
@@ -49,6 +85,21 @@ export class OrganizationsRepository {
       }
       return tx.organization.update({ where: { id }, data: changes, include: withSports });
     });
+  }
+
+  /**
+   * Объединение направлений (DECISION-003): у организации, где есть оба, остаётся
+   * целевое, у остальных старое заменяется целевым.
+   */
+  async moveSport(fromId: string, toId: string, tx: Prisma.TransactionClient): Promise<void> {
+    const both = await tx.organizationSport.findMany({
+      where: { sportId: toId },
+      select: { organizationId: true },
+    });
+    await tx.organizationSport.deleteMany({
+      where: { sportId: fromId, organizationId: { in: both.map((row) => row.organizationId) } },
+    });
+    await tx.organizationSport.updateMany({ where: { sportId: fromId }, data: { sportId: toId } });
   }
 
   /** Меняет статус, только если он всё ещё прежний: два одновременных решения не пройдут оба. */

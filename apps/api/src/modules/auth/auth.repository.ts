@@ -67,6 +67,26 @@ export class AuthRepository {
     return session?.user ?? null;
   }
 
+  /**
+   * Сливает изменение в `settings.theme` одним UPDATE: два одновременных запроса
+   * («Крупный текст» и «Контраст») не затирают друг друга, остальные ключи `settings`
+   * не трогаются. Не объект в `settings` или `theme` считается пустым.
+   */
+  async mergeTheme(userId: string, theme: Record<string, boolean>): Promise<UserWithOrganization> {
+    await this.prisma.$executeRaw`
+      UPDATE "users" SET "settings" = jsonb_set(
+        CASE WHEN jsonb_typeof("settings") = 'object' THEN "settings" ELSE '{}'::jsonb END,
+        '{theme}',
+        CASE WHEN jsonb_typeof("settings" -> 'theme') = 'object'
+          THEN "settings" -> 'theme' ELSE '{}'::jsonb END || ${JSON.stringify(theme)}::jsonb
+      )
+      WHERE "id" = ${userId}::uuid`;
+    return this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      include: withOrganization,
+    });
+  }
+
   async revokeSession(tokenHash: string, now: Date) {
     await this.prisma.session.updateMany({
       where: { tokenHash, revokedAt: null },

@@ -1,0 +1,228 @@
+/* Админка (ТЗ 2.11): плотнее остальных экранов, но размер текста и области нажатия те же. */
+
+.admin-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.admin-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+}
+
+.admin-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.admin-tile:hover {
+  border-color: var(--color-primary);
+}
+
+.admin-tile-value {
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: var(--fs-display);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+}
+
+.admin-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.admin-search .field {
+  flex: 1 1 12rem;
+  /* Колонка сетки поля не шире формы: иначе список статусов растягивается под самый
+     длинный пункт и на 360 px в «Крупном тексте» появляется горизонтальная прокрутка */
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-search select {
+  width: 100%;
+  max-width: 100%;
+}
+
+.admin-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-row {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.admin-row h2 {
+  margin: 0;
+  font-size: var(--fs-lead);
+  overflow-wrap: anywhere;
+}
+
+.admin-row p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.admin-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-control);
+  font-weight: 600;
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Поля форм в строке — не шире строки: у input своя ширина по умолчанию, и на 360 px
+   в «Крупном тексте» она раздвигала строку каталога */
+.admin-decision .field {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.admin-decision input,
+.admin-decision select {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-decision textarea {
+  min-height: 5rem;
+}
+
+.admin-tile--wait {
+  border-color: var(--status-wait-fg);
+  background: var(--status-wait-bg);
+}
+
+.admin-tile--wait .admin-tile-value,
+.admin-tile--wait .icon {
+  color: var(--status-wait-fg);
+}
+
+.admin-tile-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Текстовые ссылки в строках — с областью нажатия не меньше tap-min (ТЗ 2.8) */
+.admin-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+}
+
+.admin-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.admin-pager p {
+  margin: 0;
+}
+
+.admin-discussion {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.admin-messages {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.admin-messages p {
+  margin: 0;
+}
+
+.admin-quote {
+  margin: 0;
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--color-line-strong);
+  overflow-wrap: anywhere;
+}
+
+/* На узком экране и в «Крупном тексте» подпись — над значением: колонка значений не сжимается до слога */
+@media (max-width: 599px) {
+  .admin-facts {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .admin-facts dd + dt {
+    margin-top: var(--space-2);
+  }
+}
+
+/* Подсказки «Объединить с…»: выбранное направление — с рамкой основного цвета */
+.admin-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-choices .button {
+  overflow-wrap: anywhere;
+}
+
+.admin-choices [aria-pressed='true'] {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
