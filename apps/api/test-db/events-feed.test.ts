@@ -269,6 +269,11 @@ describe('GET /events — фильтры', () => {
     expect(await titles({ area: 'центральный', date: 'tomorrow' })).toEqual(['Пробежка в полночь']);
     expect(await titles({ area: 'Октябрьский' })).toEqual([]);
   });
+
+  it('мероприятия одной организации — для её страницы', async () => {
+    expect(await titles({ organization: orgId })).toEqual(['Блиц в субботу']);
+    expect(await titles({ organization: '00000000-0000-4000-8000-000000000000' })).toEqual([]);
+  });
 });
 
 describe('GET /events — пагинация и ошибки', () => {
@@ -293,6 +298,7 @@ describe('GET /events — пагинация и ошибки', () => {
     ['лимит больше 50', { limit: 51 }, 'limit'],
     ['неизвестная группа', { category: 'mind' }, 'category'],
     ['направление не UUID', { sport: 'футбол' }, 'sport'],
+    ['организация не UUID', { organization: 'ладья' }, 'organization'],
   ])('%s — 400 с полем', async (_, query, field) => {
     const response = await feed(query);
     expect(response.status).toBe(400);

@@ -3,7 +3,11 @@ import type { Actor } from '../../core/policies';
 import { CurrentActor, SignedIn } from '../auth';
 import { JoinDto, RejectDto } from './participations.dto';
 import { ParticipationsService } from './participations.service';
-import type { ParticipantsView, ParticipationView } from './participations.service';
+import type {
+  MyParticipationsView,
+  ParticipantsView,
+  ParticipationView,
+} from './participations.service';
 
 // Записаться и отменить запись — только вошедшему (метки на методах). Кто из вошедших
 // может, решают политика и автомат записи в сервисе
@@ -56,5 +60,17 @@ export class ParticipationDecisionsController {
     @Body() dto: RejectDto,
   ): Promise<ParticipationView> {
     return this.participations.reject(actor, id, dto.reason);
+  }
+}
+
+// «Мои записи» — свои записи вошедшего (ТЗ 2.5, 4.5)
+@Controller('me')
+export class MyParticipationsController {
+  constructor(private readonly participations: ParticipationsService) {}
+
+  @SignedIn()
+  @Get('participations')
+  mine(@CurrentActor() actor: Actor): Promise<MyParticipationsView> {
+    return this.participations.mine(actor);
   }
 }

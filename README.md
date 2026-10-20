@@ -126,7 +126,7 @@ sh scripts/stands.sh down            # остановить; данные сте
 - Сдвиг демо-часов и время последнего сброса хранятся в базе своего стенда:
   `POST /demo/reset` и `POST /demo/clock` на одном стенде другие не трогают.
 - Стереть данные стенда целиком (новый сид при следующем старте):
-  `docker compose -p stand-1 --env-file stands/stand-1.env down -v`.
+  `docker compose -f docker-compose.yml -p stand-1 --env-file stands/stand-1.env down -v`.
 
 ## Ядро API
 
@@ -193,10 +193,19 @@ TEST_DATABASE_URL=postgresql://tandem:tandem@127.0.0.1:5433/tandem npm run test:
 Сквозные тесты идут против запущенного приложения:
 
 ```sh
-DEMO_RESET_INTERVAL_SECONDS=0 docker compose up --build -d --wait
+WEB_BIND=127.0.0.1 DEMO_RESET_INTERVAL_SECONDS=0 docker compose up --build -d --wait
 npx playwright install chromium   # один раз
 npm run e2e                       # адрес меняется переменной BASE_URL
 ```
+
+Для прогона нужен стенд с `DEMO_RESET_INTERVAL_SECONDS=0`: тесты сбрасывают данные
+перед каждым тестом, а с интервалом получили бы 429. Такой стенд — с входом без
+пароля и сбросом без интервала — публикуется только на `127.0.0.1` (`WEB_BIND`):
+из сети его быть не должно видно. Стенды `scripts/stands.sh` для этого не подходят:
+у них интервал задан в `stands/stand-N.env`, а ни одна переменная, которую читает
+`docker-compose.yml`, и ни `COMPOSE_FILE` из shell на них не действуют, чтобы
+оставшиеся после e2e `0` и `127.0.0.1` не сняли защиту сброса с открытых стендов и
+не закрыли их для экспертов.
 
 Стенд должен быть в демо-режиме (`DEMO_MODE=true`, в Compose так по умолчанию):
 перед каждым тестом его демо-данные сбрасываются. Поэтому тесты идут в один поток

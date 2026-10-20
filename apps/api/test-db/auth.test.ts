@@ -144,6 +144,19 @@ describe('регистрация', () => {
     expect(response.body.fields).toEqual({ email: 'Укажите почту, например anna@mail.ru' });
   });
 
+  it('мягкий перенос в почте — ошибка поля: иначе второй аккаунт выглядит как первый', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        accountType: 'person',
+        name: 'Анна',
+        email: `an­na-${randomUUID()}@example.ru`,
+        password: 'пароль-1234',
+      });
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toEqual({ email: 'В тексте есть недопустимые символы' });
+  });
+
   it('роль из тела запроса не принимается', async () => {
     const response = await request(app.getHttpServer()).post('/auth/register').send({
       accountType: 'person',
