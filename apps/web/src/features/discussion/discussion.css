@@ -1,0 +1,89 @@
+.discussion,
+.thread-replies {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Ответы — под вопросом со сдвигом и линией слева: видно, к чему они относятся */
+.thread-replies {
+  margin-top: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: var(--border-width) solid var(--color-line);
+}
+
+.thread {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.message {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.message-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.message-author {
+  color: var(--color-ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* Метка «Организатор» — текстом и рамкой, не только цветом */
+.message-organizer {
+  padding: 0 var(--space-1);
+  border: var(--border-width) solid var(--color-primary);
+  border-radius: var(--radius-control);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.message-text {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.message-placeholder {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.discussion-form,
+.discussion-confirm {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.discussion-form .field {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.discussion-form textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.discussion-confirm p {
+  margin: 0;
+}
+
+.discussion-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

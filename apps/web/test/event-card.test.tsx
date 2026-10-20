@@ -41,6 +41,8 @@ const card = (patch: Record<string, unknown> = {}) => ({
   participation: null,
   participationReason: null,
   participantInfo: null,
+  capacity: null,
+  confirmedCount: 0,
   actions: [{ code: 'join', enabled: true }],
   ...patch,
 });
@@ -160,6 +162,10 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     expect(inCard.getAllByText('Красноярск, Остров Татышев, Вход у моста')).toHaveLength(2);
     inCard.getByText('Набор открыт');
     inCard.getByText('Свободно');
+    // Места — между местом и панелью действия (docs/design.md, «Первый экран карточки»)
+    const seats = inCard.getByText('Без ограничения мест');
+    const first = article.querySelector('.event-card-first');
+    expect(first?.contains(seats)).toBe(true);
     expect(inCard.getAllByRole('button')).toHaveLength(1);
     inCard.getByRole('button', { name: 'Записаться' });
     expect(inCard.getByRole('link', { name: 'Беговой клуб «Енисей»' }).getAttribute('href')).toBe(
@@ -173,6 +179,38 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     expect(inCard.getByText('Условия').closest('details')?.open).toBe(false);
     inCard.getByRole('heading', { name: 'Частые вопросы' });
     inCard.getByRole('heading', { name: 'Обсуждение' });
+  });
+
+  it('места: «Осталось N из M» по ответу карточки, при полном наборе — «Мест нет»', async () => {
+    fakeApi({
+      signedIn: true,
+      cardFor: () => json(200, card({ capacity: 10, confirmedCount: 7 })),
+    });
+    renderCard();
+    const article = await screen.findByRole('article', { name: 'Пробежка 5 км на Татышеве' });
+    within(article).getByText('Осталось 3 из 10');
+    expect(article.querySelectorAll('.seats-dots i[data-taken]')).toHaveLength(7);
+    cleanup();
+
+    fakeApi({
+      signedIn: true,
+      cardFor: () => json(200, card({ capacity: 10, confirmedCount: 10, displayStatus: 'full' })),
+    });
+    renderCard();
+    const full = await screen.findByRole('article', { name: 'Пробежка 5 км на Татышеве' });
+    expect(full.querySelector('.seats--full')?.textContent).toBe('Мест нет');
+  });
+
+  it('больше 10 мест — полоса, а не кружки: ряд кружков на 360 px перенёсся бы', async () => {
+    fakeApi({
+      signedIn: true,
+      cardFor: () => json(200, card({ capacity: 16, confirmedCount: 4 })),
+    });
+    renderCard();
+    const article = await screen.findByRole('article', { name: 'Пробежка 5 км на Татышеве' });
+    within(article).getByText('Осталось 12 из 16');
+    expect(article.querySelector('.seats-dots')).toBeNull();
+    expect(article.querySelector('.seats-bar')).not.toBeNull();
   });
 
   it('гость: кнопка ведёт на вход, после входа запись выполняется сама', async () => {
@@ -227,6 +265,29 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     screen.getByText('Сколько бегаете?');
     screen.getByRole('heading', { name: 'Информация для участников' });
     screen.getByText('Сбор у входа в 7:20');
+  });
+
+  it('от 768 px статус в панели — полным текстом, отдельной строки полного статуса нет', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(min-width: 768px)',
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    fakeApi({
+      cardFor: () =>
+        json(
+          200,
+          card({
+            participation: 'confirmed',
+            actions: [{ code: 'join', enabled: false, reason: 'Вы уже участник' }],
+          }),
+        ),
+    });
+    renderCard();
+    const full = await screen.findByText('Набор открыт. Вы участник');
+    expect(full.closest('.status')).not.toBeNull();
+    expect(screen.queryByText('Вы участник')).toBeNull();
+    expect(document.querySelector('.event-card-full-status')).toBeNull();
   });
 
   it('отменённое мероприятие — статус с причиной', async () => {

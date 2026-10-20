@@ -10,6 +10,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
@@ -19,6 +20,9 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
+import { cleanLine, singleLine, visible } from '../../core/validation';
+import { EVENT_MODERATIONS } from '../events/events.service';
+import type { EventModeration } from '../events/events.service';
 
 const trim = () =>
   Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
@@ -108,6 +112,21 @@ export class OrganizationDecisionDto {
   @Matches(/\S/, { message: 'Укажите причину отказа' })
   @Matches(SINGLE_LINE_TEXT, { message: HIDDEN_CHARS })
   reason?: string;
+}
+
+/** «Снять с публикации» или «Удалить» мероприятие — всегда с причиной (ТЗ 2.10). */
+export class EventModerationDto {
+  @IsIn(EVENT_MODERATIONS, { message: 'Действие: снять с публикации или удалить' })
+  action!: EventModeration;
+
+  // Общие правила текста: «.» или «—» причиной не считаются, мягкие переносы убираются
+  @cleanLine()
+  @visible()
+  @singleLine()
+  @MaxLength(500, { message: 'Причина — не длиннее 500 символов' })
+  @IsNotEmpty({ message: 'Укажите причину' })
+  @IsString({ message: 'Укажите причину' })
+  reason!: string;
 }
 
 export const SPORT_STATUSES = ['active', 'hidden'] as const;
