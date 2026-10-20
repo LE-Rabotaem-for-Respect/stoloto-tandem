@@ -136,7 +136,13 @@ const SPORT_NAME_RULE = `Название направления — от 2 до
  * Проверки шага до отправки — те же правила, что у api (ТЗ 2.2), чтобы человек
  * увидел ошибку сразу у поля. Окончательно решает сервер.
  */
-export function stepErrors(step: StepIndex, state: CreateEventState, now: Date): FieldErrors {
+export function stepErrors(
+  step: StepIndex,
+  state: CreateEventState,
+  now: Date,
+  // При изменении дата и время не правятся (только переносом) — их не проверяем
+  options: { schedule?: boolean } = {},
+): FieldErrors {
   const errors: FieldErrors = {};
   if (step === 0) {
     if (lineLength(state.title) < 5 || lineLength(state.title) > 80) {
@@ -158,12 +164,14 @@ export function stepErrors(step: StepIndex, state: CreateEventState, now: Date):
     const starts = krasnoyarskTime(state.date, state.startTime);
     const ends = krasnoyarskTime(state.date, state.endTime);
     // Без даты ошибка одна — у даты: под заполненным временем «укажите время» сбивает
-    if (!state.date) errors.date = 'Укажите дату';
-    else {
-      if (!starts) errors.startTime = 'Укажите время начала';
-      else if (starts <= now) errors.startTime = 'Время начала должно быть в будущем';
-      if (!ends) errors.endTime = 'Укажите время окончания';
-      else if (starts && ends <= starts) errors.endTime = 'Окончание — позже начала';
+    if (options.schedule !== false) {
+      if (!state.date) errors.date = 'Укажите дату';
+      else {
+        if (!starts) errors.startTime = 'Укажите время начала';
+        else if (starts <= now) errors.startTime = 'Время начала должно быть в будущем';
+        if (!ends) errors.endTime = 'Укажите время окончания';
+        else if (starts && ends <= starts) errors.endTime = 'Окончание — позже начала';
+      }
     }
     if (lineLength(state.city) < 2 || lineLength(state.city) > 80) {
       errors.city = 'Город — от 2 до 80 символов';
@@ -222,5 +230,63 @@ export function toRequestBody(state: CreateEventState) {
     ...(state.mode === 'approval' &&
       state.applyQuestion.trim() && { applyQuestion: state.applyQuestion.trim() }),
     level: state.level,
+  };
+}
+
+// Красноярск — UTC+7 без перехода на летнее время: момент → дата и время для полей формы
+function krasnoyarskParts(iso: string): { date: string; time: string } {
+  const local = new Date(new Date(iso).getTime() + 7 * 3_600_000).toISOString();
+  return { date: local.slice(0, 10), time: local.slice(11, 16) };
+}
+
+/** Мероприятие из карточки → поля формы изменения. */
+export function stateFromCard(card: {
+  title: string;
+  description: string;
+  sport: { id: string; name: string; category: SportCategory };
+  startsAt: string;
+  endsAt: string;
+  city: string;
+  area: string;
+  placeText: string;
+  participantInfo: string | null;
+  level: EventLevel;
+  mode: 'free' | 'approval';
+  applyQuestion: string | null;
+}): CreateEventState {
+  const starts = krasnoyarskParts(card.startsAt);
+  return {
+    title: card.title,
+    description: card.description,
+    sport: { kind: 'existing', ...card.sport },
+    date: starts.date,
+    startTime: starts.time,
+    endTime: krasnoyarskParts(card.endsAt).time,
+    city: card.city,
+    area: card.area,
+    placeText: card.placeText,
+    participantInfo: card.participantInfo ?? '',
+    level: card.level,
+    mode: card.mode,
+    applyQuestion: card.applyQuestion ?? '',
+  };
+}
+
+/**
+ * Тело `PATCH /events/:id` (ТЗ 2.2): только то, что можно менять после публикации —
+ * без направления, даты и времени. «Информацию для участников» можно очистить; вопрос к
+ * заявке остаётся только у режима «По заявке».
+ */
+export function toUpdateBody(state: CreateEventState) {
+  return {
+    title: state.title.trim(),
+    description: state.description.trim(),
+    city: state.city.trim(),
+    area: state.area.trim(),
+    placeText: state.placeText.trim(),
+    participantInfo: state.participantInfo.trim(),
+    level: state.level ?? undefined,
+    mode: state.mode ?? undefined,
+    applyQuestion: state.mode === 'approval' ? state.applyQuestion.trim() || null : null,
   };
 }

@@ -3,7 +3,19 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppProviders, AppRoutes, createQueryClient } from '../src/App';
-import { filterParams, hiddenFilterCount, readFilters } from '../src/features/feed/filters';
+import {
+  feedQuery,
+  filterParams,
+  hiddenFilterCount,
+  readFilters,
+} from '../src/features/feed/filters';
+
+const CURLING = { id: '3f0c2a8e-5b1d-4c7e-9a20-6d8e1f4b7c31', name: 'Кёрлинг на льду' };
+const SPORTS = [
+  CURLING,
+  { id: '9b7e4d12-0c3a-4f56-8e19-2a5d7c6b8f40', name: 'Кёрлинг' },
+  { id: '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f', name: 'Бег' },
+];
 
 const json = (status: number, body?: unknown) =>
   new Response(body === undefined ? null : JSON.stringify(body), {
@@ -26,7 +38,12 @@ const item = (n: number) => ({
 });
 
 /** Api в памяти: лента из `total` событий страницами, гость. */
-function fakeApi(total = 1, fail: (offset: number, attempt: number) => boolean = () => false) {
+function fakeApi(
+  total = 1,
+  fail: (offset: number, attempt: number) => boolean = () => false,
+  /** Ответ ждёт, пока не выполнится этот промис, — чтобы застать запрос в пути. */
+  wait: (attempt: number) => Promise<void> | undefined = () => undefined,
+) {
   let attempt = 0;
   const feedRequests: URLSearchParams[] = [];
   vi.stubGlobal(
@@ -42,11 +59,19 @@ function fakeApi(total = 1, fail: (offset: number, attempt: number) => boolean =
           lastResetAt: null,
         });
       }
+      if (pathname === '/api/sports') {
+        const q = (searchParams.get('q') ?? '').toLowerCase();
+        const items = SPORTS.filter((sport) => sport.name.toLowerCase().includes(q)).map(
+          (sport) => ({ ...sport, category: 'other', isCustom: true }),
+        );
+        return json(200, { items, exactMatch: false });
+      }
       if (pathname === '/api/events') {
         feedRequests.push(searchParams);
         const limit = Number(searchParams.get('limit'));
         const offset = Number(searchParams.get('offset'));
         attempt += 1;
+        await wait(attempt);
         if (fail(offset, attempt)) {
           return json(500, {
             code: 'internal',
@@ -107,6 +132,30 @@ describe('фильтры ленты в адресе', () => {
     expect(params.toString()).toBe(
       new URLSearchParams({ date: 'weekend', city: 'Красноярск' }).toString(),
     );
+  });
+
+  it('направление — id в api, название только в адресе; чужое id отбрасывается', () => {
+    const filters = readFilters(
+      new URLSearchParams({ sport: CURLING.id, sportName: CURLING.name, q: 'лёд' }),
+    );
+    expect(filters.sport).toEqual(CURLING);
+    expect(filterParams(filters).get('sportName')).toBe(CURLING.name);
+    expect(feedQuery(filters).get('sport')).toBe(CURLING.id);
+    expect(feedQuery(filters).has('sportName')).toBe(false);
+    expect(hiddenFilterCount(filters)).toBe(1);
+
+    for (const sport of [
+      'curling',
+      '1; DROP',
+      `${CURLING.id}x`,
+      // Hex в форме UUID, но без версии и варианта: api ответил бы 400
+      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      '11111111-1111-1111-1111-111111111111',
+    ]) {
+      expect(readFilters(new URLSearchParams({ sport, sportName: 'x' })).sport).toBeUndefined();
+    }
+    const long = readFilters(new URLSearchParams({ sport: CURLING.id, sportName: 'к'.repeat(80) }));
+    expect(long.sport?.name).toHaveLength(50);
   });
 
   it('число на «Фильтрах» — только свёрнутые фильтры', () => {
@@ -196,6 +245,72 @@ describe('лента и поиск', { timeout: 15_000 }, () => {
     expect(screen.getByRole('radio', { name: 'Сегодня' })).toBe(document.activeElement);
   });
 
+  it('фильтр по направлению: выбор из подсказок уходит в запрос, пустое поле его снимает', async () => {
+    const { last } = fakeApi();
+    const user = userEvent.setup();
+    renderFeed();
+    await user.click(await screen.findByText('Фильтры'));
+
+    const field = screen.getByRole('combobox', { name: 'Направление' });
+    await user.type(field, 'кёрл');
+    const list = await screen.findByRole('listbox', { name: 'Подсказки' });
+    expect(within(list).getAllByRole('option')).toHaveLength(2);
+    // Набранный текст без выбора фильтром не становится
+    expect(last()?.has('sport')).toBe(false);
+    await user.click(screen.getByRole('option', { name: 'Кёрлинг на льду' }));
+
+    await waitFor(() => expect(last()?.get('sport')).toBe(CURLING.id));
+    expect(last()?.has('sportName')).toBe(false);
+    expect(field).toHaveProperty('value', CURLING.name);
+    screen.getByText('Фильтры · 1');
+
+    await user.clear(field);
+    await waitFor(() => expect(last()?.has('sport')).toBe(false));
+  });
+
+  it('фильтр по направлению с клавиатуры: стрелка и Enter выбирают, форма не отправляется', async () => {
+    const { last } = fakeApi();
+    const user = userEvent.setup();
+    renderFeed();
+    await user.click(await screen.findByText('Фильтры'));
+
+    const field = screen.getByRole('combobox', { name: 'Направление' });
+    await user.type(field, 'кёрл');
+    await screen.findByRole('listbox', { name: 'Подсказки' });
+    await user.keyboard('{ArrowDown}{Enter}');
+    await waitFor(() => expect(last()?.get('sport')).toBe(SPORTS[1]?.id));
+    expect(field).toBe(document.activeElement);
+
+    // Не выбранный текст после ухода из поля возвращается к выбранному направлению
+    await user.type(field, ' что-то');
+    await user.tab();
+    expect(field).toHaveProperty('value', 'Кёрлинг');
+  });
+
+  it('направление из адреса: в запросе id, в поле — название', async () => {
+    const { last } = fakeApi();
+    const user = userEvent.setup();
+    renderFeed(`/?sport=${CURLING.id}&sportName=${encodeURIComponent(CURLING.name)}`);
+    await waitFor(() => expect(last()?.get('sport')).toBe(CURLING.id));
+    await user.click(screen.getByText('Фильтры · 1'));
+    expect(screen.getByRole('combobox', { name: 'Направление' })).toHaveProperty(
+      'value',
+      CURLING.name,
+    );
+  });
+
+  it('направление из адреса без названия: поле не выглядит пустым фильтром', async () => {
+    const { last } = fakeApi();
+    const user = userEvent.setup();
+    renderFeed(`/?sport=${CURLING.id}`);
+    await waitFor(() => expect(last()?.get('sport')).toBe(CURLING.id));
+    await user.click(screen.getByText('Фильтры · 1'));
+    expect(screen.getByRole('combobox', { name: 'Направление' })).toHaveProperty(
+      'placeholder',
+      'Выбрано направление',
+    );
+  });
+
   it('у каждого пункта «Уровня» своя подпись: «без фильтра» не путается с «Любой»', async () => {
     const { last } = fakeApi();
     const user = userEvent.setup();
@@ -273,6 +388,67 @@ describe('лента и поиск', { timeout: 15_000 }, () => {
       40,
     );
     screen.getByRole('button', { name: 'Показать ещё' });
+  });
+
+  it('во время «Повторить» — статус загрузки, кнопка неактивна', async () => {
+    let release: () => void = () => undefined;
+    const third = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // Лента загрузилась, перечитывание упало (например, после перемотки демо-часов),
+    // «Повторить» — третий запрос, его ответ задержан
+    const { feedRequests } = fakeApi(
+      1,
+      (_offset, attempt) => attempt === 2,
+      (attempt) => (attempt === 3 ? third : undefined),
+    );
+    const client = createQueryClient();
+    const user = userEvent.setup();
+    render(
+      <AppProviders client={client}>
+        <MemoryRouter initialEntries={['/']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AppProviders>,
+    );
+    await screen.findByRole('link', { name: /Пробежка 5 км на Татышеве/ });
+    await client.refetchQueries({ queryKey: ['feed'] });
+    await screen.findByRole('alert');
+    await user.click(screen.getByRole('button', { name: 'Повторить' }));
+
+    expect(await screen.findByText('Загрузка…')).toBeTruthy();
+    const retry = screen.getByRole('button', { name: 'Повторить' });
+    expect(retry.getAttribute('aria-disabled')).toBe('true');
+    // Повторное нажатие, пока идёт запрос, нового запроса не делает
+    const requests = feedRequests.length;
+    await user.click(retry);
+    expect(feedRequests).toHaveLength(requests);
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    release();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Повторить' })).toBeNull());
+    expect(screen.queryByText('Загрузка…')).toBeNull();
+  });
+
+  it('фокус на первой новой карточке и после смены фильтров с тем же индексом', async () => {
+    fakeApi(45);
+    const user = userEvent.setup();
+    renderFeed();
+    await screen.findByText('Найдено: 45');
+    await user.click(screen.getByRole('button', { name: 'Показать ещё' }));
+    await waitFor(() => expect(document.activeElement?.textContent).toContain('Событие 21'));
+
+    // Другой фильтр — лента заново с первой страницы, догрузка снова начинается с 21-й
+    await user.click(screen.getByRole('radio', { name: 'Сегодня' }));
+    await waitFor(() =>
+      expect(screen.getAllByRole('listitem').filter((li) => li.matches('.feed-card'))).toHaveLength(
+        20,
+      ),
+    );
+    const more = screen.getByRole('button', { name: 'Показать ещё' });
+    await user.click(more);
+    await waitFor(() => expect(document.activeElement?.textContent).toContain('Событие 21'));
+    expect(document.activeElement).not.toBe(more);
   });
 
   it('обложка — содержательная: alt — название группы', async () => {

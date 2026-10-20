@@ -33,10 +33,9 @@ html {
   top: var(--space-2);
 }
 
-/* Сбой сохранения оформления — строкой под шапкой, с теми же отступами */
+/* Сбой сохранения оформления — в начале содержимого страницы, не в прилипающей шапке */
 .theme-save-error {
-  border-radius: 0;
-  padding-inline: var(--space-4);
+  margin-block-end: var(--space-4);
   overflow-wrap: anywhere;
 }
 

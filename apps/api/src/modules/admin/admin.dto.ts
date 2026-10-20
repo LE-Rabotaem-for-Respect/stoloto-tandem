@@ -1,7 +1,13 @@
-import { EVENT_STATUSES, ORGANIZATION_STATUSES, SINGLE_LINE_TEXT } from '@tandem/domain';
-import type { EventStatus, OrganizationStatus } from '@tandem/domain';
+import {
+  EVENT_STATUSES,
+  ORGANIZATION_STATUSES,
+  SINGLE_LINE_TEXT,
+  SPORT_CATEGORIES,
+} from '@tandem/domain';
+import type { EventStatus, OrganizationStatus, SportCategory } from '@tandem/domain';
 import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -102,4 +108,36 @@ export class OrganizationDecisionDto {
   @Matches(/\S/, { message: 'Укажите причину отказа' })
   @Matches(SINGLE_LINE_TEXT, { message: HIDDEN_CHARS })
   reason?: string;
+}
+
+export const SPORT_STATUSES = ['active', 'hidden'] as const;
+
+export class AdminSportsQuery extends AdminPageQuery {
+  @IsOptional()
+  @IsIn(SPORT_STATUSES, { message: 'Статус: active или hidden' })
+  status?: (typeof SPORT_STATUSES)[number];
+
+  /** `true` — только пользовательские направления, `false` — только основной список. */
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean({ message: 'custom: true или false' })
+  custom?: boolean;
+}
+
+/** Новое имя направления; правила — как у нового направления в форме мероприятия. */
+export class RenameSportDto {
+  @IsString({ message: 'Укажите название направления' })
+  name!: string;
+}
+
+export class MergeSportDto {
+  @IsUUID('all', { message: 'Выберите направление из списка' })
+  targetId!: string;
+}
+
+export class PromoteSportDto {
+  @IsIn(SPORT_CATEGORIES, { message: 'Выберите группу из списка' })
+  category!: SportCategory;
 }

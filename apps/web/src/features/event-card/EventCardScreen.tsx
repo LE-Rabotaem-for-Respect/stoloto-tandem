@@ -242,6 +242,9 @@ function CardBody({ event }: { event: EventCardView }) {
         <details className="event-card-section">
           <summary>Условия</summary>
           <dl className="facts">
+            {/* Полное направление: на первом экране до 768 px оно может быть обрезано */}
+            <dt>Направление</dt>
+            <dd>{event.sport.name}</dd>
             <dt>Место</dt>
             <dd>{place}</dd>
             <dt>Уровень</dt>

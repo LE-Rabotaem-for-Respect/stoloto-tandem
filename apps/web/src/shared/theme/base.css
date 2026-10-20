@@ -113,7 +113,9 @@ a {
   background: var(--color-primary-hover);
 }
 
-.button:disabled {
+/* aria-disabled — неактивная кнопка, которая не теряет фокус (ждёт ответа на своё действие) */
+.button:disabled,
+.button[aria-disabled='true'] {
   cursor: default;
   color: var(--color-ink-muted);
   background: var(--color-surface);

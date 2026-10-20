@@ -76,7 +76,12 @@ export class MessagesRepository {
   async update(
     id: string,
     from: MessageStatus,
-    data: { text?: string; editedAt?: Date; status?: MessageStatus },
+    data: {
+      text?: string;
+      editedAt?: Date;
+      status?: MessageStatus;
+      moderationReason?: string;
+    },
   ): Promise<MessageRecord | null> {
     const { count } = await this.prisma.message.updateMany({ where: { id, status: from }, data });
     return count === 1 ? this.find(id) : null;

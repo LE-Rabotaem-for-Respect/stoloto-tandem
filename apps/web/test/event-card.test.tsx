@@ -154,7 +154,8 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     const article = await screen.findByRole('article', { name: 'Пробежка 5 км на Татышеве' });
     const inCard = within(article);
     expect(inCard.getByRole('img', { name: 'Выносливость' })).toBeTruthy();
-    inCard.getByText('Бег');
+    // Направление — в строке над названием (до 768 px может быть обрезано) и полностью в «Условиях»
+    expect(inCard.getAllByText('Бег')).toHaveLength(2);
     inCard.getByText('07:30–08:30');
     inCard.getByText('Любитель');
     // Место — в первом блоке и полностью в «Условиях»

@@ -5,12 +5,15 @@ import {
   AdminEventsPage,
   AdminMessagesPage,
   AdminOrganizationsPage,
+  AdminSportsPage,
   AdminOverviewPage,
 } from './features/admin/AdminPages';
+import { CheckPage, ScenariosPage } from './features/check';
 import { AppLayout } from './features/navigation/AppLayout';
 import { OrganizationPage, PublicOrganizationPage } from './features/organizations';
 import {
   CreateEventPage,
+  EditEventPage,
   EventPage,
   FeedPage,
   LoginPage,
@@ -35,6 +38,7 @@ export function AppRoutes() {
       <Route element={<AppLayout />}>
         <Route index element={<FeedPage />} />
         <Route path="events/:id" element={<EventPage />} />
+        <Route path="events/:id/edit" element={<EditEventPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
         <Route path="my" element={<MyParticipationsPage />} />
@@ -45,8 +49,11 @@ export function AppRoutes() {
         <Route path="admin/organizations" element={<AdminOrganizationsPage />} />
         <Route path="admin/events" element={<AdminEventsPage />} />
         <Route path="admin/messages" element={<AdminMessagesPage />} />
+        <Route path="admin/sports" element={<AdminSportsPage />} />
         <Route path="organization" element={<OrganizationPage />} />
         <Route path="organizations/:id" element={<PublicOrganizationPage />} />
+        <Route path="check" element={<CheckPage />} />
+        <Route path="check/scenarios" element={<ScenariosPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

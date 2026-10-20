@@ -96,6 +96,7 @@ describe('actions: закрытый список действий для actions
         'submit_organization',
         'hide_message',
         'delete_message',
+        'moderate_delete_message',
         'unpublish_event',
         'delete_event',
         'restore_event',

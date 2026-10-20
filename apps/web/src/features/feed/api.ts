@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import type { EventDisplayStatus, EventLevel, SportCategory } from '@tandem/domain';
 import { apiRequest } from '../../shared/api';
-import { filterParams } from './filters';
+import { feedQuery } from './filters';
 import type { FeedFilters } from './filters';
 
 /** Строка ленты (`GET /events`): только то, что помещается в карточку ленты. */
@@ -30,7 +30,7 @@ export const FEED_PAGE_SIZE = 20;
 
 /** Лента страницами по 20: «Показать ещё» догружает следующую. */
 export function useFeed(filters: FeedFilters) {
-  const params = filterParams(filters);
+  const params = feedQuery(filters);
   params.set('limit', String(FEED_PAGE_SIZE));
   return useInfiniteQuery({
     queryKey: ['feed', params.toString()],
