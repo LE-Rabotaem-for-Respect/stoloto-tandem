@@ -71,8 +71,7 @@ function fakeApi() {
         return json(200, { now: '2026-10-19T12:00:00Z', demoMode: false, standId: null });
       }
       if (call.startsWith('GET /api/admin/sports')) {
-        const visible = sports.filter((row) => row.status === 'active' || hidden.id === row.id);
-        return json(200, { items: visible, total: visible.length, limit: 20, offset: 0 });
+        return json(200, { items: sports, total: sports.length, limit: 20, offset: 0 });
       }
       if (call.startsWith('GET /api/sports')) {
         return json(200, {
