@@ -10,7 +10,7 @@ import {
   useMe,
 } from '../features/auth';
 import { EventCardScreen } from '../features/event-card';
-import { CreateEventForm } from '../features/events';
+import { CreateEventForm, EditEventScreen } from '../features/events';
 import { FeedScreen } from '../features/feed';
 import { NotificationCenter } from '../features/notifications';
 import { MyParticipations } from '../features/participations';
@@ -84,6 +84,12 @@ export const MyParticipationsPage = () => (
       <h1>Мои записи</h1>
       <MyParticipations />
     </div>
+  </RequireAuth>
+);
+
+export const EditEventPage = () => (
+  <RequireAuth>
+    <EditEventScreen />
   </RequireAuth>
 );
 

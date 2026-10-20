@@ -163,6 +163,7 @@ describe('метки доступа маршрутов приложения', ()
         'OrganizationsController.update',
         'OrganizationsController.submit',
         'SportsController.search',
+        'MessagesController.moderate',
       ]),
     );
   });

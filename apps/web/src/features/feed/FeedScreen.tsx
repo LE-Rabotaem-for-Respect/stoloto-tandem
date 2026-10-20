@@ -22,6 +22,7 @@ import {
   readFilters,
 } from './filters';
 import type { FeedFilters } from './filters';
+import { SportFilter } from './SportFilter';
 
 const LEVEL_OPTIONS = EVENT_LEVELS.map((value) => ({ value, label: EVENT_LEVEL_TITLES[value] }));
 
@@ -151,6 +152,7 @@ function FeedFiltersForm({
           Фильтры{hidden > 0 && ` · ${hidden}`}
         </summary>
         <div className="feed-more-fields">
+          <SportFilter value={filters.sport} onChange={(sport) => apply({ sport })} />
           <div className="field">
             <label htmlFor="feed-category">Группа направлений</label>
             <select
