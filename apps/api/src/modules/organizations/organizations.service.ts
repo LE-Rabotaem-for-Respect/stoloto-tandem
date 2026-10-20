@@ -172,7 +172,13 @@ export class OrganizationsService {
   ): Promise<{ items: OwnOrganizationView[]; total: number; limit: number; offset: number }> {
     allowOrThrow(canModerate(actor));
     const { organizations, total } = await this.repository.adminSearch(filter, page);
-    return { items: organizations.map(toOwnView), total, ...page };
+    return {
+      items: organizations.map((organization) =>
+        toOwnView(organization, organizationActions(actor, organization)),
+      ),
+      total,
+      ...page,
+    };
   }
 
   /** Заявки, которые ждут решения администратора (обзор админки). */
