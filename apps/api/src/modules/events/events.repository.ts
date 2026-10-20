@@ -89,9 +89,7 @@ export class EventsRepository {
   }
 
   /** Название и кто организатор: пользователь или владелец организации-организатора. */
-  findOrganizerOf(
-    id: string,
-  ): Promise<{
+  findOrganizerOf(id: string): Promise<{
     title: string;
     organizerUserId: string | null;
     organizerOrg: { ownerUserId: string } | null;
