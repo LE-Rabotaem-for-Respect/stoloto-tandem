@@ -65,6 +65,10 @@ export interface EventCard {
   participationReason: string | null;
   /** Только подтверждённым участникам, организатору и администратору; остальным — `null`. */
   participantInfo: string | null;
+  /** Лимит мест; `null` — без ограничения. */
+  capacity: number | null;
+  /** Подтверждённые участники — для блока мест «Осталось N из M» (ТЗ 2.11). */
+  confirmedCount: number;
   actions: Action[];
 }
 
@@ -386,6 +390,8 @@ export class EventsService {
       participation,
       participationReason,
       participantInfo: seesInfo ? event.participantInfo : null,
+      capacity: event.capacity,
+      confirmedCount,
       actions: eventActions(actor, { ...event, hasSeats }, participation, now),
     };
   }
