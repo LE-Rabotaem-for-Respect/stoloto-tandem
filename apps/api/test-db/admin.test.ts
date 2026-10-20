@@ -480,6 +480,8 @@ describe('плитки ведут к своим спискам', () => {
       text: `Реклама ${tag}`,
       moderationReason: 'Реклама',
       createdAt: new Date(NOW).toISOString(),
+      // Скрытое — только удалить: восстановления у модерации нет
+      actions: [{ code: 'delete_message', enabled: true }],
     });
     expect((list.body.items as { text: string }[]).some((entry) => entry.text === 'Видимое')).toBe(
       false,
