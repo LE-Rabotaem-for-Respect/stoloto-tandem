@@ -16,24 +16,26 @@ apps/web  ──HTTP /api──►  apps/api  ──Prisma──►  PostgreSQL
 
 **api** (`apps/api/src`):
 
-| Где                      | Что                                                                   |
-| ------------------------ | --------------------------------------------------------------------- |
-| `core/clock`             | `Clock` — единственный источник «сейчас», демо-сдвиг часов            |
-| `core/access`            | метки маршрутов `@Public()`, `@Roles(…)`; без метки — только вошедшим |
-| `core/policies`          | права по таблице ТЗ 4.4 и сборка `actions[]`                          |
-| `core/event-bus`         | доменные события после коммита транзакции                             |
-| `core/errors`            | единый формат ошибок `{ code, message, fields? }`                     |
-| `core/validation`        | общие правила текстовых полей DTO                                     |
-| `core/prisma`            | клиент БД                                                             |
-| `modules/auth`           | регистрация, вход, сессии, `GET /me`, настройки                       |
-| `modules/events`         | создание, изменение, лента и поиск, карточка                          |
-| `modules/participations` | запись, заявки и решения организатора, «Мои записи», лимит мест       |
-| `modules/messages`       | обсуждение мероприятия                                                |
-| `modules/notifications`  | уведомления внутри платформы — обработчики доменных событий           |
-| `modules/organizations`  | профиль организации, отправка на проверку, решение                    |
-| `modules/sports`         | каталог направлений и подсказки                                       |
-| `modules/admin`          | обзор, допуск организаций, модерация, каталог                         |
-| `modules/demo`           | сид, сброс демо-данных, перемотка часов (только при `DEMO_MODE=true`) |
+| Где                      | Что                                                                      |
+| ------------------------ | ------------------------------------------------------------------------ |
+| `core/clock`             | `Clock` — единственный источник «сейчас», демо-сдвиг часов               |
+| `core/access`            | метки маршрутов `@Public()`, `@Roles(…)`; без метки — только вошедшим    |
+| `core/policies`          | права по таблице ТЗ 4.4 и сборка `actions[]`                             |
+| `core/event-bus`         | доменные события после коммита транзакции                                |
+| `core/errors`            | единый формат ошибок `{ code, message, fields? }`                        |
+| `core/validation`        | общие правила текстовых полей DTO                                        |
+| `core/prisma`            | клиент БД                                                                |
+| `core/config`            | настройки стенда из окружения (`DEMO_MODE`, `STAND_ID`, интервал сброса) |
+| `modules/auth`           | регистрация, вход, сессии, `GET /me`, настройки                          |
+| `modules/events`         | создание, изменение, лента и поиск, карточка                             |
+| `modules/participations` | запись, заявки и решения организатора, «Мои записи», лимит мест          |
+| `modules/messages`       | обсуждение мероприятия                                                   |
+| `modules/notifications`  | уведомления внутри платформы — обработчики доменных событий              |
+| `modules/organizations`  | профиль организации, отправка на проверку, решение                       |
+| `modules/sports`         | каталог направлений и подсказки                                          |
+| `modules/admin`          | обзор, допуск организаций, модерация, каталог                            |
+| `modules/demo`           | сид, сброс демо-данных, перемотка часов (только при `DEMO_MODE=true`)    |
+| `modules/health`         | проверка готовности для Compose                                          |
 
 Слои внутри модуля: контроллер (DTO, без логики) → сервис (политика,
 переход автомата, сохранение, доменное событие) → репозиторий (Prisma).
@@ -42,7 +44,8 @@ apps/web  ──HTTP /api──►  apps/api  ──Prisma──►  PostgreSQL
 
 **web** (`apps/web/src`): `features/<раздел>` — экраны и запросы раздела
 (`feed`, `event-card`, `events`, `participations`, `discussion`,
-`notifications`, `organizations`, `admin`, `auth`, `demo`, `check`);
+`notifications`, `organizations`, `admin`, `auth`, `demo`, `check`,
+`navigation` — каркас, шапка и нижняя панель);
 `shared/` — дизайн-система (`ui`, `theme`), клиент api, часы стенда
 (`useClock()`), иллюстрации.
 
@@ -63,12 +66,14 @@ apps/web  ──HTTP /api──►  apps/api  ──Prisma──►  PostgreSQL
 - `Message` — вопрос или ответ в обсуждении, от себя или от организации.
 - `Notification`, `ModerationLog` — уведомления и журнал решений модератора.
 - `AppState` — настройки стенда: сдвиг демо-часов, время последнего сброса.
-- Таблицы P2 (`Helfigochi*`, `Accessory`, `CalendarToken`,
-  `SeriesSubscription`, `EventSeries`) уже в схеме, кодом пока не
-  используются.
+- Таблицы P2 (`Helfigochi*`, `Accessory`, `UserAccessory`,
+  `CalendarToken`, `SeriesSubscription`, `EventSeries`, `CompanyRequest`) уже в
+  схеме; в интерфейсе не используются (при объединении направлений в каталоге
+  их ссылки на направление переносятся).
 
-Ограничения, которых не выражает Prisma (частичные уникальные индексы,
-`CHECK`), — ручными SQL-миграциями в `apps/api/prisma/migrations`. Тесты
+Частичные уникальные индексы заданы в `schema.prisma` (`where: raw(…)`),
+ограничения `CHECK` — ручной SQL-миграцией `*_constraints` в
+`apps/api/prisma/migrations`. Тесты
 ограничений идут на настоящей PostgreSQL (`npm run test:db`).
 
 ## Автоматы состояний
