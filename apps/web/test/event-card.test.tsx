@@ -449,6 +449,8 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     const anna = within(waiting).getByText('Анна').closest('li') as HTMLElement;
     await user.click(within(anna).getByRole('button', { name: 'Принять' }));
     await waitFor(() => expect(calls).toContain('POST /api/participations/p-anna/accept'));
+    // Строка заявки ушла в «Участники» — фокус на заголовке «Ждут решения», а не на body
+    await waitFor(() => expect(document.activeElement?.textContent).toMatch(/^Ждут решения/));
     // Решение сразу меняет списки
     const people = await screen.findByRole('region', { name: /Участники/ });
     await within(people).findByText('Анна');
@@ -456,6 +458,14 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     const ksenia = within(screen.getByRole('region', { name: /Ждут решения/ }))
       .getByText('Ксения')
       .closest('li') as HTMLElement;
+    // «Отмена» закрывает форму причины и возвращает фокус на «Отклонить»
+    await user.click(within(ksenia).getByRole('button', { name: 'Отклонить' }));
+    await user.click(within(ksenia).getByRole('button', { name: 'Отмена' }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(ksenia).getByRole('button', { name: 'Отклонить' }),
+      ),
+    );
     await user.click(within(ksenia).getByRole('button', { name: 'Отклонить' }));
     await user.type(
       within(ksenia).getByLabelText('Причина (необязательно)'),

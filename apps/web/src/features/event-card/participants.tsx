@@ -1,7 +1,7 @@
 import { PARTICIPATION_STATUS_VIEW } from '@tandem/domain';
 import type { Action, ParticipationStatus } from '@tandem/domain';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiRequestError, apiRequest } from '../../shared/api';
 import { StatusBadge, TextAreaField } from '../../shared/ui';
@@ -74,16 +74,34 @@ const errorText = (error: unknown) =>
     : 'Не получилось. Попробуйте ещё раз';
 
 /** «Принять» и «Отклонить» с необязательной причиной — по `actions[]` записи. */
-function Decision({ eventId, participant }: { eventId: string; participant: Participant }) {
+// После решения строка заявки уходит в другой раздел, а форма причины — по «Отмена»: фокус
+// не должен падать на body — на заголовок «Ждут решения» или обратно на «Отклонить»
+const focusLater = (target: () => HTMLElement | null) =>
+  requestAnimationFrame(() => target()?.focus());
+
+function Decision({
+  eventId,
+  participant,
+  afterDecision,
+}: {
+  eventId: string;
+  participant: Participant;
+  afterDecision(): void;
+}) {
   const decision = useDecision(eventId);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
   const hintId = useId();
+  const rejectButton = useRef<HTMLButtonElement>(null);
+  const decided = { onSuccess: afterDecision };
   const accept = findAction(participant.actions, 'accept_participation');
   const reject = findAction(participant.actions, 'reject_participation');
   const submitReject = (form: FormEvent) => {
     form.preventDefault();
-    decision.mutate({ participationId: participant.id, decision: 'reject', reason: reason.trim() });
+    decision.mutate(
+      { participationId: participant.id, decision: 'reject', reason: reason.trim() },
+      decided,
+    );
   };
   return (
     <div className="participant-decision">
@@ -94,13 +112,16 @@ function Decision({ eventId, participant }: { eventId: string; participant: Part
             type="button"
             disabled={!accept.enabled || decision.isPending}
             aria-describedby={accept.enabled ? undefined : hintId}
-            onClick={() => decision.mutate({ participationId: participant.id, decision: 'accept' })}
+            onClick={() =>
+              decision.mutate({ participationId: participant.id, decision: 'accept' }, decided)
+            }
           >
             Принять
           </button>
         )}
         {reject && !rejecting && (
           <button
+            ref={rejectButton}
             className="button"
             type="button"
             disabled={!reject.enabled || decision.isPending}
@@ -129,7 +150,14 @@ function Decision({ eventId, participant }: { eventId: string; participant: Part
             <button className="button button-primary" type="submit" disabled={decision.isPending}>
               Отклонить заявку
             </button>
-            <button className="button" type="button" onClick={() => setRejecting(false)}>
+            <button
+              className="button"
+              type="button"
+              onClick={() => {
+                setRejecting(false);
+                focusLater(() => rejectButton.current);
+              }}
+            >
               Отмена
             </button>
           </div>
@@ -149,16 +177,19 @@ function Group({
   people,
   eventId,
   empty,
+  titleId,
+  afterDecision,
 }: {
   title: string;
   people: Participant[];
   eventId: string;
   empty: string;
+  titleId: string;
+  afterDecision(): void;
 }) {
-  const titleId = useId();
   return (
     <section className="participants-group" aria-labelledby={titleId}>
-      <h2 id={titleId}>
+      <h2 id={titleId} tabIndex={-1}>
         {title} <span className="participants-count">{people.length}</span>
       </h2>
       {people.length === 0 ? (
@@ -181,7 +212,9 @@ function Group({
                   {person.answer}
                 </p>
               )}
-              {person.actions.length > 0 && <Decision eventId={eventId} participant={person} />}
+              {person.actions.length > 0 && (
+                <Decision eventId={eventId} participant={person} afterDecision={afterDecision} />
+              )}
             </li>
           ))}
         </ul>
@@ -196,6 +229,9 @@ function Group({
  */
 export function ParticipantsPanel({ eventId, active }: { eventId: string; active: boolean }) {
   const list = useParticipants(eventId, active);
+  const id = useId();
+  const titleId = (group: string) => `${id}-${group}`;
+  const toPending = () => focusLater(() => document.getElementById(titleId('pending')));
   if (list.isPending) return <p role="status">Загрузка…</p>;
   if (list.isError) {
     return (
@@ -207,16 +243,39 @@ export function ParticipantsPanel({ eventId, active }: { eventId: string; active
   const { pending, confirmed, waitlist, archive } = list.data;
   return (
     <div className="participants">
-      <Group title="Ждут решения" people={pending} eventId={eventId} empty="Новых заявок нет" />
-      <Group title="Участники" people={confirmed} eventId={eventId} empty="Пока никто не записан" />
+      <Group
+        title="Ждут решения"
+        people={pending}
+        eventId={eventId}
+        empty="Новых заявок нет"
+        titleId={titleId('pending')}
+        afterDecision={toPending}
+      />
+      <Group
+        title="Участники"
+        people={confirmed}
+        eventId={eventId}
+        empty="Пока никто не записан"
+        titleId={titleId('confirmed')}
+        afterDecision={toPending}
+      />
       {waitlist.length > 0 && (
-        <Group title="Лист ожидания" people={waitlist} eventId={eventId} empty="" />
+        <Group
+          title="Лист ожидания"
+          people={waitlist}
+          eventId={eventId}
+          empty=""
+          titleId={titleId('waitlist')}
+          afterDecision={toPending}
+        />
       )}
       <Group
         title="Архив"
         people={archive}
         eventId={eventId}
         empty="Отклонённых и отменённых записей нет"
+        titleId={titleId('archive')}
+        afterDecision={toPending}
       />
     </div>
   );
