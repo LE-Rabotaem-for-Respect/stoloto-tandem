@@ -435,9 +435,9 @@ describe('одновременные изменения каталога', () =>
 
   it('цепочка A→B→C: имена A и B ведут к C, мероприятие A — на C', async () => {
     const cookie = await admin();
-    const a = await sport('Бадминтон уличный');
-    const b = await sport('Бадминтон на улице');
-    const c = await sport('Бадминтон');
+    const a = await sport('Городки уличные');
+    const b = await sport('Городки на улице');
+    const c = await sport('Городки');
     const event = await eventOn(a.id);
 
     expect((await merge(cookie, a.id, b.id)).status).toBe(200);
