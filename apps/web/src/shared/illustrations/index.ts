@@ -36,6 +36,7 @@ export const ICONS = [
   'action-back',
   'action-profile',
   'action-contrast',
+  'action-theme',
   'action-first-time',
   'action-price',
   'action-uniform',

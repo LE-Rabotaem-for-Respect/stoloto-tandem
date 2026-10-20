@@ -1,15 +1,143 @@
-/* Лента и поиск: на 360 px — строка поиска, быстрые даты и свёрнутые «Фильтры». */
+/* Лента и поиск: на 360 px — яркий первый блок со строкой поиска, быстрыми датами и
+   свёрнутыми «Фильтрами», ниже — карточки. */
+
+/* Первый блок: «размытый» градиент фисташки, инея и денима */
+.feed-hero {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-5);
+  padding: var(--space-5) var(--space-4);
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--gradient-hero);
+  box-shadow: var(--shadow-card);
+}
+
+/* Два мягких пятна — знак «тандема»: медленно дышат, при «Уменьшить движение» стоят */
+.feed-hero-blob {
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  filter: blur(36px);
+  opacity: 0.75;
+  pointer-events: none;
+  animation: hero-drift 14s ease-in-out infinite alternate;
+}
+
+.feed-hero-blob-a {
+  top: -30%;
+  right: -10%;
+  width: 60%;
+  aspect-ratio: 1;
+  background: var(--denim);
+}
+
+.feed-hero-blob-b {
+  bottom: -40%;
+  left: -15%;
+  width: 55%;
+  aspect-ratio: 1;
+  background: var(--pistachio);
+  animation-delay: -7s;
+}
+
+[data-theme='contrast'] .feed-hero-blob {
+  display: none;
+}
+
+/* В тёмной схеме пятна приглушены: белый текст на них остаётся читаемым */
+[data-scheme='dark'] .feed-hero-blob {
+  opacity: 0.32;
+}
+
+[data-theme='contrast'] .feed-hero {
+  border: var(--border-width) solid var(--color-line);
+}
+
+@keyframes hero-drift {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+
+  to {
+    transform: translate(-8%, 10%) scale(1.12);
+  }
+}
+
+.feed-hero-text {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.feed-hero-kicker {
+  margin: 0;
+  font-size: var(--fs-body);
+}
+
+.feed-hero-kicker .script-accent {
+  color: var(--color-ink);
+}
+
+.feed-hero h1 {
+  margin: 0;
+  max-width: 14ch;
+  font-size: var(--fs-hero);
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+}
+
+.feed-hero-lead {
+  margin: 0;
+  max-width: 36ch;
+  font-size: var(--fs-lead);
+  font-weight: 500;
+}
+
+/* Подзаголовок и текст поверх градиента — на светлой подложке в тёмной схеме тоже читаются */
+[data-scheme='dark'] .feed-hero-lead {
+  color: var(--color-ink);
+}
+
+@media (min-width: 768px) {
+  .feed-hero {
+    gap: var(--space-5);
+    padding: var(--space-7) var(--space-6) var(--space-6);
+  }
+}
+
+@media (min-width: 1100px) {
+  .feed-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    align-items: end;
+  }
+}
 
 .feed-filters {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
+  margin: 0;
 }
 
+/* Поиск — белая «пилюля» с кнопкой внутри */
 .feed-search {
   display: flex;
   gap: var(--space-2);
+  padding: var(--space-1);
+  border: var(--border-width) solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow var(--motion-base) var(--ease-out);
+}
+
+.feed-search:focus-within {
+  box-shadow:
+    0 0 0 4px var(--color-sky-soft),
+    var(--shadow-lift);
 }
 
 /* Поле поиска сжимается: без width у type=search своя ширина и при крупном
@@ -19,12 +147,30 @@
   width: 100%;
   min-width: 0;
   min-height: var(--tap-min);
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width) solid var(--color-line-strong);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
   color: var(--color-ink);
   font: inherit;
+}
+
+.feed-search input::placeholder {
+  color: var(--color-ink-muted);
+}
+
+/* Кольцо фокуса — у всей «пилюли» (focus-within), не у поля внутри */
+.feed-search input:focus-visible {
+  outline: none;
+}
+
+.feed-search:has(input:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.feed-search .button {
+  flex: none;
 }
 
 .feed-dates {
@@ -36,46 +182,136 @@
   border: 0;
 }
 
+/* Быстрые даты — «пилюли»; выбранная — charcoal с галочкой, видно не только по цвету */
 .feed-chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   min-height: var(--tap-min);
-  padding: 0 var(--space-3);
+  padding: 0 var(--space-4);
   border: var(--border-width) solid var(--color-line-strong);
-  border-radius: 999px;
-  background: var(--color-surface);
+  border-radius: var(--radius-pill);
+  background: var(--color-glass);
+  font-weight: 600;
   cursor: pointer;
+  transition:
+    background-color var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    transform var(--motion-fast) var(--ease-out);
+}
+
+.feed-chip:hover {
+  border-color: var(--color-ink);
+}
+
+.feed-chip:active {
+  transform: scale(0.96);
 }
 
 .feed-chip:has(input:checked) {
-  border-color: var(--color-primary);
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--color-on-action);
   font-weight: 700;
+  animation: pop-in var(--motion-base) var(--ease-spring);
 }
 
+[data-theme='contrast'] .feed-chip:has(input:checked) {
+  background: var(--color-paper);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* Радиокнопка спрятана визуально, но остаётся в обходе клавиатурой; вместо кружка — галочка */
 .feed-chip input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
   margin: 0;
+  opacity: 0;
+}
+
+.feed-chip:has(input:checked)::before {
+  content: '✓' / '';
+}
+
+.feed-chip:has(input:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.feed-more {
+  border-radius: var(--radius-control);
 }
 
 .feed-more summary {
-  display: flex;
+  display: inline-flex;
   gap: var(--space-2);
   align-items: center;
   min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border: var(--border-width) solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-glass);
   font-weight: 600;
   cursor: pointer;
+  list-style: none;
+  transition: border-color var(--motion-fast) ease;
+}
+
+.feed-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.feed-more summary:hover {
+  border-color: var(--color-ink);
+}
+
+/* Стрелка: «Фильтры» раскрываются — стрелка поворачивается */
+.feed-more summary::after {
+  content: '';
+  width: 0.5em;
+  height: 0.5em;
+  margin-left: var(--space-1);
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-25%) rotate(45deg);
+  transition: transform var(--motion-base) var(--ease-out);
+}
+
+.feed-more[open] summary::after {
+  transform: translateY(15%) rotate(225deg);
 }
 
 .feed-more-fields {
   display: grid;
   gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--color-line);
+  border-radius: var(--radius-inner);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+@media (min-width: 768px) {
+  .feed-more-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+  }
+
+  .feed-more-fields > :first-child {
+    grid-column: 1 / -1;
+  }
 }
 
 .feed-more-fields input,
 .feed-more-fields select {
   width: 100%;
   min-height: var(--tap-min);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   border: var(--border-width) solid var(--color-line-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
@@ -84,16 +320,17 @@
 }
 
 .feed-total {
-  margin: 0 0 var(--space-2);
+  margin: 0 0 var(--space-3);
   color: var(--color-ink-muted);
+  font-weight: 600;
 }
 
 /* Лента: одна колонка, с 768 px — две, с 1280 px — три (docs/design.md) */
 .feed-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-3);
-  margin: 0 0 var(--space-4);
+  gap: var(--space-4);
+  margin: 0 0 var(--space-5);
   padding: 0;
   list-style: none;
 }
@@ -101,6 +338,7 @@
 @media (min-width: 768px) {
   .feed-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-5);
   }
 }
 
@@ -110,58 +348,188 @@
   }
 }
 
+/* Карточки появляются «лесенкой» */
+.feed-card {
+  animation: rise-in var(--motion-enter) var(--ease-out) both;
+  animation-delay: calc(var(--order, 0) * 55ms);
+}
+
+/* Карточка как в референсе: белая рамка, картинка внутри со скруглением, текст снизу */
 .feed-card-link {
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden;
+  padding: var(--space-2);
   border: var(--border-width) solid var(--color-line);
   border-radius: var(--radius-card);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
   color: inherit;
   text-decoration: none;
+  transition:
+    transform var(--motion-base) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out),
+    border-color var(--motion-base) ease;
+}
+
+.feed-card-link:hover {
+  color: inherit;
+  border-color: var(--color-sky-soft);
+  box-shadow: var(--shadow-lift);
+  transform: translateY(-4px);
+}
+
+.feed-card-link:active {
+  transform: translateY(-1px) scale(0.99);
 }
 
 .feed-card-link:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 2px;
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
 }
 
-/* Обложка 16:9 на всю ширину, рисунок целиком — обрезать нельзя (docs/design.md) */
+.feed-card-media {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-inner);
+  background: var(--gradient-cover);
+}
+
+/* Обложка 16:9 на всю ширину, рисунок целиком — обрезать нельзя (docs/design.md).
+   Пастельный фон рисунка смешивается с градиентом карточки — все группы в одной палитре */
 .feed-card-cover {
   display: block;
   width: 100%;
   height: auto;
   aspect-ratio: 16 / 9;
   object-fit: contain;
+  mix-blend-mode: multiply;
+  transition: transform 600ms var(--ease-out);
+}
+
+.feed-card-link:hover .feed-card-cover {
+  transform: scale(1.05);
+}
+
+[data-scheme='dark'] .feed-card-cover {
+  mix-blend-mode: normal;
+  opacity: 0.92;
 }
 
 /* Контурная обложка в <img> рисуется чёрным: на чёрном фоне темы — инверсия */
 [data-theme='contrast'] .feed-card-cover {
   filter: invert(1);
+  mix-blend-mode: normal;
+  opacity: 1;
+}
+
+/* «Вырез» в правом верхнем углу картинки: режим записи на фоне карточки, углы выреза
+   вогнутые — как ценник в референсе */
+.feed-card-tag {
+  --notch: var(--radius-inner);
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: var(--space-1) var(--space-1) var(--space-2) var(--space-3);
+  border-bottom-left-radius: var(--notch);
+  background: var(--color-surface);
+}
+
+.feed-card-tag::before,
+.feed-card-tag::after {
+  content: '';
+  position: absolute;
+  width: var(--notch);
+  height: var(--notch);
+  background: radial-gradient(
+    circle at 0 100%,
+    transparent calc(var(--notch) - 0.5px),
+    var(--color-surface) var(--notch)
+  );
+}
+
+.feed-card-tag::before {
+  top: 0;
+  right: 100%;
+}
+
+.feed-card-tag::after {
+  top: 100%;
+  right: 0;
+}
+
+.feed-card-tag .mode-badge {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-lime-soft);
+}
+
+[data-theme='contrast'] .feed-card-tag .mode-badge {
+  border: var(--border-width) solid var(--color-line);
 }
 
 .feed-card-body {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-3);
+  padding: var(--space-4) var(--space-3) var(--space-3);
 }
 
 .feed-card-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-lead);
   font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
 .feed-card-meta {
   display: flex;
-  flex-wrap: wrap;
   gap: var(--space-2) var(--space-3);
   align-items: center;
+  justify-content: space-between;
+}
+
+/* Кружок со стрелкой ↗ — «подробнее»; при наведении поворачивается вправо */
+.feed-card-go {
+  display: grid;
+  flex: none;
+  place-items: center;
+  align-self: flex-end;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border-radius: 50%;
+  background: var(--color-action);
+  color: var(--color-on-action);
+  transition:
+    transform var(--motion-base) var(--ease-spring),
+    background-color var(--motion-fast) ease;
+}
+
+.feed-card-go .icon {
+  transform: rotate(135deg);
+  transition: transform var(--motion-base) var(--ease-spring);
+}
+
+.feed-card-link:hover .feed-card-go {
+  background: var(--color-marker);
+  color: var(--color-on-marker);
+  transform: scale(1.06);
+}
+
+.feed-card-link:hover .feed-card-go .icon {
+  transform: rotate(180deg);
+}
+
+[data-theme='contrast'] .feed-card-go {
+  border: var(--border-width) solid var(--color-line);
 }
 
 .feed-card-area {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
   color: var(--color-ink-muted);
   overflow-wrap: anywhere;
 }

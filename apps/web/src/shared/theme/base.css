@@ -9,6 +9,7 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  background: var(--color-paper);
 }
 
 body {
@@ -18,18 +19,24 @@ body {
   color: var(--color-ink);
   font-family: var(--font-text);
   line-height: var(--lh-text);
+  -webkit-font-smoothing: antialiased;
+  transition:
+    background-color var(--motion-base) ease,
+    color var(--motion-base) ease;
 }
 
 h1,
 h2 {
   margin: 0 0 var(--space-4);
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: var(--tracking-display);
   line-height: var(--lh-tight);
 }
 
 /* Длинное слово в заголовке («Достопримечательности») переносится по слогам, а если и так
-   не помещается — рвётся: широкий Unbounded иначе даёт горизонтальную прокрутку на 360 px */
+   не помещается — рвётся: плотный заголовочный шрифт иначе даёт горизонтальную прокрутку
+   на 360 px */
 h1,
 h2,
 h3 {
@@ -43,6 +50,7 @@ h1 {
 
 h2 {
   font-size: var(--fs-lead);
+  font-weight: 700;
 }
 
 p {
@@ -52,6 +60,18 @@ p {
 
 a {
   color: var(--color-primary);
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 0.08em;
+  transition: color var(--motion-fast) ease;
+}
+
+a:hover {
+  color: var(--color-primary-hover);
+}
+
+::selection {
+  background: var(--color-marker);
+  color: var(--color-on-marker);
 }
 
 :focus-visible {
@@ -71,6 +91,17 @@ a {
   border: 0;
 }
 
+/* Рукописный акцент — короткая подпись над заголовком, как в референсе */
+.script-accent {
+  display: inline-block;
+  font-family: var(--font-script);
+  font-size: calc(1.6em);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-primary);
+  transform: rotate(-3deg);
+}
+
 /* Пиктограмма: SVG-маска цветом текста, 1,25 от размера текста рядом */
 .icon {
   display: inline-block;
@@ -86,31 +117,54 @@ a {
   -webkit-mask-position: center;
 }
 
+/* Кнопки — «пилюли»: мягкий подъём при наведении, лёгкое сжатие при нажатии */
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
   min-height: var(--tap-min);
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-5);
   border: var(--border-width) solid var(--color-line-strong);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   background: var(--color-surface);
   color: var(--color-ink);
   font: inherit;
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
+  transition:
+    transform var(--motion-fast) var(--ease-out),
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-base) var(--ease-out),
+    color var(--motion-fast) ease;
 }
 
+.button:hover:not(:disabled, [aria-disabled='true']) {
+  border-color: var(--color-ink);
+  transform: translateY(-1px);
+}
+
+.button:active:not(:disabled, [aria-disabled='true']) {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Главная кнопка — charcoal (в тёмной схеме — фисташка), с кружком-стрелкой слева */
 .button-primary {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  position: relative;
+  border-color: var(--color-action);
+  background: var(--gradient-action);
+  color: var(--color-on-action);
   font-weight: 700;
+  box-shadow: var(--shadow-card);
 }
 
-.button-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
+.button-primary:hover:not(:disabled, [aria-disabled='true']) {
+  border-color: var(--color-action-hover);
+  background: var(--color-action-hover);
+  color: var(--color-on-action);
+  box-shadow: var(--shadow-lift);
 }
 
 /* aria-disabled — неактивная кнопка, которая не теряет фокус (ждёт ответа на своё действие) */
@@ -118,8 +172,13 @@ a {
 .button[aria-disabled='true'] {
   cursor: default;
   color: var(--color-ink-muted);
-  background: var(--color-surface);
+  background: var(--color-surface-2);
   border-color: var(--color-line-strong);
+  box-shadow: none;
+}
+
+[data-theme='contrast'] .button-primary {
+  background: var(--color-action);
 }
 
 .form {
@@ -144,12 +203,27 @@ a {
   /* Поле сжимается по сетке: у даты и времени своя ширина по содержимому */
   min-width: 0;
   min-height: var(--tap-min);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   border: var(--border-width) solid var(--color-line-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-ink);
   font: inherit;
+  transition:
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.field input:hover,
+.field textarea:hover,
+.field select:hover {
+  border-color: var(--color-ink);
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible,
+.field select:focus-visible {
+  box-shadow: 0 0 0 4px var(--color-sky-soft);
 }
 
 .field textarea {
@@ -168,9 +242,10 @@ a {
 }
 
 .form-error {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-control);
   background: var(--status-bad-bg);
+  animation: rise-in var(--motion-base) var(--ease-out) both;
 }
 
 .choice {
@@ -186,16 +261,30 @@ a {
   align-items: center;
   gap: var(--space-3);
   min-height: var(--tap-min);
-  padding: 0 var(--space-3);
+  padding: 0 var(--space-4);
   border: var(--border-width) solid var(--color-line);
   border-radius: var(--radius-control);
   background: var(--color-surface);
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+
+.choice-option:hover {
+  border-color: var(--color-line-strong);
+}
+
+.choice-option:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-surface-2);
 }
 
 .choice-option input {
   width: 1.25em;
   height: 1.25em;
   margin: 0;
+  accent-color: var(--color-primary);
 }
 
 .facts {
@@ -234,8 +323,8 @@ a {
 
 .appearance-options [aria-pressed='true'] {
   border-color: var(--color-primary);
-  background: var(--color-paper);
-  color: var(--color-primary);
+  background: var(--color-sky-soft);
+  color: var(--color-ink);
 }
 
 /* Включённое видно не только по цвету: галочка перед подписью (для чтения с экрана
@@ -247,4 +336,97 @@ a {
 .appearance-hint {
   margin: 0;
   color: var(--color-ink-muted);
+}
+
+/* Белая «стеклянная» панель — профиль, формы входа и создания */
+.panel {
+  padding: var(--space-5);
+  border: var(--border-width) solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+/* На телефоне панель — с меньшими полями, чтобы форма не сжималась */
+@media (max-width: 767px) {
+  .panel {
+    padding: var(--space-4);
+  }
+}
+
+/* Вход и регистрация: подпись от руки и цветная полоса сверху */
+.auth-panel {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: var(--space-5);
+}
+
+.auth-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 6px;
+  background: linear-gradient(90deg, var(--pistachio), var(--denim));
+}
+
+[data-theme='contrast'] .auth-panel::before {
+  background: var(--color-marker);
+}
+
+.auth-kicker {
+  margin: 0 0 var(--space-1);
+}
+
+.auth-switch {
+  margin: 0;
+}
+
+/* Появление содержимого: снизу вверх с прозрачности */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Раскрытый блок <details> — содержимое мягко проявляется */
+details[open] > :not(summary) {
+  animation: rise-in var(--motion-base) var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+  }
 }

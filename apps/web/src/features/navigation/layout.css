@@ -17,6 +17,19 @@ html {
   position: sticky;
   top: 0;
   z-index: 10;
+  border-bottom: var(--border-width) solid var(--color-line);
+}
+
+/* «Стекло» — на подложке, а не на самой шапке: backdrop-filter у предка сделал бы его
+   опорой для position: fixed, и нижняя панель уехала бы наверх вместе с шапкой */
+.app-top::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--color-glass);
+  -webkit-backdrop-filter: saturate(1.6) blur(14px);
+  backdrop-filter: saturate(1.6) blur(14px);
 }
 
 .skip-link {
@@ -25,6 +38,7 @@ html {
   top: -100px;
   z-index: 20;
   padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
   background: var(--color-surface);
   color: var(--color-primary);
 }
@@ -44,15 +58,16 @@ html {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2) var(--space-3);
+  max-width: 1200px;
   min-height: 56px;
+  margin: 0 auto;
   padding: var(--space-1) var(--space-4);
-  border-bottom: var(--border-width) solid var(--color-line);
-  background: var(--color-surface);
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
+  gap: var(--space-2);
   min-width: 0;
   min-height: var(--tap-min);
   margin-right: auto;
@@ -61,8 +76,65 @@ html {
   text-overflow: ellipsis;
   color: var(--color-ink);
   font-family: var(--font-display);
-  font-weight: 700;
+  font-size: var(--fs-lead);
+  font-weight: 800;
+  letter-spacing: var(--tracking-display);
   text-decoration: none;
+}
+
+.brand:hover {
+  color: var(--color-ink);
+}
+
+/* Знак «Тандем»: два пересекающихся круга — фисташка и деним */
+.brand-mark {
+  position: relative;
+  flex: none;
+  width: calc(2.25rem * var(--text-scale));
+  height: calc(1.5rem * var(--text-scale));
+}
+
+.brand-mark::before,
+.brand-mark::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: calc(1.5rem * var(--text-scale));
+  height: calc(1.5rem * var(--text-scale));
+  border-radius: 50%;
+  transition: transform var(--motion-base) var(--ease-spring);
+}
+
+.brand-mark::before {
+  left: 0;
+  background: var(--pistachio);
+}
+
+.brand-mark::after {
+  right: 0;
+  background: var(--denim);
+  mix-blend-mode: multiply;
+}
+
+.brand:hover .brand-mark::before {
+  transform: translateX(-3px);
+}
+
+.brand:hover .brand-mark::after {
+  transform: translateX(3px);
+}
+
+[data-scheme='dark'] .brand-mark::after {
+  mix-blend-mode: normal;
+  opacity: 0.85;
+}
+
+[data-theme='contrast'] .brand-mark::before,
+[data-theme='contrast'] .brand-mark::after {
+  border: 2px solid var(--color-ink);
+  background: none;
+  mix-blend-mode: normal;
+  opacity: 1;
 }
 
 .theme-switches {
@@ -74,21 +146,57 @@ html {
 .header-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-1);
+  min-width: var(--tap-min);
   min-height: var(--tap-min);
-  padding: 0 var(--space-2);
+  padding: 0 var(--space-3);
   border: var(--border-width) solid transparent;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   background: none;
   color: var(--color-primary);
   font: inherit;
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
+  transition:
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    transform var(--motion-fast) var(--ease-out);
+}
+
+.header-button {
+  color: var(--color-ink);
+}
+
+.header-button:hover,
+.header-link:hover {
+  background: var(--color-surface-2);
+}
+
+.header-button:active {
+  transform: scale(0.94);
 }
 
 .header-button[aria-pressed='true'] {
+  border-color: var(--color-ink);
+  background: var(--color-marker);
+  color: var(--color-on-marker);
+}
+
+[data-theme='contrast'] .header-button[aria-pressed='true'] {
   border-color: var(--color-primary);
   background: var(--color-paper);
+  color: var(--color-primary);
+}
+
+/* Луна поворачивается, когда тёмная схема включается */
+.header-button-theme .icon {
+  transition: transform var(--motion-base) var(--ease-spring);
+}
+
+.header-button-theme[aria-pressed='true'] .icon {
+  transform: rotate(-25deg);
 }
 
 .account {
@@ -110,6 +218,27 @@ html {
   font-weight: 600;
 }
 
+/* Имя вошедшего — с кружком-аватаром из первой буквы */
+.account-avatar {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: calc(2rem * var(--text-scale));
+  height: calc(2rem * var(--text-scale));
+  margin-right: var(--space-1);
+  border-radius: 50%;
+  background: var(--color-lime-soft);
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: var(--fs-caption);
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+[data-theme='contrast'] .account-avatar {
+  border: 2px solid var(--color-ink);
+}
+
 /* До 768 px: в первой строке название и переключатели тем, во второй — под кем
    вход и «Сменить аккаунт» (ТЗ 2.6: они видны всегда, а в одну строку на 360 px
    не помещаются) */
@@ -122,14 +251,19 @@ html {
 
   /* В сетке растягивается на всю колонку — иначе длинное название наезжает на переключатели */
   .brand {
-    display: block;
+    display: flex;
     margin-right: 0;
     line-height: var(--tap-min);
   }
 
   .account {
+    flex-wrap: nowrap;
     grid-column: 1 / -1;
     border-top: var(--border-width) solid var(--color-line);
+  }
+
+  .account .header-link {
+    flex: none;
   }
 
   /* Имя — в одну строку с многоточием: длинное название организации иначе добавляет
@@ -144,6 +278,24 @@ html {
   }
 }
 
+/* На узком экране у «Контраста» остаётся пиктограмма: подпись читает экранный диктор,
+   а три переключателя помещаются рядом с названием */
+@media (max-width: 479px) {
+  .header-button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .header-button {
+    padding: 0 var(--space-2);
+  }
+}
+
 .app-main {
   max-width: 1200px;
   margin: 0 auto;
@@ -154,18 +306,35 @@ html {
   outline: none;
 }
 
-.page-narrow {
-  max-width: 32rem;
+/* Смена страницы: содержимое мягко поднимается */
+.page-enter {
+  animation: rise-in var(--motion-enter) var(--ease-out) both;
 }
 
-/* На мобильном — нижняя панель из пяти пунктов, пиктограмма над подписью */
+.page-narrow {
+  max-width: 34rem;
+}
+
+/* На мобильном — нижняя панель из пяти пунктов, пиктограмма над подписью: тёмная
+   charcoal-полоса, активный пункт — фисташковая «пилюля» под пиктограммой */
 .main-nav {
   position: fixed;
   right: 0;
   bottom: 0;
   left: 0;
   z-index: 10;
+  border-radius: var(--radius-inner) var(--radius-inner) 0 0;
+  background: var(--charcoal);
+  box-shadow: var(--shadow-nav);
+}
+
+[data-scheme='dark'] .main-nav {
+  background: #1d1d1d;
+}
+
+[data-theme='contrast'] .main-nav {
   border-top: var(--border-width) solid var(--color-line);
+  border-radius: 0;
   background: var(--color-surface);
 }
 
@@ -180,6 +349,7 @@ html {
 }
 
 .main-nav-link {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -187,23 +357,41 @@ html {
   gap: 2px;
   min-height: var(--nav-height);
   padding: var(--space-1) 2px;
-  color: var(--color-ink-muted);
+  color: #c9d1d9;
   font-size: var(--fs-caption);
   line-height: var(--lh-tight);
   text-align: center;
   text-decoration: none;
   hyphens: auto;
+  transition: color var(--motion-fast) ease;
+}
+
+.main-nav-link:hover {
+  color: #ffffff;
+}
+
+[data-theme='contrast'] .main-nav-link {
+  color: var(--color-ink-muted);
 }
 
 .main-nav-link .icon {
   /* Пиктограмма растёт вместе с темой «Крупный текст» */
   width: calc(1.5rem * var(--text-scale));
   height: calc(1.5rem * var(--text-scale));
+  transition: transform var(--motion-base) var(--ease-spring);
+}
+
+.main-nav-link:active .icon {
+  transform: scale(0.88);
 }
 
 .main-nav-link[aria-current='page'] {
-  color: var(--color-primary);
+  color: var(--pistachio);
   font-weight: 700;
+}
+
+[data-theme='contrast'] .main-nav-link[aria-current='page'] {
+  color: var(--color-primary);
   box-shadow: inset 0 3px 0 var(--color-marker);
 }
 
@@ -219,13 +407,58 @@ html {
     width: 1.5em;
     height: 1.5em;
   }
+
+  /* Фисташковая «пилюля» под пиктограммой активного пункта */
+  .main-nav-link::before {
+    content: '';
+    position: absolute;
+    top: calc(var(--space-1) + 1px);
+    left: 50%;
+    width: 3.25em;
+    height: 2em;
+    border-radius: var(--radius-pill);
+    background: var(--pistachio);
+    opacity: 0;
+    transform: translateX(-50%) scale(0.6);
+    transition:
+      opacity var(--motion-base) ease,
+      transform var(--motion-base) var(--ease-spring);
+  }
+
+  .main-nav-link[aria-current='page']::before {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+
+  .main-nav-link[aria-current='page'] .icon {
+    position: relative;
+    color: var(--charcoal);
+  }
+
+  [data-theme='contrast'] .main-nav-link::before {
+    display: none;
+  }
+
+  [data-theme='contrast'] .main-nav-link[aria-current='page'] .icon {
+    color: var(--color-primary);
+  }
 }
 
-/* С 768 px панель становится верхним меню под шапкой */
+/* С 768 px панель становится верхним меню под шапкой: ряд «пилюль» */
 @media (min-width: 768px) {
   .main-nav {
     position: static;
     bottom: auto;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  [data-scheme='dark'] .main-nav {
+    background: none;
+  }
+
+  [data-theme='contrast'] .main-nav {
     border-top: 0;
     border-bottom: var(--border-width) solid var(--color-line);
   }
@@ -235,29 +468,59 @@ html {
   .main-nav ul {
     display: flex;
     flex-wrap: wrap;
-    gap: 0 var(--space-2);
+    gap: var(--space-1) var(--space-2);
     max-width: 1200px;
     margin: 0 auto;
-    padding: 0 var(--space-4);
+    padding: 0 var(--space-4) var(--space-2);
   }
 
   .main-nav-link {
     flex-direction: row;
     gap: var(--space-2);
     min-height: var(--tap-min);
-    padding: 0 var(--space-3);
+    padding: 0 var(--space-4);
+    border-radius: var(--radius-pill);
+    color: var(--color-ink);
     font-size: var(--fs-body);
+    font-weight: 600;
     /* Подписи меню — одной строкой, без переносов с дефисом */
     white-space: nowrap;
     hyphens: manual;
+    transition:
+      background-color var(--motion-fast) ease,
+      color var(--motion-fast) ease;
+  }
+
+  .main-nav-link:hover {
+    background: var(--color-surface);
+    color: var(--color-ink);
   }
 
   .main-nav-link[aria-current='page'] {
+    background: var(--color-action);
+    color: var(--color-on-action);
+  }
+
+  /* До 1024 px пять пунктов в обычном тексте помещаются в одну строку только плотнее */
+  @media (max-width: 1023px) {
+    .main-nav ul {
+      gap: var(--space-1);
+    }
+
+    .main-nav-link {
+      padding: 0 var(--space-3);
+    }
+  }
+
+  [data-theme='contrast'] .main-nav-link[aria-current='page'] {
+    background: none;
+    color: var(--color-primary);
     box-shadow: inset 0 -3px 0 var(--color-marker);
   }
 
   .app-main {
-    padding-bottom: var(--space-6);
+    padding-top: var(--space-6);
+    padding-bottom: var(--space-7);
   }
 
   html {
@@ -270,10 +533,11 @@ html {
 }
 
 .quick-login {
-  padding: var(--space-4);
+  padding: var(--space-5);
   border: var(--border-width) solid var(--color-line);
   border-radius: var(--radius-card);
   background: var(--color-surface);
+  box-shadow: var(--shadow-card);
 }
 
 .quick-login-list {
@@ -295,6 +559,7 @@ html {
   align-items: flex-start;
   gap: 0;
   width: 100%;
+  border-radius: var(--radius-control);
   text-align: left;
 }
 
@@ -302,10 +567,6 @@ html {
   color: var(--color-ink-muted);
   font-size: var(--fs-caption);
   font-weight: 400;
-}
-
-.main-nav-link {
-  position: relative;
 }
 
 /* В нижней панели счётчик — в углу пиктограммы, а не третьей строкой: высота панели не прыгает */
@@ -321,12 +582,18 @@ html {
   min-width: 1.5em;
   padding: 0 var(--space-1);
   border-radius: 999px;
-  background: var(--color-marker);
-  color: var(--color-on-marker);
+  background: var(--color-sky);
+  color: var(--charcoal);
   font-size: var(--fs-caption);
   font-weight: 700;
   line-height: 1.5;
   text-align: center;
+  animation: pop-in var(--motion-base) var(--ease-spring) both;
+}
+
+[data-theme='contrast'] .badge {
+  background: var(--color-marker);
+  color: var(--color-on-marker);
 }
 
 .notifications {
@@ -337,23 +604,36 @@ html {
   list-style: none;
 }
 
+.notifications > li {
+  animation: rise-in var(--motion-enter) var(--ease-out) both;
+}
+
 .notification-body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1) var(--space-3);
   min-height: var(--tap-min);
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border: var(--border-width) solid var(--color-line);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-ink);
   text-decoration: none;
+  transition:
+    transform var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out);
+}
+
+a.notification-body:hover {
+  color: var(--color-ink);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-1px);
 }
 
 .notification-unread .notification-body {
   border-color: var(--color-marker-strong);
-  box-shadow: inset 4px 0 0 var(--color-marker);
+  box-shadow: inset 5px 0 0 var(--color-marker);
 }
 
 .notification-text {

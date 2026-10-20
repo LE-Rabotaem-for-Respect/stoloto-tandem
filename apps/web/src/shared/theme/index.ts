@@ -1,2 +1,9 @@
-export { ThemeProvider, applyThemeSettings, readThemeSettings, useTheme } from './theme';
-export type { ThemeSettings } from './theme';
+export {
+  ThemeProvider,
+  applyColorScheme,
+  applyThemeSettings,
+  readColorScheme,
+  readThemeSettings,
+  useTheme,
+} from './theme';
+export type { ColorScheme, ThemeSettings } from './theme';
