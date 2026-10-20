@@ -129,6 +129,20 @@ describe('core/config: настройки стенда из окружения',
     }
   });
 
+  it('интервал между сбросами демо-данных: по умолчанию 10 с, 0 — без интервала', () => {
+    expect(loadStandConfig({}).demoResetIntervalSeconds).toBe(10);
+    expect(loadStandConfig({ DEMO_RESET_INTERVAL_SECONDS: '' }).demoResetIntervalSeconds).toBe(10);
+    expect(loadStandConfig({ DEMO_RESET_INTERVAL_SECONDS: '0' }).demoResetIntervalSeconds).toBe(0);
+    expect(loadStandConfig({ DEMO_RESET_INTERVAL_SECONDS: '30' }).demoResetIntervalSeconds).toBe(
+      30,
+    );
+    for (const value of ['-1', '1.5', 'abc']) {
+      expect(() => loadStandConfig({ DEMO_RESET_INTERVAL_SECONDS: value }), value).toThrow(
+        /DEMO_RESET_INTERVAL_SECONDS/,
+      );
+    }
+  });
+
   it('номер стенда без пробелов, пустой — null', () => {
     expect(loadStandConfig({ STAND_ID: ' stand-3 ' }).standId).toBe('stand-3');
     expect(loadStandConfig({ STAND_ID: '  ' }).standId).toBeNull();

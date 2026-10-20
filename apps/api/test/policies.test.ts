@@ -299,23 +299,55 @@ describe('actions[]: пример для карточки события', () =>
 
   it('гость видит запись и обсуждение с requiresAuth', () => {
     expect(card(guest)).toEqual([
-      { code: 'join', enabled: false, requiresAuth: true, reason: 'Войдите, чтобы продолжить' },
+      {
+        code: 'join',
+        enabled: false,
+        requiresAuth: true,
+        reason: 'Войдите, чтобы продолжить',
+        reasonCode: 'unauthorized',
+      },
       {
         code: 'post_message',
         enabled: false,
         requiresAuth: true,
         reason: 'Войдите, чтобы продолжить',
+        reasonCode: 'unauthorized',
       },
     ]);
   });
 
-  it('пользователь может записаться; уже записанный — нет, с причиной из автомата', () => {
+  it('пользователь может записаться; после отмены — снова, после отказа — нет, с причиной', () => {
     expect(card(user)[0]).toEqual({ code: 'join', enabled: true });
-    expect(card(user, 'confirmed')[0]).toEqual({
+    expect(card(user, 'cancelled')[0]).toEqual({ code: 'join', enabled: true });
+    expect(card(user, 'rejected')[0]).toEqual({
       code: 'join',
       enabled: false,
-      reason: expect.stringMatching(/[А-Яа-я]/),
+      reason: 'После отказа повторная заявка на это мероприятие недоступна',
+      reasonCode: 'rejected_final',
     });
+  });
+
+  it.each(['pending', 'confirmed', 'waitlist'] as const)(
+    'запись %s: «Отменить запись» вместо «Записаться»',
+    (status) => {
+      const actions = card(user, status);
+      expect(actions[0]).toEqual({ code: 'leave', enabled: true });
+      expect(actions.map((action) => action.code)).not.toContain('join');
+    },
+  );
+
+  it('после окончания и вне публикации отмена записи неактивна — с причиной', () => {
+    const ended = new Date(userEvent.endsAt.getTime() + 60_000);
+    const event = { ...userEvent, mode: 'free' as const, hasSeats: true };
+    expect(eventActions(user, event, 'confirmed', ended)[0]).toEqual({
+      code: 'leave',
+      enabled: false,
+      reason: 'Мероприятие недоступно для записи',
+      reasonCode: 'event_not_joinable',
+    });
+    expect(
+      eventActions(user, { ...event, status: 'cancelled' }, 'confirmed', now)[0],
+    ).toMatchObject({ code: 'leave', enabled: false });
   });
 
   it('организатор получает управление событием, но не запись на своё', () => {
@@ -325,6 +357,7 @@ describe('actions[]: пример для карточки события', () =>
       code: 'join',
       enabled: false,
       reason: 'Нельзя записаться на своё мероприятие',
+      reasonCode: 'own_event',
     });
   });
 
@@ -334,7 +367,12 @@ describe('actions[]: пример для карточки события', () =>
   });
 
   it('у снятого и удалённого мероприятия обсуждение неактивно для всех ролей (ТЗ 2.10)', () => {
-    const unavailable = { code: 'post_message', enabled: false, reason: 'Мероприятие недоступно' };
+    const unavailable = {
+      code: 'post_message',
+      enabled: false,
+      reason: 'Мероприятие недоступно',
+      reasonCode: 'event_not_available',
+    };
     const actors = { guest, user, author, orgApproved, orgPending, admin };
     for (const status of ['unpublished', 'deleted'] as const) {
       for (const base of [userEvent, orgEvent]) {
@@ -372,6 +410,7 @@ describe('actions[]: заявка в «Участниках и заявках»'
       code: 'accept_participation',
       enabled: false,
       reason: 'Мест нет: увеличьте лимит или дождитесь отмены',
+      reasonCode: 'no_seats',
     });
   });
 

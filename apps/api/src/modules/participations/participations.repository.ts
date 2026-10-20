@@ -43,6 +43,14 @@ export interface ParticipantRow extends ParticipationRow {
   user: { id: string; name: string };
 }
 
+export interface OwnParticipationRow {
+  id: string;
+  eventId: string;
+  status: ParticipationStatus;
+  decisionReason: string | null;
+  createdAt: Date;
+}
+
 @Injectable()
 export class ParticipationsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -105,6 +113,14 @@ export class ParticipationsRepository {
     return row?.eventId ?? null;
   }
 
+  async signedUpUserIds(eventId: string): Promise<string[]> {
+    const rows = await this.prisma.participation.findMany({
+      where: { eventId, status: { in: ['pending', 'confirmed', 'waitlist'] } },
+      select: { userId: true },
+    });
+    return rows.map((row) => row.userId);
+  }
+
   findById(id: string, tx: Db): Promise<ParticipationRow | null> {
     return tx.participation.findUnique({ where: { id }, select: rowSelect });
   }
@@ -123,6 +139,41 @@ export class ParticipationsRepository {
         user: { select: { id: true, name: true } },
       },
     });
+  }
+
+  /**
+   * Записи пользователя, по одной на мероприятие: неотменённая (такая у пары одна), а если
+   * её нет — последняя отменённая, как в карточке мероприятия.
+   */
+  async ofUser(userId: string): Promise<OwnParticipationRow[]> {
+    const rows = await this.prisma.participation.findMany({
+      where: { userId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { id: true, eventId: true, status: true, decisionReason: true, createdAt: true },
+    });
+    const byEvent = new Map<string, OwnParticipationRow>();
+    for (const row of rows) {
+      const kept = byEvent.get(row.eventId);
+      if (!kept || (kept.status === 'cancelled' && row.status !== 'cancelled')) {
+        byEvent.set(row.eventId, row);
+      }
+    }
+    return [...byEvent.values()];
+  }
+
+  /** Позиция в листе ожидания — по порядку (created_at, id), с единицы. */
+  async waitlistPosition(row: OwnParticipationRow): Promise<number> {
+    const ahead = await this.prisma.participation.count({
+      where: {
+        eventId: row.eventId,
+        status: 'waitlist',
+        OR: [
+          { createdAt: { lt: row.createdAt } },
+          { createdAt: row.createdAt, id: { lt: row.id } },
+        ],
+      },
+    });
+    return ahead + 1;
   }
 
   /** Решение организатора: статус меняется, только если он ещё `from`. */

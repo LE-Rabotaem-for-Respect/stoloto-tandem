@@ -4,6 +4,7 @@ import type { IconName } from '../../shared/illustrations';
 import { useTheme } from '../../shared/theme';
 import { Icon } from '../../shared/ui/Icon';
 import { loginPath, returnPath, useLogout, useMe, usePendingActionRelay } from '../auth';
+import { UnreadBadge } from '../notifications';
 
 /** Пять пунктов (ТЗ 2.8): нижняя панель на мобильном, верхнее меню на компьютере. */
 export const NAV_ITEMS: readonly { to: string; label: string; icon: IconName }[] = [
@@ -122,7 +123,7 @@ export function AppLayout() {
       <div className="app-top" ref={top}>
         <header className="app-header">
           <Link className="brand" to="/">
-            Спорт вместе
+            Тандем
           </Link>
           <ThemeSwitches />
           <Account />
@@ -134,6 +135,7 @@ export function AppLayout() {
                 <NavLink to={item.to} end={item.to === '/'} className="main-nav-link">
                   <Icon name={item.icon} />
                   <span>{item.label}</span>
+                  {item.to === '/notifications' && <UnreadBadge />}
                 </NavLink>
               </li>
             ))}
