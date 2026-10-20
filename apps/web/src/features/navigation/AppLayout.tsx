@@ -4,6 +4,7 @@ import type { IconName } from '../../shared/illustrations';
 import { useTheme } from '../../shared/theme';
 import { Icon } from '../../shared/ui/Icon';
 import { loginPath, returnPath, useLogout, useMe, usePendingActionRelay } from '../auth';
+import { DemoPanel } from '../demo';
 import { UnreadBadge } from '../notifications';
 
 /** Пять пунктов (ТЗ 2.8): нижняя панель на мобильном, верхнее меню на компьютере. */
@@ -142,6 +143,7 @@ export function AppLayout() {
           </ul>
         </nav>
       </div>
+      <DemoPanel />
       <main id="main" className="app-main" tabIndex={-1}>
         <Outlet />
       </main>
