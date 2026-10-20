@@ -12,6 +12,8 @@ import { OrganizationsService } from '../src/modules/organizations/organizations
 import { createSport, createUser, databaseUrl, prisma } from './db';
 
 let app: INestApplication;
+const char = (...codePoints: number[]) => String.fromCodePoint(...codePoints);
+
 const http = () => request(app.getHttpServer());
 
 beforeAll(async () => {
@@ -145,6 +147,73 @@ describe('профиль организации', () => {
       .send({ sportIds: [sport.id, sport.id] });
     expect(repeated.status).toBe(200);
     expect(repeated.body.sports).toEqual([expect.objectContaining({ id: sport.id })]);
+  });
+
+  it.each([
+    ['переворот текста в названии', { name: `Клуб ${char(0x202e)}Ладья` }, 'name'],
+    ['невидимый оператор внутри названия', { name: `Лад${char(0x2063)}ья` }, 'name'],
+    ['заполнитель хангыля вместо города', { city: char(0x3164).repeat(3) }, 'city'],
+    ['невидимый пробел в контактах', { contacts: `+7 900 ${char(0x200b)}000-00-00` }, 'contacts'],
+    [
+      'изоляция направления в описании',
+      { description: `Турниры ${char(0x2067)}для всех` },
+      'description',
+    ],
+    [
+      'управляющий символ у представителя',
+      { representativeName: `Иван${char(7)} Петров` },
+      'representativeName',
+    ],
+    [
+      'разделитель строк в должности',
+      { representativeRole: `Тренер${char(0x2028)}клуба` },
+      'representativeRole',
+    ],
+    ['перевод строки в названии', { name: 'Клуб\nЛадья' }, 'name'],
+  ])('%s — 400 с полем', async (_, change, field) => {
+    const { cookie, id } = await organizationAccount();
+    const response = await http().patch(`/organizations/${id}`).set('Cookie', cookie).send(change);
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toHaveProperty(field);
+  });
+
+  it('эмодзи, переводы строк в описании и контактах допустимы; переводы строк Windows — как обычные', async () => {
+    const { cookie, id } = await organizationAccount();
+    const chess = String.fromCodePoint(0x265f, 0xfe0f);
+    const response = await http()
+      .patch(`/organizations/${id}`)
+      .set('Cookie', cookie)
+      .send({
+        name: `Ладья ${chess}`,
+        description: 'Турниры\r\nи занятия',
+        contacts: '+7 900 000-00-00\r\nTelegram @ladya',
+      });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      name: `Ладья ${chess}`,
+      description: 'Турниры\nи занятия',
+      contacts: '+7 900 000-00-00\nTelegram @ladya',
+    });
+  });
+
+  it('при регистрации организации имя и название проверяются тем же правилом', async () => {
+    for (const change of [
+      { organizationName: `Клуб ${char(0x202e)}Ладья` },
+      { name: `Иван${char(0x2063)}` },
+    ]) {
+      const response = await http()
+        .post('/auth/register')
+        .send({
+          accountType: 'organization',
+          name: 'Иван Петров',
+          email: `org-${randomUUID()}@example.ru`,
+          password: 'пароль-1234',
+          organizationName: 'Шахматный клуб',
+          ...change,
+        });
+      expect(response.status).toBe(400);
+      expect(Object.keys(response.body.fields)).toEqual(Object.keys(change));
+    }
   });
 
   it('чужую организацию не правит ни другая организация, ни пользователь; гостю — 401', async () => {

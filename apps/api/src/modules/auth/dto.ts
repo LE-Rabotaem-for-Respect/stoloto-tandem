@@ -10,6 +10,7 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
+import { singleLine } from '../../core/validation';
 
 const trim = () =>
   Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
@@ -30,6 +31,7 @@ export class RegisterDto {
   @trim()
   @IsString({ message: 'Укажите имя' })
   @Length(2, 80, { message: 'Имя — от 2 до 80 символов' })
+  @singleLine()
   name!: string;
 
   @email()
@@ -45,6 +47,7 @@ export class RegisterDto {
   @trim()
   @IsString({ message: 'Укажите название организации' })
   @Length(2, 120, { message: 'Название организации — от 2 до 120 символов' })
+  @singleLine()
   organizationName?: string;
 }
 
