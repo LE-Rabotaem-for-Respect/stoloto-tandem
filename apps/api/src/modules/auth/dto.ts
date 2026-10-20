@@ -2,17 +2,20 @@ import { DEMO_ACCOUNT_KEYS, normalizeEmail } from '@tandem/domain';
 import type { DemoAccountKey } from '@tandem/domain';
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsEmail,
   IsIn,
   IsNotEmpty,
   IsString,
   Length,
+  Matches,
   MaxLength,
   ValidateIf,
 } from 'class-validator';
+import { cleanLine, plainLine, singleLine, visible } from '../../core/validation';
 
-const trim = () =>
-  Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
+// Печатные символы ASCII без пробела
+const EMAIL_ASCII = /^[!-~]+$/;
 
 const email = () =>
   Transform(({ value }: { value: unknown }) =>
@@ -27,24 +30,32 @@ export class RegisterDto {
   @IsIn(ACCOUNT_TYPES, { message: 'Выберите: человек или организация' })
   accountType!: AccountType;
 
-  @trim()
-  @IsString({ message: 'Укажите имя' })
+  @cleanLine()
+  @visible()
+  @singleLine()
   @Length(2, 80, { message: 'Имя — от 2 до 80 символов' })
+  @IsString({ message: 'Укажите имя' })
   name!: string;
 
   @email()
+  @plainLine()
   @MaxLength(254, { message: 'Слишком длинная почта' })
   @IsEmail({}, { message: 'Укажите почту, например anna@mail.ru' })
+  // Только латиница: «аnna@mail.ru» с кириллической «а», «ａnna» или «anná» — на вид та же
+  // почта, а аккаунт другой. Домен на кириллице — в punycode (xn--…), как его отдаёт почта
+  @Matches(EMAIL_ASCII, { message: 'Почта — латиницей, например anna@mail.ru' })
   email!: string;
 
-  @IsString({ message: 'Придумайте пароль' })
   @Length(8, 128, { message: 'Пароль — от 8 до 128 символов' })
+  @IsString({ message: 'Придумайте пароль' })
   password!: string;
 
   @ValidateIf((dto: RegisterDto) => dto.accountType === 'organization')
-  @trim()
-  @IsString({ message: 'Укажите название организации' })
+  @cleanLine()
+  @visible()
+  @singleLine()
   @Length(2, 120, { message: 'Название организации — от 2 до 120 символов' })
+  @IsString({ message: 'Укажите название организации' })
   organizationName?: string;
 }
 
@@ -67,4 +78,18 @@ export class LoginDto {
 export class DemoLoginDto {
   @IsIn(DEMO_ACCOUNT_KEYS, { message: 'Такого демо-аккаунта нет' })
   account!: DemoAccountKey;
+}
+
+/** Настройки оформления (ТЗ 2.8): у вошедшего хранятся в аккаунте, а не только в браузере. */
+// Не передано — не меняется; null — не «нет», а ошибка
+const present = () => ValidateIf((_dto: object, value: unknown) => value !== undefined);
+
+export class UpdateSettingsDto {
+  @present()
+  @IsBoolean({ message: '«Крупный текст» — да или нет' })
+  largeText?: boolean;
+
+  @present()
+  @IsBoolean({ message: '«Высокий контраст» — да или нет' })
+  contrast?: boolean;
 }

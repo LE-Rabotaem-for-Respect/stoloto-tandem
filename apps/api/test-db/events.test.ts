@@ -160,12 +160,55 @@ describe('POST /events', () => {
     expect(search.body.items).toEqual([expect.objectContaining({ id: response.body.sport.id })]);
   });
 
+  it('не строка в названии и городе — сообщение о поле, а не о символах', async () => {
+    const response = await post(anna, { ...validEvent(), title: 5, city: 5 });
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toMatchObject({
+      title: 'Укажите название',
+      city: 'Укажите город',
+    });
+  });
+
+  it('эмодзи с соединителем и селектором начертания и мягкий перенос — допустимы', async () => {
+    const runner = String.fromCodePoint(0x1f3c3, 0x200d, 0x2640, 0xfe0f);
+    const softHyphen = String.fromCodePoint(0xad);
+    const title = `Бег ${runner} вместе`;
+    const description = `Пробеж${softHyphen}ка по набережной ${runner}`;
+    const response = await post(igor, { ...validEvent(), title, description });
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({ title, description });
+  });
+
+  it('мягкий перенос в названии убирается: мероприятие находится поиском', async () => {
+    const response = await post(igor, {
+      ...validEvent(),
+      title: `Кёр${String.fromCodePoint(0xad)}линг для новичков`,
+      city: `Крас${String.fromCodePoint(0xad)}ноярск`,
+    });
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({ title: 'Кёрлинг для новичков', city: 'Красноярск' });
+    const stored = await prisma.event.findUniqueOrThrow({ where: { id: response.body.id } });
+    expect(stored.title).toBe('Кёрлинг для новичков');
+  });
+
   it('в описании и «Информации для участников» допустимы переводы строк', async () => {
     const newline = String.fromCharCode(10);
     const description = `Играем 7 на 7${newline}Команды делим на месте`;
     const response = await post(igor, { ...validEvent(), description });
     expect(response.status).toBe(201);
     expect(response.body.description).toBe(description);
+  });
+
+  it('переводы строк Windows в описании сохраняются как обычные', async () => {
+    const [cr, lf] = [String.fromCharCode(13), String.fromCharCode(10)];
+    const response = await post(igor, {
+      ...validEvent(),
+      description: `Играем 7 на 7${cr}${lf}Команды делим на месте${cr}Мяч есть`,
+      participantInfo: `Вход со двора${cr}${lf}Раздевалка открыта`,
+    });
+    expect(response.status).toBe(201);
+    expect(response.body.description).toBe(`Играем 7 на 7${lf}Команды делим на месте${lf}Мяч есть`);
+    expect(response.body.participantInfo).toBe(`Вход со двора${lf}Раздевалка открыта`);
   });
 
   it('режим «по заявке» сохраняет вопрос к заявке', async () => {
@@ -207,9 +250,113 @@ describe('POST /events', () => {
     ['неизвестный уровень', { level: 'pro' }, 'level'],
     ['нет направления', { sportId: undefined }, 'sportId'],
     ['нет направления, новое — null', { sportId: undefined, newSport: null }, 'sportId'],
+    ['новое направление — пустой массив', { sportId: undefined, newSport: [] }, 'newSport'],
+    [
+      'новое направление — массив объектов',
+      { sportId: undefined, newSport: [{ name: 'Падел' }] },
+      'newSport',
+    ],
+    [
+      'изоляция направления текста в названии',
+      { title: `Футбол 7×7 ${String.fromCodePoint(0x2066)}` },
+      'title',
+    ],
+    ['невидимый пробел в районе', { area: `Цент${String.fromCodePoint(0x200b)}ральный` }, 'area'],
+    // По краям U+FEFF снял бы trim — ставим в середину, чтобы проверить само правило
+    ['BOM в середине города', { city: `Красно${String.fromCodePoint(0xfeff)}ярск` }, 'city'],
+    [
+      'метка слева направо в месте',
+      { placeText: `Поле ${String.fromCodePoint(0x200e)}у школы` },
+      'placeText',
+    ],
+    [
+      'метка справа налево в названии',
+      { title: `Футбол ${String.fromCodePoint(0x200f)}7×7` },
+      'title',
+    ],
+    ['арабская метка в названии', { title: `Футбол ${String.fromCodePoint(0x61c)}7×7` }, 'title'],
+    // Не перечень символов, а классы невидимого целиком
+    [
+      'невидимый оператор внутри слова в названии',
+      { title: `Фут${String.fromCodePoint(0x2063)}бол 7×7` },
+      'title',
+    ],
+    ['тег в названии', { title: `Футбол 7×7 ${String.fromCodePoint(0xe0041)}` }, 'title'],
+    [
+      'заполнитель хангыля вместо названия',
+      { title: String.fromCodePoint(0x3164).repeat(5) },
+      'title',
+    ],
+    [
+      'подстрочная аннотация в названии',
+      { title: `Футбол ${String.fromCodePoint(0xfff9)}7×7` },
+      'title',
+    ],
+    [
+      'разделитель строк в названии',
+      { title: `Футбол${String.fromCodePoint(0x2028)}7×7` },
+      'title',
+    ],
+    [
+      'разделитель абзацев в описании',
+      { description: `Играем${String.fromCodePoint(0x2029)}7 на 7` },
+      'description',
+    ],
+    [
+      'словесный соединитель в районе',
+      { area: `Цент${String.fromCodePoint(0x2060)}ральный` },
+      'area',
+    ],
+    // Многострочные поля: переводы строк можно, остальное — нет
+    [
+      'переворот текста в описании',
+      { description: `Играем ${String.fromCodePoint(0x202e)}7 на 7` },
+      'description',
+    ],
+    [
+      'управляющий символ в «Информации для участников»',
+      { participantInfo: `Раздевалка ${String.fromCodePoint(0x7)}открыта` },
+      'participantInfo',
+    ],
+    [
+      'изоляция направления в вопросе к заявке',
+      { mode: 'approval', applyQuestion: `Ваш ${String.fromCodePoint(0x2067)}опыт?` },
+      'applyQuestion',
+    ],
     ['неверный sportId, новое — null', { sportId: 'not-a-uuid', newSport: null }, 'sportId'],
     ['переворот текста в названии', { title: 'Футбол 7×7 \u202e' }, 'title'],
     ['управляющий символ в месте', { placeText: 'Поле \u0007 у школы' }, 'placeText'],
+    // Разрешённые невидимые — только на своём месте; пустое на вид поле не проходит
+    [
+      'пять соединителей вместо названия',
+      { title: String.fromCodePoint(0x200d).repeat(5) },
+      'title',
+    ],
+    [
+      'соединитель внутри слова в названии',
+      { title: `Фут${String.fromCodePoint(0x200d)}бол 7×7` },
+      'title',
+    ],
+    [
+      'селектор начертания после буквы в названии',
+      { title: `Фут${String.fromCodePoint(0xfe0f)}бол 7×7` },
+      'title',
+    ],
+    [
+      'пустые символы Брайля вместо названия',
+      { title: String.fromCodePoint(0x2800).repeat(5) },
+      'title',
+    ],
+    ['мягкие переносы вместо названия', { title: String.fromCodePoint(0xad).repeat(5) }, 'title'],
+    ['название из одних точек', { title: '.....' }, 'title'],
+    ['город из тире', { city: '— —' }, 'city'],
+    ['район из одних эмодзи', { area: String.fromCodePoint(0x1f3c3, 0x1f3c3) }, 'area'],
+    ['место из знаков', { placeText: '--- ...' }, 'placeText'],
+    [
+      'частный символ в описании',
+      { description: `Играем ${String.fromCodePoint(0xe000)}` },
+      'description',
+    ],
     ['лишнее поле', { organizerOrgId: randomUUID() }, 'organizerOrgId'],
   ])('%s — 400 с полем', async (_, change, field) => {
     const response = await post(anna, { ...validEvent(), ...change });
@@ -260,7 +407,9 @@ describe('GET /events/:id', () => {
   });
 
   it('«Информация для участников» — подтверждённому участнику, организатору и администратору', async () => {
-    const [confirmed, pending, waitlist] = await Promise.all([
+    const [confirmed, pending, waitlist, rejected, cancelled] = await Promise.all([
+      account('user'),
+      account('user'),
       account('user'),
       account('user'),
       account('user'),
@@ -268,6 +417,8 @@ describe('GET /events/:id', () => {
     await participation(eventId, confirmed.id, 'confirmed');
     await participation(eventId, pending.id, 'pending');
     await participation(eventId, waitlist.id, 'waitlist');
+    await participation(eventId, rejected.id, 'rejected');
+    await participation(eventId, cancelled.id, 'cancelled');
 
     const info = async (who: Account | null) => (await get(who, eventId)).body.participantInfo;
     expect(await info(igor)).toBe('Раздевалка открыта с 18:30');
@@ -275,12 +426,146 @@ describe('GET /events/:id', () => {
     expect(await info(admin)).toBe('Раздевалка открыта с 18:30');
     expect(await info(pending)).toBeNull();
     expect(await info(waitlist)).toBeNull();
+    expect(await info(rejected)).toBeNull();
+    expect(await info(cancelled)).toBeNull();
     expect(await info(anna)).toBeNull();
     expect(await info(orgApproved)).toBeNull();
     expect(await info(null)).toBeNull();
 
     const forParticipant = await get(confirmed, eventId);
     expect(forParticipant.body.participation).toBe('confirmed');
+  });
+
+  it('после перемотки демо-часов назад «новее» оказалась отменённая запись — участник всё равно участник', async () => {
+    const viewer = await account('user');
+    // Записался и отменил, часы перемотали назад, записался снова: отменённая запись
+    // создана раньше по порядку, но её время по Clock позже, чем у активной
+    await prisma.participation.create({
+      data: {
+        eventId,
+        userId: viewer.id,
+        status: 'cancelled',
+        createdAt: new Date('2026-10-20T10:00:00Z'),
+        updatedAt: new Date('2026-10-20T10:00:00Z'),
+      },
+    });
+    await prisma.participation.create({
+      data: {
+        eventId,
+        userId: viewer.id,
+        status: 'confirmed',
+        createdAt: new Date('2026-10-19T10:00:00Z'),
+        updatedAt: new Date('2026-10-19T10:00:00Z'),
+      },
+    });
+    const response = await get(viewer, eventId);
+    expect(response.body.participation).toBe('confirmed');
+    expect(response.body.participantInfo).toBe('Раздевалка открыта с 18:30');
+  });
+
+  it('причина отказа — только тому, кому отказали; без причины и у других статусов — null', async () => {
+    const id = (await post(igor, validEvent())).body.id as string;
+    const [refused, refusedSilently, other] = await Promise.all([
+      account('user'),
+      account('user'),
+      account('user'),
+    ]);
+    const decided = (userId: string, status: 'rejected' | 'confirmed', reason: string | null) =>
+      prisma.participation.create({
+        data: {
+          eventId: id,
+          userId,
+          status,
+          decisionReason: reason,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+    await decided(refused.id, 'rejected', 'Группа уже набрана');
+    await decided(refusedSilently.id, 'rejected', null);
+    // Причина у принятой записи не показывается, даже если в базе она есть
+    await decided(other.id, 'confirmed', 'Ждём в 18:30');
+
+    const reason = async (who: Account | null) => (await get(who, id)).body.participationReason;
+    expect(await reason(refused)).toBe('Группа уже набрана');
+    expect(await reason(refusedSilently)).toBeNull();
+    expect(await reason(other)).toBeNull();
+    // Чужая отклонённая заявка: ни другому пользователю, ни организатору, ни администратору, ни гостю
+    for (const who of [anna, igor, admin, orgApproved, null]) {
+      expect(await reason(who)).toBeNull();
+    }
+  });
+
+  it('мест нет: «Записаться» неактивна с причиной «Мест нет», как ответил бы POST join', async () => {
+    const id = (await post(igor, validEvent())).body.id as string;
+    // Лимит мест в форме создания — P1 (ТЗ 3.2), в базе он уже есть
+    await prisma.event.update({ where: { id }, data: { capacity: 1 } });
+    const taken = await account('user');
+    await participation(id, taken.id, 'confirmed');
+    const viewer = await account('user');
+    const response = await get(viewer, id);
+    expect(response.body.displayStatus).toBe('full');
+    expect(response.body.actions[0]).toEqual({
+      code: 'join',
+      enabled: false,
+      reason: 'Мест нет',
+      reasonCode: 'no_seats',
+    });
+    const join = await http().post(`/events/${id}/join`).set('Cookie', viewer.cookie);
+    expect(join.status).toBe(409);
+    expect(join.body.code).toBe('no_seats');
+  });
+
+  it('«Участники и заявки» в actions[] — организатору и администратору, другим — нет', async () => {
+    const codes = async (who: Account | null) =>
+      ((await get(who, eventId)).body.actions as { code: string }[]).map((action) => action.code);
+    expect(await codes(igor)).toContain('view_participants');
+    expect(await codes(admin)).toContain('view_participants');
+    for (const who of [anna, orgApproved, null]) {
+      expect(await codes(who)).not.toContain('view_participants');
+    }
+  });
+
+  it('карточка, лента, /me и ответы с ошибкой не кешируются', async () => {
+    expect((await get(anna, eventId)).headers['cache-control']).toBe('no-store');
+    expect((await get(null, eventId)).headers['cache-control']).toBe('no-store');
+    const me = await http().get('/me').set('Cookie', anna.cookie);
+    expect(me.status).toBe(200);
+    expect(me.headers['cache-control']).toBe('no-store');
+    const feed = await http().get('/events');
+    expect(feed.status).toBe(200);
+    expect(feed.headers['cache-control']).toBe('no-store');
+    const missing = await get(anna, randomUUID());
+    expect(missing.status).toBe(404);
+    expect(missing.headers['cache-control']).toBe('no-store');
+  });
+
+  it('главная кнопка по статусу записи: «Отменить запись» или «Записаться»', async () => {
+    const id = (await post(igor, validEvent())).body.id as string;
+    const expected = {
+      pending: { code: 'leave', enabled: true },
+      confirmed: { code: 'leave', enabled: true },
+      waitlist: { code: 'leave', enabled: true },
+      cancelled: { code: 'join', enabled: true },
+      rejected: {
+        code: 'join',
+        enabled: false,
+        reason: expect.stringMatching(/После отказа/),
+        reasonCode: 'rejected_final',
+      },
+    } as const;
+    for (const [status, action] of Object.entries(expected)) {
+      const viewer = await account('user');
+      await participation(id, viewer.id, status as keyof typeof expected);
+      const response = await get(viewer, id);
+      expect(response.status, status).toBe(200);
+      const codes = (response.body.actions as { code: string }[]).map((item) => item.code);
+      expect(response.body.actions[0], status).toEqual(action);
+      expect(
+        codes.filter((code) => code === 'join' || code === 'leave'),
+        status,
+      ).toHaveLength(1);
+    }
   });
 
   it('гость видит опубликованное мероприятие, запись предлагает после входа', async () => {

@@ -26,15 +26,19 @@ import type { ErrorFields } from '../../core/errors';
 import { EventBus, domainEvent } from '../../core/event-bus';
 import {
   canCreateEvent,
+  canManageEvent,
+  canModerate,
   canSeeParticipantInfo,
   canViewEvent,
   eventActions,
 } from '../../core/policies';
 import type { Actor } from '../../core/policies';
+import { EventTermsService } from '../participations/event-terms.service';
 import { SportsService } from '../sports/sports.service';
-import type { CreateEventDto, EventFeedQuery, FeedDate } from './events.dto';
+import type { CreateEventDto, EventFeedQuery, FeedDate, UpdateEventDto } from './events.dto';
 import { EventsRepository } from './events.repository';
-import type { EventWithCard } from './events.repository';
+import type { EditableFields, EventWithCard } from './events.repository';
+import type { Prisma } from '../../generated/prisma/client';
 
 export interface EventCard {
   id: string;
@@ -56,9 +60,31 @@ export interface EventCard {
   displayStatus: EventDisplayStatus;
   /** Запись текущего пользователя; `null` — записи нет или вошёл не пользователь. */
   participation: ParticipationStatus | null;
+  /** Причина отказа по своей отклонённой заявке, если организатор её указал; остальным — `null`. */
+  participationReason: string | null;
   /** Только подтверждённым участникам, организатору и администратору; остальным — `null`. */
   participantInfo: string | null;
   actions: Action[];
+}
+
+/** Строка поиска в админке: статус и причина видны, направление — под своим названием. */
+export interface AdminEventItem {
+  id: string;
+  title: string;
+  sport: { id: string; name: string; category: SportCategory };
+  organizer: EventCard['organizer'];
+  startsAt: Date;
+  city: string;
+  status: EventStatus;
+  statusReason: string | null;
+  createdAt: Date;
+}
+
+export interface AdminEventList {
+  items: AdminEventItem[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 /** Строка ленты: только то, что помещается в карточку ленты (ТЗ 2.11). */
@@ -114,11 +140,28 @@ function organizerOf(event: EventWithCard): EventCard['organizer'] {
   throw new Error(`У мероприятия ${event.id} нет организатора`);
 }
 
+function feedItem(event: EventWithCard, now: Date, confirmed: number): EventFeedItem {
+  return {
+    id: event.id,
+    title: event.title,
+    sport: sportOf(event),
+    organizer: organizerOf(event),
+    startsAt: event.startsAt,
+    endsAt: event.endsAt,
+    city: event.city,
+    area: event.area,
+    mode: event.mode,
+    level: event.level,
+    displayStatus: displayStatus(event, now, confirmed),
+  };
+}
+
 @Injectable()
 export class EventsService {
   constructor(
     private readonly events: EventsRepository,
     private readonly sports: SportsService,
+    private readonly terms: EventTermsService,
     private readonly clock: Clock,
     private readonly bus: EventBus,
   ) {}
@@ -191,18 +234,107 @@ export class EventsService {
   }
 
   /**
+   * Мероприятие и запись зрителя, если ему видно мероприятие (ТЗ 2.10); иначе — одинаково
+   * «Мероприятие недоступно». Одно правило для карточки и обсуждения: снятое видят
+   * организатор, администратор и записавшиеся.
+   */
+  async viewable(
+    actor: Actor,
+    id: string,
+  ): Promise<{
+    event: EventWithCard;
+    participation: ParticipationStatus | null;
+    participationReason: string | null;
+  }> {
+    const event = isUUID(id) ? await this.events.findCard(id) : null;
+    if (!event) throw new ApiError('event_not_available');
+    const own =
+      actor.role === 'user' ? await this.events.viewerParticipation(id, actor.userId) : null;
+    const participation = own?.status ?? null;
+    const view = canViewEvent(actor, event, participation);
+    if (!view.allowed) throw new ApiError(view.code);
+    // Запись — своя: причину отказа видит только тот, кому отказали
+    const participationReason = own?.status === 'rejected' ? own.decisionReason : null;
+    return { event, participation, participationReason };
+  }
+
+  /**
+   * Изменение после публикации (ТЗ 2.2): только организатор, только опубликованное и
+   * до начала. Режим записи и лимит мест проверяет модуль участия — он же блокирует
+   * строку мероприятия до конца транзакции (DECISION-002, «Лимит мест»): запись, которая
+   * идёт в это же время, дождётся изменения или пройдёт до него. После коммита —
+   * `EventUpdated` со списком изменённых полей; если ничего не изменилось — без события.
+   */
+  async update(actor: Actor, id: string, dto: UpdateEventDto): Promise<EventCard> {
+    await this.bus.afterCommit((emit) =>
+      this.events.transaction(async (tx) => {
+        const locked = await this.terms.lockForTermsChange(
+          id,
+          { mode: dto.mode, capacity: dto.capacity },
+          tx,
+        );
+        if (!locked) throw new ApiError('event_not_available');
+        const { event } = locked;
+        // Кому мероприятие не видно, тот не узнаёт и о нём: тот же ответ, что у карточки
+        const view = canViewEvent(actor, event, null);
+        if (!view.allowed) throw new ApiError(view.code);
+        const manage = canManageEvent(actor, event);
+        if (!manage.allowed) throw new ApiError(manage.code);
+        const now = this.clock.now();
+        eventMachine.nextState(event.status, 'edit', { now, startsAt: event.startsAt });
+
+        const fields: ErrorFields = { ...locked.fields };
+        const mode = dto.mode ?? event.mode;
+        // Вопрос к заявке остаётся только у режима «По заявке» (как при создании)
+        if (mode === 'free' && dto.applyQuestion) {
+          fields.applyQuestion = 'Вопрос к заявке — только для режима «По заявке»';
+        }
+        if (Object.keys(fields).length > 0) throw new ApiError('validation_failed', fields);
+
+        const current = await this.events.findEditable(event.id, tx);
+        const next: EditableFields = {
+          title: dto.title,
+          description: dto.description,
+          city: dto.city,
+          area: dto.area,
+          placeText: dto.placeText,
+          participantInfo: dto.participantInfo,
+          level: dto.level,
+          mode: dto.mode,
+          capacity: dto.capacity,
+          applyQuestion:
+            mode === 'free'
+              ? null
+              : dto.applyQuestion === undefined
+                ? undefined
+                : dto.applyQuestion || null,
+        };
+        const changed = (Object.keys(next) as (keyof EditableFields)[]).filter(
+          (field) => next[field] !== undefined && next[field] !== current[field],
+        );
+        if (changed.length === 0) return;
+
+        await this.events.update(event.id, next, tx);
+        emit(
+          domainEvent('EventUpdated', {
+            eventId: event.id,
+            fields: changed,
+            actorId: actor.role === 'guest' ? null : actor.userId,
+            occurredAt: now,
+          }),
+        );
+      }),
+    );
+    return this.card(actor, id);
+  }
+
+  /**
    * Карточка мероприятия (ТЗ 2.2): статус для показа, организатор, запись текущего
    * пользователя и `actions[]` из тех же политик, что проверяют действия.
    * Недоступное этому пользователю и несуществующее — одинаково «Мероприятие недоступно».
    */
   async card(actor: Actor, id: string): Promise<EventCard> {
-    const event = isUUID(id) ? await this.events.findCard(id) : null;
-    if (!event) throw new ApiError('event_not_available');
-
-    const participation =
-      actor.role === 'user' ? await this.events.viewerParticipation(id, actor.userId) : null;
-    const view = canViewEvent(actor, event, participation);
-    if (!view.allowed) throw new ApiError(view.code);
+    const { event, participation, participationReason } = await this.viewable(actor, id);
 
     const now = this.clock.now();
     const confirmedCount = await this.events.confirmedCount(id);
@@ -228,6 +360,7 @@ export class EventsService {
       statusReason: event.statusReason,
       displayStatus: displayStatus(event, now, confirmedCount),
       participation,
+      participationReason,
       participantInfo: seesInfo ? event.participantInfo : null,
       actions: eventActions(actor, { ...event, hasSeats }, participation, now),
     };
@@ -252,6 +385,7 @@ export class EventsService {
         sportText: text && normalizeSportName(text),
         sportId: query.sport,
         category: query.category,
+        organizationId: query.organization,
         startsFrom: range?.from,
         startsBefore: range?.to,
         city: query.city || undefined,
@@ -264,23 +398,113 @@ export class EventsService {
     const confirmed = await this.events.confirmedCounts(events.map((event) => event.id));
 
     return {
-      items: events.map((event) => ({
-        id: event.id,
-        title: event.title,
-        sport: sportOf(event),
-        organizer: organizerOf(event),
-        startsAt: event.startsAt,
-        endsAt: event.endsAt,
-        city: event.city,
-        area: event.area,
-        mode: event.mode,
-        level: event.level,
-        displayStatus: displayStatus(event, now, confirmed.get(event.id) ?? 0),
-      })),
+      items: events.map((event) => feedItem(event, now, confirmed.get(event.id) ?? 0)),
       total,
       limit,
       offset,
     };
+  }
+
+  /** Поиск мероприятий для администратора (ТЗ 2.10): все статусы, новые сверху. */
+  async adminList(
+    actor: Actor,
+    filter: { text?: string; status?: EventStatus; organizationId?: string; lastWeek?: boolean },
+    page: { limit: number; offset: number },
+  ): Promise<AdminEventList> {
+    const decision = canModerate(actor);
+    if (!decision.allowed) throw new ApiError(decision.code);
+    const { events, total } = await this.events.adminSearch(
+      {
+        text: filter.text,
+        status: filter.status,
+        organizerOrgId: filter.organizationId,
+        statusChangedSince: filter.lastWeek ? this.weekAgo() : undefined,
+      },
+      page,
+    );
+    return {
+      items: events.map((event) => ({
+        id: event.id,
+        title: event.title,
+        sport: { id: event.sport.id, name: event.sport.name, category: event.sport.category },
+        organizer: organizerOf(event),
+        startsAt: event.startsAt,
+        city: event.city,
+        status: event.status,
+        statusReason: event.statusReason,
+        createdAt: event.createdAt,
+      })),
+      total,
+      ...page,
+    };
+  }
+
+  /** Сколько мероприятий снято с публикации за последние 7 дней (обзор админки). */
+  countUnpublishedLastWeek(): Promise<number> {
+    return this.events.countStatusSince('unpublished', this.weekAgo());
+  }
+
+  /** Мероприятия переходят на целевое направление — в транзакции объединения дублей. */
+  moveSport(fromId: string, toId: string, tx: Prisma.TransactionClient): Promise<void> {
+    return this.events.moveSport(fromId, toId, tx);
+  }
+
+  /** Сколько мероприятий у каждого направления — для каталога в админке. */
+  countBySports(sportIds: readonly string[]): Promise<Map<string, number>> {
+    return this.events.countBySports(sportIds);
+  }
+
+  /** Названия мероприятий по id — для списков других модулей (сообщения в админке). */
+  titles(ids: readonly string[]): Promise<Map<string, string>> {
+    return this.events.titles(ids);
+  }
+
+  private weekAgo(): Date {
+    return new Date(this.clock.now().getTime() - 7 * 24 * 60 * 60 * 1000);
+  }
+
+  /**
+   * Мероприятия строками ленты для «Моих записей» (ТЗ 2.5): `participations` — статус записи
+   * человека по id мероприятия. Видимость — по правилу карточки: снятое модератором видно,
+   * пока человек записан или ждёт решения, а после отказа или отмены его в ответе нет.
+   */
+  async feedItemsFor(
+    actor: Actor,
+    participations: Map<string, ParticipationStatus>,
+  ): Promise<Map<string, EventFeedItem>> {
+    const ids = [...participations.keys()];
+    if (ids.length === 0) return new Map();
+    const now = this.clock.now();
+    const [events, confirmed] = await Promise.all([
+      this.events.findCards(ids),
+      this.events.confirmedCounts(ids),
+    ]);
+    return new Map(
+      events
+        .filter((event) => canViewEvent(actor, event, participations.get(event.id) ?? null).allowed)
+        .map((event) => [event.id, feedItem(event, now, confirmed.get(event.id) ?? 0)]),
+    );
+  }
+
+  /**
+   * Мероприятие глазами уведомлений (ТЗ 3.3): название и аккаунт организатора —
+   * пользователь или представитель организации. Права не проверяются: вызывают
+   * обработчики доменных событий, а не маршруты.
+   */
+  async notificationTarget(id: string): Promise<{ title: string; organizerUserId: string } | null> {
+    const event = await this.events.findOrganizerOf(id);
+    const organizerUserId = event?.organizerUserId ?? event?.organizerOrg?.ownerUserId;
+    return event && organizerUserId ? { title: event.title, organizerUserId } : null;
+  }
+
+  /** Кто организатор мероприятия — пользователь или организация (для других модулей). */
+  async organizerOf(
+    id: string,
+  ): Promise<{ organizerUserId: string | null; organizerOrgId: string | null } | null> {
+    const event = await this.events.findOrganizerOf(id);
+    return (
+      event && { organizerUserId: event.organizerUserId, organizerOrgId: event.organizerOrgId }
+    );
   }
 
   private startsRange(query: EventFeedQuery, now: Date): Partial<TimeRange> | undefined {

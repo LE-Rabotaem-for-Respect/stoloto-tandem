@@ -1,6 +1,29 @@
-import { errorMessage, eventMachine, participationMachine } from '@tandem/domain';
-import type { Action, ActionCode, EventAction, EventMode } from '@tandem/domain';
-import { canJoin, canManageEvent, canModerate, canPostMessage } from './policies';
+import {
+  errorMessage,
+  eventMachine,
+  organizationMachine,
+  participationMachine,
+} from '@tandem/domain';
+import type {
+  Action,
+  ActionCode,
+  ErrorCode,
+  EventAction,
+  EventMode,
+  OrganizationStatus,
+  ParticipationStatus,
+} from '@tandem/domain';
+import {
+  canCreateEvent,
+  canDecideParticipation,
+  canEditOrganization,
+  canJoin,
+  canLeave,
+  canManageEvent,
+  canModerate,
+  canPostMessage,
+  canViewParticipants,
+} from './policies';
 import type { Actor, Decision, PolicyEvent, ViewerParticipation } from './policies';
 
 /** Решение политики → элемент `actions[]`: неактивное — с причиной, гостю — `requiresAuth`. */
@@ -9,10 +32,19 @@ export function toAction(code: ActionCode, decision: Decision): Action {
   const action: Action = { code, enabled: false };
   if (decision.requiresAuth) action.requiresAuth = true;
   action.reason = errorMessage(decision.code);
+  action.reasonCode = decision.code;
   return action;
 }
 
-const disabled = (code: ActionCode, reason: string): Action => ({ code, enabled: false, reason });
+// Отказ автомата: его текст точнее общего текста кода
+const disabled = (code: ActionCode, error: { code: ErrorCode; message: string }): Action => ({
+  code,
+  enabled: false,
+  reason: error.message,
+  reasonCode: error.code,
+});
+
+const noSeats: Decision = { allowed: false, code: 'no_seats' };
 
 export interface CardEvent extends PolicyEvent {
   mode: EventMode;
@@ -27,7 +59,7 @@ function eventAction(code: ActionCode, action: EventAction, event: CardEvent, no
     newStartsAt: new Date(now.getTime() + 86_400_000),
     reason: 'указана в форме',
   });
-  return result.ok ? { code, enabled: true } : disabled(code, result.error.message);
+  return result.ok ? { code, enabled: true } : disabled(code, result.error);
 }
 
 /**
@@ -41,16 +73,24 @@ export function eventActions(
   participation: ViewerParticipation,
   now: Date,
 ): Action[] {
-  const join = canJoin(actor, event, now);
   const actions: Action[] = [];
-  if (join.allowed) {
+  // Записавшемуся главная кнопка — «Отменить запись», а не неактивная «Записаться» (ТЗ 2.2)
+  const cancel = participationMachine.check(participation, 'cancel', event);
+  const join = canJoin(actor, event, now);
+  if (cancel.ok) {
+    actions.push(toAction('leave', canLeave(actor, event, now)));
+  } else if (join.allowed) {
     const check = participationMachine.check(participation, 'join', event);
-    actions.push(check.ok ? toAction('join', join) : disabled('join', check.error.message));
+    if (!check.ok) actions.push(disabled('join', check.error));
+    // Листа ожидания пока нет (ТЗ 3.2, P1): на заполненное свободное мероприятие не записаться
+    else if (check.to === 'waitlist') actions.push(toAction('join', noSeats));
+    else actions.push(toAction('join', join));
   } else {
     actions.push(toAction('join', join));
   }
   actions.push(toAction('post_message', canPostMessage(actor, event)));
   if (canManageEvent(actor, event).allowed) {
+    actions.push(eventAction('edit_event', 'edit', event, now));
     actions.push(eventAction('reschedule_event', 'reschedule', event, now));
     actions.push(eventAction('cancel_event', 'cancel', event, now));
   }
@@ -61,6 +101,67 @@ export function eventActions(
       actions.push(eventAction('unpublish_event', 'unpublish', event, now));
     }
     actions.push(eventAction('delete_event', 'delete', event, now));
+  }
+  if (canViewParticipants(actor, event).allowed) {
+    actions.push({ code: 'view_participants', enabled: true });
+  }
+  return actions;
+}
+
+/**
+ * `actions[]` у записи в «Участниках и заявках» (ТЗ 2.4, 2.5): принять и отклонить —
+ * только организатору и только у заявки. Администратор смотрит список без действий.
+ */
+export function participationActions(
+  actor: Actor,
+  event: CardEvent,
+  status: ParticipationStatus,
+  now: Date,
+): Action[] {
+  if (status !== 'pending' || !canManageEvent(actor, event).allowed) return [];
+  const decide = canDecideParticipation(actor, event, now);
+  if (!decide.allowed) {
+    return [toAction('accept_participation', decide), toAction('reject_participation', decide)];
+  }
+  const accept = participationMachine.check(status, 'accept', event);
+  return [
+    accept.ok
+      ? { code: 'accept_participation', enabled: true }
+      : disabled('accept_participation', accept.error),
+    { code: 'reject_participation', enabled: true },
+  ];
+}
+
+/**
+ * `actions[]` профиля организации (ТЗ 2.9): владельцу — правка, отправка на
+ * проверку и создание мероприятия, администратору — решение по заявке.
+ * Одобренная организация на проверку больше не отправляется — действия нет.
+ */
+export function organizationActions(
+  actor: Actor,
+  organization: { id: string; status: OrganizationStatus },
+): Action[] {
+  const actions: Action[] = [];
+  if (canEditOrganization(actor, organization.id).allowed) {
+    actions.push({ code: 'edit_organization', enabled: true });
+    if (organization.status !== 'approved') {
+      const submit = organizationMachine.check(organization.status, 'submit', {});
+      actions.push(
+        submit.ok
+          ? { code: 'submit_organization', enabled: true }
+          : disabled('submit_organization', submit.error),
+      );
+    }
+    actions.push(toAction('create_event', canCreateEvent(actor)));
+  }
+  if (canModerate(actor).allowed) {
+    // Причина решения вводится в форме: доступность — до ввода
+    const review = organizationMachine.check(organization.status, 'approve', {});
+    actions.push(
+      review.ok
+        ? { code: 'review_organization', enabled: true }
+        : disabled('review_organization', review.error),
+    );
   }
   return actions;
 }

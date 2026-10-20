@@ -1,5 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Clock } from '../../core/clock';
+import { STAND_CONFIG } from '../../core/config';
+import type { StandConfig } from '../../core/config';
 import { ApiError } from '../../core/errors';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { hashPassword } from '../auth/password';
@@ -16,11 +18,47 @@ const DEMO_PASSWORD = 'demo';
 export class DemoService {
   // argon2id намеренно медленный: хеш пароля demo считается один раз на процесс
   private passwordHash?: Promise<string>;
+  // Идущий сброс и время окончания последнего — на стенд один процесс api
+  private running?: Promise<Date>;
+  private finishedAt?: number;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly clock: Clock,
+    @Inject(STAND_CONFIG) private readonly config: StandConfig,
   ) {}
+
+  /**
+   * «Сбросить демо-данные» по запросу: пока сброс идёт, повторный запрос ждёт
+   * его же и получает тот же результат; новый сброс — не раньше интервала после
+   * окончания прошлого (429 с `Retry-After`). Время — реальное, не демо-часы.
+   */
+  requestReset(): Promise<Date> {
+    if (this.running) return this.running;
+    const interval = (this.config.demoResetIntervalSeconds ?? 0) * 1000;
+    const since =
+      this.finishedAt === undefined ? Infinity : this.clock.realNow().getTime() - this.finishedAt;
+    // Часы, переведённые назад, не запрещают сброс: отрицательный промежуток — не «только что»
+    if (since >= 0 && since < interval) {
+      const wait = Math.max(1, Math.ceil((interval - since) / 1000));
+      throw new ApiError(
+        'too_many_requests',
+        undefined,
+        `Данные только что сброшены. Повторите через ${wait} с`,
+        wait,
+      );
+    }
+    // Интервал отсчитывается от успешного сброса: после сбоя можно повторить сразу
+    this.running = this.reset()
+      .then((resetAt) => {
+        this.finishedAt = this.clock.realNow().getTime();
+        return resetAt;
+      })
+      .finally(() => {
+        this.running = undefined;
+      });
+    return this.running;
+  }
 
   /** Новый стенд: пустая база заполняется сидом; база с данными не трогается. */
   async seedIfEmpty(): Promise<boolean> {

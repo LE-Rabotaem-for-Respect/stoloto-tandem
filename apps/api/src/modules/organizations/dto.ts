@@ -1,4 +1,3 @@
-import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -10,9 +9,7 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
-
-const trim = () =>
-  Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
+import { cleanLine, multiLine, singleLine, trimText, visible } from '../../core/validation';
 
 /**
  * Профиль организации (ТЗ 2.9). Все поля необязательны: правка частичная,
@@ -20,50 +17,62 @@ const trim = () =>
  */
 export class UpdateOrganizationDto {
   @IsOptional()
-  @trim()
-  @IsString({ message: 'Укажите название' })
+  @cleanLine()
+  @visible({ allowEmpty: true })
+  @singleLine()
   @Length(2, 120, { message: 'Название — от 2 до 120 символов' })
+  @IsString({ message: 'Укажите название' })
   name?: string;
 
   @IsOptional()
-  @trim()
-  @IsString({ message: 'Расскажите, чем занимается организация' })
+  @trimText()
+  @multiLine()
   @MaxLength(2000, { message: 'Описание — не длиннее 2000 символов' })
+  @IsString({ message: 'Расскажите, чем занимается организация' })
   description?: string;
 
   @IsOptional()
-  @trim()
-  @IsString({ message: 'Укажите город' })
+  @cleanLine()
+  @visible({ allowEmpty: true })
+  @singleLine()
   @MaxLength(80, { message: 'Город — не длиннее 80 символов' })
+  @IsString({ message: 'Укажите город' })
   city?: string;
 
+  // Телефон, мессенджер и часы работы — можно с новой строки
   @IsOptional()
-  @trim()
-  @IsString({ message: 'Укажите контакты' })
+  @trimText()
+  @multiLine()
   @MaxLength(300, { message: 'Контакты — не длиннее 300 символов' })
+  @IsString({ message: 'Укажите контакты' })
   contacts?: string;
 
   /** Пустая строка — сайта нет. */
   @IsOptional()
-  @trim()
+  @cleanLine()
+  @singleLine()
   @ValidateIf((dto: UpdateOrganizationDto) => dto.website !== '')
   @IsUrl(
-    { require_protocol: true, protocols: ['http', 'https'] },
+    // Без данных входа: в https://vk.com@evil.com человек видит «vk.com», а попадает на evil.com
+    { require_protocol: true, protocols: ['http', 'https'], disallow_auth: true },
     { message: 'Ссылка на сайт или соцсеть, например https://vk.com/club' },
   )
   @MaxLength(300, { message: 'Ссылка — не длиннее 300 символов' })
+  @IsString({ message: 'Ссылка на сайт или соцсеть, например https://vk.com/club' })
   website?: string;
 
   @IsOptional()
-  @trim()
-  @IsString({ message: 'Укажите, кто представитель' })
+  @cleanLine()
+  @singleLine()
   @MaxLength(120, { message: 'Имя представителя — не длиннее 120 символов' })
+  @IsString({ message: 'Укажите, кто представитель' })
   representativeName?: string;
 
   @IsOptional()
-  @trim()
-  @IsString({ message: 'Укажите роль представителя' })
+  @cleanLine()
+  @singleLine()
   @MaxLength(120, { message: 'Роль — не длиннее 120 символов' })
+  @IsString({ message: 'Укажите роль представителя' })
   representativeRole?: string;
 
   @IsOptional()

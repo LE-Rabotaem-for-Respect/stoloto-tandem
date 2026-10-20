@@ -7,7 +7,7 @@ import type { StandConfig } from '../../core/config';
 import { ApiError } from '../../core/errors';
 import { AuthRepository } from './auth.repository';
 import type { UserWithOrganization } from './auth.repository';
-import type { LoginDto, RegisterDto } from './dto';
+import type { LoginDto, RegisterDto, UpdateSettingsDto } from './dto';
 import { AUTH_LIMITS, AttemptLimiter } from './attempt-limiter';
 import type { AuthLimits } from './attempt-limiter';
 import { PasswordHasher } from './password-hasher';
@@ -88,6 +88,21 @@ export class AuthService {
       throw new ApiError('not_found', undefined, 'Демо-аккаунта нет в базе — сбросьте демо-данные');
     }
     return this.signIn(user, previousToken);
+  }
+
+  /**
+   * Настройки оформления вошедшего (ТЗ 2.8): «Крупный текст» и «Высокий контраст» —
+   * в `settings.theme`, остальные настройки аккаунта не трогаются. Слияние — в базе,
+   * а не по снимку пользователя из сессии: иначе быстрые переключения теряют одно из них.
+   */
+  updateSettings(
+    user: UserWithOrganization,
+    dto: UpdateSettingsDto,
+  ): Promise<UserWithOrganization> {
+    return this.repository.mergeTheme(user.id, {
+      ...(dto.largeText !== undefined && { largeText: dto.largeText }),
+      ...(dto.contrast !== undefined && { contrast: dto.contrast }),
+    });
   }
 
   async logout(token?: string) {

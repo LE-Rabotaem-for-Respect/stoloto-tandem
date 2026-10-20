@@ -62,6 +62,17 @@ export function canJoin(actor: Actor, event: PolicyEvent, now: Date): Decision {
   return allow;
 }
 
+/**
+ * Отменить свою запись или заявку. У снятого, удалённого, отменённого и завершённого
+ * мероприятия записи не меняются (ТЗ 4.3, 2.10). Статус записи проверяет автомат.
+ */
+export function canLeave(actor: Actor, event: PolicyEvent, now: Date): Decision {
+  if (actor.role === 'guest') return loginFirst;
+  if (actor.role !== 'user') return deny('users_only');
+  if (event.status !== 'published' || now >= event.endsAt) return deny('event_not_joinable');
+  return allow;
+}
+
 export function canSeeParticipantInfo(
   actor: Actor,
   event: PolicyEvent,
@@ -88,6 +99,25 @@ export function canManageEvent(actor: Actor, event: PolicyEvent): Decision {
   return isEventOrganizer(actor, event) ? allow : deny('not_event_organizer');
 }
 
+/** «Участники и заявки» события (ТЗ 2.5): организатору, администратору — для просмотра. */
+export function canViewParticipants(actor: Actor, event: PolicyEvent): Decision {
+  if (actor.role === 'guest') return loginFirst;
+  if (actor.role === 'admin' || isEventOrganizer(actor, event)) return allow;
+  return deny('not_event_organizer');
+}
+
+/**
+ * Принять или отклонить заявку — только организатор (у администратора этого действия
+ * нет, ТЗ 2.4), пока мероприятие опубликовано и не завершилось. Статус заявки и места
+ * проверяет автомат.
+ */
+export function canDecideParticipation(actor: Actor, event: PolicyEvent, now: Date): Decision {
+  const manage = canManageEvent(actor, event);
+  if (!manage.allowed) return manage;
+  if (event.status !== 'published' || now >= event.endsAt) return deny('event_not_joinable');
+  return allow;
+}
+
 /** Писать в обсуждение. Со снятым и удалённым мероприятием новые действия заблокированы (ТЗ 2.10). */
 export function canPostMessage(actor: Actor, event: PolicyEvent): Decision {
   if (event.status === 'unpublished' || event.status === 'deleted') {
@@ -99,6 +129,27 @@ export function canPostMessage(actor: Actor, event: PolicyEvent): Decision {
     return actor.organization.status === 'approved' ? allow : deny('organization_not_approved');
   }
   return deny('forbidden');
+}
+
+/**
+ * Править и удалять своё сообщение. Организация действует от своего имени только после
+ * допуска; в снятом и удалённом мероприятии новые действия заблокированы (ТЗ 2.7, 2.10).
+ * Статус сообщения проверяет автомат.
+ */
+export function canEditMessage(
+  actor: Actor,
+  event: PolicyEvent,
+  message: { authorUserId: string },
+): Decision {
+  if (event.status === 'unpublished' || event.status === 'deleted') {
+    return deny('event_not_available');
+  }
+  if (actor.role === 'guest') return loginFirst;
+  if (message.authorUserId !== actor.userId) return deny('not_message_author');
+  if (actor.role === 'org' && actor.organization.status !== 'approved') {
+    return deny('organization_not_approved');
+  }
+  return allow;
 }
 
 /** Редактировать профиль организации и отправить его на проверку — в любом статусе. */

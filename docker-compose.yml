@@ -26,6 +26,8 @@ services:
       # Быстрый вход, сброс и перемотка демо; на стенде без демо — DEMO_MODE=false
       DEMO_MODE: ${DEMO_MODE:-true}
       STAND_ID: ${STAND_ID:-}
+      # Не чаще одного сброса демо-данных за столько секунд; e2e сбрасывает перед каждым тестом — 0
+      DEMO_RESET_INTERVAL_SECONDS: ${DEMO_RESET_INTERVAL_SECONDS:-10}
       # Пусто — секрет создаётся при первом старте и хранится в томе api-secrets
       SESSION_SECRET: ${SESSION_SECRET:-}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}

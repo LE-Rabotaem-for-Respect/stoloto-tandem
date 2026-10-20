@@ -26,6 +26,7 @@ const POLICY_ERROR_CODES = [
   'participants_only',
   'not_organization_owner',
   'admins_only',
+  'not_message_author',
 ] as const;
 
 /** Закрытый список кодов ошибок API: `{ code, message, fields? }` (DECISION-002). */
@@ -62,6 +63,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   participants_only: 'Информация доступна подтверждённым участникам и организатору',
   not_organization_owner: 'Это может сделать только представитель организации',
   admins_only: 'Доступно только администратору',
+  not_message_author: 'Это может сделать только автор сообщения',
   invalid_transition: 'Действие недоступно в текущем статусе',
   already_joined: 'Вы уже записаны на это мероприятие',
   rejected_final: 'Заявка отклонена, подать её повторно нельзя',
@@ -72,6 +74,39 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
 };
 
 export const errorMessage = (code: ErrorCode): string => ERROR_MESSAGES[code];
+
+/** Предел строки статуса в панели действия карточки на 360 px (docs/design.md). */
+export const SHORT_MESSAGE_MAX_LENGTH = 28;
+
+/**
+ * Короткие формы причин для строки статуса панели действия — только у
+ * текстов длиннее предела; полный текст стоит строкой под первым блоком.
+ */
+export const ERROR_SHORT_MESSAGES: Partial<Record<ErrorCode, string>> = {
+  forbidden: 'Недостаточно прав',
+  busy: 'Сервер занят',
+  internal: 'Что-то пошло не так',
+  unsupported_media_type: 'Неверный формат данных',
+  cross_site_request: 'Запрос с другого сайта',
+  too_many_requests: 'Слишком много попыток',
+  event_not_joinable: 'Запись закрыта',
+  own_event: 'Это ваше мероприятие',
+  users_only: 'Только для пользователей',
+  organization_not_approved: 'Организация не допущена',
+  not_event_organizer: 'Только для организатора',
+  participants_only: 'Только для участников',
+  not_organization_owner: 'Не ваша организация',
+  admins_only: 'Только для администратора',
+  not_message_author: 'Только для автора',
+  invalid_transition: 'Сейчас недоступно',
+  already_joined: 'Вы уже записаны',
+  rejected_final: 'Повторная заявка недоступна',
+  start_not_in_future: 'Начало — только в будущем',
+};
+
+/** Причина для панели действия: короткая форма, а если её нет — полный текст. */
+export const shortErrorMessage = (code: ErrorCode): string =>
+  ERROR_SHORT_MESSAGES[code] ?? ERROR_MESSAGES[code];
 
 /**
  * HTTP-код каждой ошибки: 400 — неверные данные, 401 — нужен вход,
@@ -100,6 +135,7 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   participants_only: 403,
   not_organization_owner: 403,
   admins_only: 403,
+  not_message_author: 403,
   invalid_transition: 409,
   already_joined: 409,
   rejected_final: 409,

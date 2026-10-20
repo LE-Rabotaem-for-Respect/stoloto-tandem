@@ -12,6 +12,8 @@ import { OrganizationsService } from '../src/modules/organizations/organizations
 import { createSport, createUser, databaseUrl, prisma } from './db';
 
 let app: INestApplication;
+const char = (...codePoints: number[]) => String.fromCodePoint(...codePoints);
+
 const http = () => request(app.getHttpServer());
 
 beforeAll(async () => {
@@ -106,6 +108,13 @@ describe('профиль организации', () => {
     expect(noSite.body.website).toBeNull();
   });
 
+  it('свою организацию с данными представителя браузер не кеширует', async () => {
+    const { cookie, id } = await organizationAccount();
+    const own = await http().get(`/organizations/${id}`).set('Cookie', cookie);
+    expect(own.status).toBe(200);
+    expect(own.headers['cache-control']).toBe('no-store');
+  });
+
   it('ошибки полей: неверная ссылка и несуществующее направление', async () => {
     const { cookie, id } = await organizationAccount();
     const badSite = await http()
@@ -114,6 +123,15 @@ describe('профиль организации', () => {
       .send({ website: 'не ссылка' });
     expect(badSite.status).toBe(400);
     expect(badSite.body.fields).toHaveProperty('website');
+
+    for (const website of ['https://vk.com@evil.com', 'https://user:pass@evil.com/club']) {
+      const withAuth = await http()
+        .patch(`/organizations/${id}`)
+        .set('Cookie', cookie)
+        .send({ website });
+      expect(withAuth.status).toBe(400);
+      expect(withAuth.body.fields).toHaveProperty('website');
+    }
 
     const badSport = await http()
       .patch(`/organizations/${id}`)
@@ -138,6 +156,107 @@ describe('профиль организации', () => {
       .send({ sportIds: [sport.id, sport.id] });
     expect(repeated.status).toBe(200);
     expect(repeated.body.sports).toEqual([expect.objectContaining({ id: sport.id })]);
+  });
+
+  it.each([
+    ['переворот текста в названии', { name: `Клуб ${char(0x202e)}Ладья` }, 'name'],
+    ['невидимый оператор внутри названия', { name: `Лад${char(0x2063)}ья` }, 'name'],
+    ['заполнитель хангыля вместо города', { city: char(0x3164).repeat(3) }, 'city'],
+    ['невидимый пробел в контактах', { contacts: `+7 900 ${char(0x200b)}000-00-00` }, 'contacts'],
+    [
+      'изоляция направления в описании',
+      { description: `Турниры ${char(0x2067)}для всех` },
+      'description',
+    ],
+    [
+      'управляющий символ у представителя',
+      { representativeName: `Иван${char(7)} Петров` },
+      'representativeName',
+    ],
+    [
+      'разделитель строк в должности',
+      { representativeRole: `Тренер${char(0x2028)}клуба` },
+      'representativeRole',
+    ],
+    ['перевод строки в названии', { name: 'Клуб\nЛадья' }, 'name'],
+    ['название из одних точек', { name: '...' }, 'name'],
+    ['город из одного тире', { city: '—' }, 'city'],
+    [
+      'переворот текста в ссылке на сайт',
+      { website: `https://ladya.ru/${char(0x202e)}abc` },
+      'website',
+    ],
+  ])('%s — 400 с полем', async (_, change, field) => {
+    const { cookie, id } = await organizationAccount();
+    const response = await http().patch(`/organizations/${id}`).set('Cookie', cookie).send(change);
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toHaveProperty(field);
+  });
+
+  it('мягкий перенос в названии и городе убирается: организация находится по слову', async () => {
+    const { cookie, id } = await organizationAccount();
+    const response = await http()
+      .patch(`/organizations/${id}`)
+      .set('Cookie', cookie)
+      .send({ name: `Лад${char(0xad)}ья`, city: `Красно${char(0xad)}ярск` });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ name: 'Ладья', city: 'Красноярск' });
+  });
+
+  it('не строка — сообщение о поле, а не о символах', async () => {
+    const { cookie, id } = await organizationAccount();
+    const response = await http()
+      .patch(`/organizations/${id}`)
+      .set('Cookie', cookie)
+      .send({ name: 5, city: 5, website: 5 });
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toEqual({
+      name: 'Укажите название',
+      city: 'Укажите город',
+      website: 'Ссылка на сайт или соцсеть, например https://vk.com/club',
+    });
+  });
+
+  it('эмодзи, переводы строк в описании и контактах допустимы; переводы строк Windows — как обычные', async () => {
+    const { cookie, id } = await organizationAccount();
+    const chess = String.fromCodePoint(0x265f, 0xfe0f);
+    const response = await http()
+      .patch(`/organizations/${id}`)
+      .set('Cookie', cookie)
+      .send({
+        name: `Ладья ${chess}`,
+        description: 'Турниры\r\nи занятия',
+        contacts: '+7 900 000-00-00\r\nTelegram @ladya',
+      });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      name: `Ладья ${chess}`,
+      description: 'Турниры\nи занятия',
+      contacts: '+7 900 000-00-00\nTelegram @ladya',
+    });
+  });
+
+  it('при регистрации организации имя и название проверяются тем же правилом', async () => {
+    for (const change of [
+      { organizationName: `Клуб ${char(0x202e)}Ладья` },
+      { name: `Иван${char(0x2063)}` },
+      { organizationName: '...' },
+      // Почта с невидимым символом выглядела бы как чужая и стала бы отдельным аккаунтом
+      { email: `an${char(0x200b)}na-${randomUUID()}@example.ru` },
+    ]) {
+      const response = await http()
+        .post('/auth/register')
+        .send({
+          accountType: 'organization',
+          name: 'Иван Петров',
+          email: `org-${randomUUID()}@example.ru`,
+          password: 'пароль-1234',
+          organizationName: 'Шахматный клуб',
+          ...change,
+        });
+      expect(response.status).toBe(400);
+      expect(Object.keys(response.body.fields)).toEqual(Object.keys(change));
+    }
   });
 
   it('чужую организацию не правит ни другая организация, ни пользователь; гостю — 401', async () => {
@@ -191,6 +310,45 @@ describe('отправка на проверку и решение админи�
     const again = await http().post(`/organizations/${id}/submit`).set('Cookie', cookie);
     expect(again.status).toBe(409);
     expect(again.body.message).toBe('Заявка уже на проверке или одобрена');
+  });
+
+  it('actions[] по статусу: владельцу — правка, отправка и создание, администратору — решение', async () => {
+    const { cookie, id } = await organizationAccount();
+    const codes = (body: { actions: { code: string; enabled: boolean }[] }) =>
+      Object.fromEntries(body.actions.map((action) => [action.code, action.enabled]));
+
+    const draft = await http().get(`/organizations/${id}`).set('Cookie', cookie);
+    expect(codes(draft.body)).toEqual({
+      edit_organization: true,
+      submit_organization: true,
+      create_event: false,
+    });
+
+    await completeProfile(cookie, id);
+    const submitted = await http().post(`/organizations/${id}/submit`).set('Cookie', cookie);
+    expect(codes(submitted.body)).toEqual({
+      edit_organization: true,
+      submit_organization: false,
+      create_event: false,
+    });
+
+    // Вход человеком, затем роль администратора: actor строится из базы на каждый запрос
+    const person = await signUp('person');
+    await prisma.user.update({ where: { id: person.body.id }, data: { role: 'admin' } });
+    const reviewer = { role: 'admin' as const, userId: person.body.id as string };
+    const forAdmin = await http().get(`/organizations/${id}`).set('Cookie', person.cookie);
+    expect(forAdmin.body.actions).toEqual([{ code: 'review_organization', enabled: true }]);
+
+    const decided = await app.get(OrganizationsService).decide(reviewer, id, 'approve');
+    expect(decided.actions).toEqual([
+      expect.objectContaining({ code: 'review_organization', enabled: false }),
+    ]);
+    const approved = await http().get(`/organizations/${id}`).set('Cookie', cookie);
+    expect(codes(approved.body)).toEqual({ edit_organization: true, create_event: true });
+
+    // Публичная страница — без действий
+    const page = await http().get(`/organizations/${id}`);
+    expect(page.body).not.toHaveProperty('actions');
   });
 
   it('отклонение с причиной публикует OrganizationDecided; после правки — повторная отправка', async () => {

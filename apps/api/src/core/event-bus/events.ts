@@ -1,4 +1,4 @@
-import type { OrganizationStatus } from '@tandem/domain';
+import type { OrganizationStatus, ParticipationStatus } from '@tandem/domain';
 
 /**
  * Полный перечень доменных событий (DECISION-002). Добавить событие —
@@ -27,8 +27,20 @@ export interface DomainEventPayloads {
     via: 'join' | 'accept';
   };
   ParticipationWaitlisted: { participationId: string; eventId: string; userId: string };
-  ParticipationRejected: { participationId: string; eventId: string; userId: string };
-  ParticipationCancelled: { participationId: string; eventId: string; userId: string };
+  /** `reason` — причина отказа, если организатор её указал: её показывает уведомление. */
+  ParticipationRejected: {
+    participationId: string;
+    eventId: string;
+    userId: string;
+    reason: string | null;
+  };
+  ParticipationCancelled: {
+    participationId: string;
+    eventId: string;
+    userId: string;
+    /** Статус до отмены: место освобождается, только если человек был участником. */
+    previousStatus: ParticipationStatus;
+  };
   ParticipationPromotedFromWaitlist: { participationId: string; eventId: string; userId: string };
   MessagePosted: { messageId: string; eventId: string; authorId: string };
   MessageHidden: { messageId: string; eventId: string; reason: string };

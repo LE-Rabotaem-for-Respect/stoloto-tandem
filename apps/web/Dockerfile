@@ -10,6 +10,8 @@ RUN npm ci --ignore-scripts
 COPY tsconfig.base.json ./
 COPY packages/domain packages/domain
 COPY apps/web apps/web
+# Страница /check показывает docs/scenarios.md
+COPY docs/scenarios.md docs/
 RUN npm run build -w @tandem/domain && npm run build -w @tandem/web
 
 FROM nginx:1.29-alpine
