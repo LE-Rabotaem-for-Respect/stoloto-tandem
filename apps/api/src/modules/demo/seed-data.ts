@@ -1,5 +1,5 @@
 import type { DemoAccountKey, OrganizationStatus } from '@tandem/domain';
-import type { SkillLevel, SportCategory, UserRole } from '../../generated/prisma/client';
+import type { Prisma, SkillLevel, SportCategory, UserRole } from '../../generated/prisma/client';
 
 /** Направление стартового каталога (ТЗ 2.3). */
 export interface SeedSport {
@@ -62,7 +62,7 @@ export interface SeedAccount {
   name: string;
   role: UserRole;
   bio?: string;
-  settings?: Record<string, string>;
+  settings?: Prisma.InputJsonObject;
   /** Сколько дней назад зарегистрирован — для «На платформе с…». */
   registeredDaysAgo: number;
   interests?: readonly { sport: string; level: SkillLevel }[];
@@ -99,7 +99,8 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
     name: 'Пётр Иванович',
     role: 'user',
     bio: 'Мне 67, каждое утро делаю зарядку во дворе',
-    settings: { text: 'large' },
+    // Формат настроек оформления — как у PATCH /me/settings
+    settings: { theme: { largeText: true } },
     registeredDaysAgo: 60,
     interests: [{ sport: 'Зарядка', level: 'beginner' }],
   },

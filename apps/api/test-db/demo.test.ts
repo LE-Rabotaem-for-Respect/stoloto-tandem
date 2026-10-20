@@ -98,7 +98,7 @@ describe('POST /demo/reset — минимальный сид', () => {
     const anna = byEmail.get('anna@demo');
     expect(anna && (await verifyPassword('demo', anna.passwordHash))).toBe(true);
     expect(byEmail.get('admin@demo')?.role).toBe('admin');
-    expect(byEmail.get('petr@demo')?.settings).toEqual({ text: 'large' });
+    expect(byEmail.get('petr@demo')?.settings).toEqual({ theme: { largeText: true } });
 
     const admin = byEmail.get('admin@demo');
     const ladya = byEmail.get('ladya@demo')?.organization;

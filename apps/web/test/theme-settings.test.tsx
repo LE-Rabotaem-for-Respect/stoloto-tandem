@@ -23,7 +23,7 @@ const anna = (settings: unknown = {}) => ({
 });
 
 /** Api в памяти: профиль, вход и сохранение настроек оформления. */
-function fakeApi({ signedIn = false, settings = {} as unknown } = {}) {
+function fakeApi({ signedIn = false, settings = {} as unknown, saveFails = false } = {}) {
   let me = signedIn ? anna(settings) : null;
   const saved: unknown[] = [];
   vi.stubGlobal(
@@ -46,6 +46,7 @@ function fakeApi({ signedIn = false, settings = {} as unknown } = {}) {
         case 'PATCH /api/me/settings': {
           const patch = JSON.parse(String(init?.body)) as object;
           saved.push(patch);
+          if (saveFails) return json(500, { code: 'internal', message: 'Ошибка' });
           return json(200, anna({ theme: patch }));
         }
         case 'GET /api/events':
@@ -167,5 +168,25 @@ describe('переключатели «Крупный текст» и «Высо
       'true',
     );
     await waitFor(() => expect(saved).toEqual([{ contrast: true }]));
+  });
+
+  it('сбой сохранения в аккаунт не откатывает выбор', async () => {
+    const { saved } = fakeApi({
+      signedIn: true,
+      settings: { theme: { largeText: true } },
+      saveFails: true,
+    });
+    const user = userEvent.setup();
+    renderApp('/');
+
+    await waitFor(() => expect(root().dataset.text).toBe('large'));
+    await user.click(screen.getByRole('button', { name: /Крупный текст/ }));
+    await waitFor(() => expect(saved).toEqual([{ largeText: false }]));
+    // Ответ с ошибкой пришёл, а оформление из аккаунта повторно не применилось
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(root().dataset.text).toBe('normal');
+    expect(JSON.parse(localStorage.getItem('tandem-theme') ?? '{}')).toMatchObject({
+      largeText: false,
+    });
   });
 });

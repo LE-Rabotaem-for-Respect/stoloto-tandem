@@ -167,7 +167,9 @@ html {
 
 .main-nav ul {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  /* minmax(0, …): колонка не растягивается по длинному слову — иначе пятый пункт
+     в «Крупном тексте» выходит за край 360 px */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 0;
   padding: 0;
   list-style: none;
@@ -190,8 +192,9 @@ html {
 }
 
 .main-nav-link .icon {
-  width: 1.5rem;
-  height: 1.5rem;
+  /* Пиктограмма растёт вместе с темой «Крупный текст» */
+  width: calc(1.5rem * var(--text-scale));
+  height: calc(1.5rem * var(--text-scale));
 }
 
 .main-nav-link[aria-current='page'] {

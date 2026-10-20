@@ -34,7 +34,7 @@ describe('данные минимального сида', () => {
 
   it('Пётр Иванович — с включённым крупным текстом', () => {
     const petr = SEED_ACCOUNTS.find((account) => account.key === 'petr');
-    expect(petr?.settings).toEqual({ text: 'large' });
+    expect(petr?.settings).toEqual({ theme: { largeText: true } });
   });
 
   it('каталог — около 25 направлений во всех 8 группах (ТЗ 2.3)', () => {
