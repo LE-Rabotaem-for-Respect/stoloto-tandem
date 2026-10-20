@@ -7,11 +7,15 @@ import type { StandConfig } from '../../core/config';
 import { ApiError } from '../../core/errors';
 import { AuthRepository } from './auth.repository';
 import type { UserWithOrganization } from './auth.repository';
-import type { LoginDto, RegisterDto } from './dto';
+import type { LoginDto, RegisterDto, UpdateSettingsDto } from './dto';
 import { AUTH_LIMITS, AttemptLimiter } from './attempt-limiter';
 import type { AuthLimits } from './attempt-limiter';
 import { PasswordHasher } from './password-hasher';
 import { SessionService } from './session.service';
+
+type JsonObject = Record<string, unknown>;
+const isPlainObject = (value: unknown): value is JsonObject =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export interface SignedIn {
   user: UserWithOrganization;
@@ -88,6 +92,27 @@ export class AuthService {
       throw new ApiError('not_found', undefined, 'Демо-аккаунта нет в базе — сбросьте демо-данные');
     }
     return this.signIn(user, previousToken);
+  }
+
+  /**
+   * Настройки оформления вошедшего (ТЗ 2.8): «Крупный текст» и «Высокий контраст» —
+   * в `settings.theme`, остальные настройки аккаунта не трогаются.
+   */
+  async updateSettings(
+    user: UserWithOrganization,
+    dto: UpdateSettingsDto,
+  ): Promise<UserWithOrganization> {
+    const current = isPlainObject(user.settings) ? user.settings : {};
+    const theme = isPlainObject(current.theme) ? current.theme : {};
+    const next = {
+      ...current,
+      theme: {
+        ...theme,
+        ...(dto.largeText !== undefined && { largeText: dto.largeText }),
+        ...(dto.contrast !== undefined && { contrast: dto.contrast }),
+      },
+    };
+    return this.repository.updateSettings(user.id, next);
   }
 
   async logout(token?: string) {

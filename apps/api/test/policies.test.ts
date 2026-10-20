@@ -353,7 +353,14 @@ describe('actions[]: пример для карточки события', () =>
 
   it('организатор получает управление событием, но не запись на своё', () => {
     const codes = card(author).map((action) => action.code);
-    expect(codes).toEqual(['join', 'post_message', 'reschedule_event', 'cancel_event']);
+    expect(codes).toEqual([
+      'join',
+      'post_message',
+      'edit_event',
+      'reschedule_event',
+      'cancel_event',
+      'view_participants',
+    ]);
     expect(card(author)[0]).toEqual({
       code: 'join',
       enabled: false,
@@ -364,7 +371,40 @@ describe('actions[]: пример для карточки события', () =>
 
   it('администратор получает модерацию, а не управление', () => {
     const codes = card(admin).map((action) => action.code);
-    expect(codes).toEqual(['join', 'post_message', 'unpublish_event', 'delete_event']);
+    expect(codes).toEqual([
+      'join',
+      'post_message',
+      'unpublish_event',
+      'delete_event',
+      'view_participants',
+    ]);
+  });
+
+  it('«Участники и заявки» — только организатору и администратору', () => {
+    for (const actor of [guest, user, orgApproved]) {
+      expect(card(actor).map((action) => action.code)).not.toContain('view_participants');
+    }
+    expect(card(author)).toContainEqual({ code: 'view_participants', enabled: true });
+    expect(card(admin)).toContainEqual({ code: 'view_participants', enabled: true });
+  });
+
+  it('мест нет: свободная запись неактивна с причиной «Мест нет», заявку подать можно', () => {
+    const full = { ...userEvent, hasSeats: false };
+    expect(eventActions(user, { ...full, mode: 'free' }, null, now)[0]).toEqual({
+      code: 'join',
+      enabled: false,
+      reason: 'Мест нет',
+      reasonCode: 'no_seats',
+    });
+    expect(eventActions(user, { ...full, mode: 'free' }, 'cancelled', now)[0]).toMatchObject({
+      code: 'join',
+      enabled: false,
+      reasonCode: 'no_seats',
+    });
+    expect(eventActions(user, { ...full, mode: 'approval' }, null, now)[0]).toEqual({
+      code: 'join',
+      enabled: true,
+    });
   });
 
   it('у снятого и удалённого мероприятия обсуждение неактивно для всех ролей (ТЗ 2.10)', () => {

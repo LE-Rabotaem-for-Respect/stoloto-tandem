@@ -137,7 +137,10 @@ a {
 }
 
 .field input,
-.field textarea {
+.field textarea,
+.field select {
+  /* Поле сжимается по сетке: у даты и времени своя ширина по содержимому */
+  min-width: 0;
   min-height: var(--tap-min);
   padding: var(--space-2) var(--space-3);
   border: var(--border-width) solid var(--color-line-strong);
@@ -207,4 +210,33 @@ a {
 .facts dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+/* «Оформление» в профиле: переключатели — кнопки с состоянием «включено» */
+.appearance {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.appearance h2 {
+  margin: 0;
+  font-size: var(--fs-lead);
+}
+
+.appearance-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.appearance-options [aria-pressed='true'] {
+  border-color: var(--color-primary);
+  background: var(--color-paper);
+  color: var(--color-primary);
+}
+
+.appearance-hint {
+  margin: 0;
+  color: var(--color-ink-muted);
 }

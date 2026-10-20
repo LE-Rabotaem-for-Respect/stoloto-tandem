@@ -22,6 +22,7 @@ import {
   canManageEvent,
   canModerate,
   canPostMessage,
+  canViewParticipants,
 } from './policies';
 import type { Actor, Decision, PolicyEvent, ViewerParticipation } from './policies';
 
@@ -42,6 +43,8 @@ const disabled = (code: ActionCode, error: { code: ErrorCode; message: string })
   reason: error.message,
   reasonCode: error.code,
 });
+
+const noSeats: Decision = { allowed: false, code: 'no_seats' };
 
 export interface CardEvent extends PolicyEvent {
   mode: EventMode;
@@ -78,12 +81,16 @@ export function eventActions(
     actions.push(toAction('leave', canLeave(actor, event, now)));
   } else if (join.allowed) {
     const check = participationMachine.check(participation, 'join', event);
-    actions.push(check.ok ? toAction('join', join) : disabled('join', check.error));
+    if (!check.ok) actions.push(disabled('join', check.error));
+    // Листа ожидания пока нет (ТЗ 3.2, P1): на заполненное свободное мероприятие не записаться
+    else if (check.to === 'waitlist') actions.push(toAction('join', noSeats));
+    else actions.push(toAction('join', join));
   } else {
     actions.push(toAction('join', join));
   }
   actions.push(toAction('post_message', canPostMessage(actor, event)));
   if (canManageEvent(actor, event).allowed) {
+    actions.push(eventAction('edit_event', 'edit', event, now));
     actions.push(eventAction('reschedule_event', 'reschedule', event, now));
     actions.push(eventAction('cancel_event', 'cancel', event, now));
   }
@@ -94,6 +101,9 @@ export function eventActions(
       actions.push(eventAction('unpublish_event', 'unpublish', event, now));
     }
     actions.push(eventAction('delete_event', 'delete', event, now));
+  }
+  if (canViewParticipants(actor, event).allowed) {
+    actions.push({ code: 'view_participants', enabled: true });
   }
   return actions;
 }

@@ -11,6 +11,8 @@ export const ACTION_CODES = [
   'reschedule_event',
   'cancel_event',
   'view_participant_info',
+  // Вкладка «Участники и заявки» (ТЗ 2.5): организатору и администратору
+  'view_participants',
   'post_message',
   'edit_message',
   'edit_organization',

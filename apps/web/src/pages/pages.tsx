@@ -1,5 +1,6 @@
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
 import {
+  AppearanceSettings,
   LoginForm,
   QuickLogin,
   RegisterForm,
@@ -8,6 +9,7 @@ import {
   safeNext,
   useMe,
 } from '../features/auth';
+import { CreateEventForm } from '../features/events';
 import { NotificationCenter } from '../features/notifications';
 import { MyParticipations } from '../features/participations';
 
@@ -42,7 +44,7 @@ export function LoginPage() {
       <LoginForm onSignedIn={done} />
       <p>
         Нет аккаунта?{' '}
-        <Link to={registerLink} state={carry}>
+        <Link to={registerLink} state={carry} replace>
           Зарегистрироваться
         </Link>
       </p>
@@ -62,7 +64,7 @@ export function RegisterPage() {
       <RegisterForm onSignedIn={done} />
       <p>
         Уже есть аккаунт?{' '}
-        <Link to={loginLink} state={carry}>
+        <Link to={loginLink} state={carry} replace>
           Войти
         </Link>
       </p>
@@ -99,7 +101,10 @@ export const MyParticipationsPage = () => (
 
 export const CreateEventPage = () => (
   <RequireAuth>
-    <Section title="Создать мероприятие" text="Здесь будет форма создания мероприятия." />
+    <div className="page page-narrow">
+      <h1>Создать мероприятие</h1>
+      <CreateEventForm />
+    </div>
   </RequireAuth>
 );
 
@@ -136,6 +141,14 @@ function Profile() {
           </>
         )}
       </dl>
+      <AppearanceSettings />
+      {me.data.role === 'admin' && (
+        <p>
+          <Link className="button" to="/admin">
+            Админка: заявки организаций и поиск
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

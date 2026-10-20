@@ -67,6 +67,14 @@ export class AuthRepository {
     return session?.user ?? null;
   }
 
+  updateSettings(userId: string, settings: Prisma.InputJsonValue): Promise<UserWithOrganization> {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { settings },
+      include: withOrganization,
+    });
+  }
+
   async revokeSession(tokenHash: string, now: Date) {
     await this.prisma.session.updateMany({
       where: { tokenHash, revokedAt: null },

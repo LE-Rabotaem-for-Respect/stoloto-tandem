@@ -8,6 +8,11 @@
   list-style: none;
 }
 
+/* Отступ до заголовка «Контакты», как у абзаца перед «Направлениями» */
+.org-sports-list {
+  margin-bottom: var(--space-4);
+}
+
 .org-sport {
   display: flex;
   flex-wrap: wrap;
