@@ -496,6 +496,36 @@ describe('GET /events/:id', () => {
     }
   });
 
+  it('мест нет: «Записаться» неактивна с причиной «Мест нет», как ответил бы POST join', async () => {
+    const id = (await post(igor, validEvent())).body.id as string;
+    // Лимит мест в форме создания — P1 (ТЗ 3.2), в базе он уже есть
+    await prisma.event.update({ where: { id }, data: { capacity: 1 } });
+    const taken = await account('user');
+    await participation(id, taken.id, 'confirmed');
+    const viewer = await account('user');
+    const response = await get(viewer, id);
+    expect(response.body.displayStatus).toBe('full');
+    expect(response.body.actions[0]).toEqual({
+      code: 'join',
+      enabled: false,
+      reason: 'Мест нет',
+      reasonCode: 'no_seats',
+    });
+    const join = await http().post(`/events/${id}/join`).set('Cookie', viewer.cookie);
+    expect(join.status).toBe(409);
+    expect(join.body.code).toBe('no_seats');
+  });
+
+  it('«Участники и заявки» в actions[] — организатору и администратору, другим — нет', async () => {
+    const codes = async (who: Account | null) =>
+      ((await get(who, eventId)).body.actions as { code: string }[]).map((action) => action.code);
+    expect(await codes(igor)).toContain('view_participants');
+    expect(await codes(admin)).toContain('view_participants');
+    for (const who of [anna, orgApproved, null]) {
+      expect(await codes(who)).not.toContain('view_participants');
+    }
+  });
+
   it('карточка, лента, /me и ответы с ошибкой не кешируются', async () => {
     expect((await get(anna, eventId)).headers['cache-control']).toBe('no-store');
     expect((await get(null, eventId)).headers['cache-control']).toBe('no-store');
