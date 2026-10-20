@@ -369,7 +369,7 @@ describe('публичная страница: /organizations/:id', () => {
     expect(await screen.findByRole('heading', { name: 'Клуб «Падел»' })).toBeTruthy();
     expect(screen.getByText(/Падел для начинающих/)).toBeTruthy();
     expect(screen.getByText('+7 391 000-00-10')).toBeTruthy();
-    const site = screen.getByRole('link', { name: 'https://padel.example' });
+    const site = screen.getByRole('link', { name: 'padel.example' });
     expect(site.getAttribute('rel')).toContain('noopener');
     const link = await screen.findByRole('link', { name: 'Падел для новичков' });
     expect(link.getAttribute('href')).toBe('/events/e1');
@@ -401,9 +401,19 @@ describe('публичная страница: /organizations/:id', () => {
     });
     renderApp(`/organizations/${ORG_ID}`);
     const link = await screen.findByRole('link', {
-      name: 'https://www.instagram.com/padel_krasnoyarsk_official_club/',
+      name: 'www.instagram.com/padel_krasnoyarsk_official_club/',
     });
     expect(link.parentElement?.className).toBe('org-website');
+  });
+
+  it('домен-двойник в адресе сайта виден: подпись — хост в punycode', async () => {
+    fakeApi({
+      signedIn: false,
+      organization: { ...complete, status: 'approved', website: 'https://vк.com/club' },
+    });
+    renderApp(`/organizations/${ORG_ID}`);
+    const link = await screen.findByRole('link', { name: 'xn--v-ttb.com/club' });
+    expect(link.getAttribute('href')).toBe('https://xn--v-ttb.com/club');
   });
 
   it('нет открытых мероприятий — пустое состояние', async () => {

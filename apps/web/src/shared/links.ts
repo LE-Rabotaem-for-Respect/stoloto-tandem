@@ -13,3 +13,14 @@ export function linkHost(url: string): string | null {
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
   return parsed.hostname;
 }
+
+/**
+ * Подпись внешней ссылки: хост из `linkHost` и путь — «vk.com/club». Подмену домена
+ * видно, а адрес страницы понятен; данные входа и протокол не показываются.
+ */
+export function linkLabel(url: string): string | null {
+  const host = linkHost(url);
+  if (!host) return null;
+  const { pathname, search } = new URL(url);
+  return `${host}${pathname === '/' ? '' : pathname}${search}`;
+}
