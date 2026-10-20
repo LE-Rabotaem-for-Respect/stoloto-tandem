@@ -280,6 +280,7 @@ export class EventsService {
         sportText: text && normalizeSportName(text),
         sportId: query.sport,
         category: query.category,
+        organizationId: query.organization,
         startsFrom: range?.from,
         startsBefore: range?.to,
         city: query.city || undefined,

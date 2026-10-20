@@ -141,6 +141,11 @@ export class EventFeedQuery {
   @IsIn(SPORT_CATEGORIES, { message: 'Выберите группу из списка' })
   category?: SportCategory;
 
+  /** Мероприятия одной организации — для её публичной страницы. */
+  @IsOptional()
+  @IsUUID('all', { message: 'Неверный номер организации' })
+  organization?: string;
+
   @IsOptional()
   @IsIn(FEED_DATES, { message: 'Дата: сегодня, завтра или выходные' })
   date?: FeedDate;
