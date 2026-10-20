@@ -88,6 +88,7 @@ function ProfileEditor({ organization }: { organization: OwnOrganization }) {
         label="Сайт (необязательно)"
         type="url"
         inputMode="url"
+        maxLength={300}
         placeholder="https://"
         {...text('website')}
       />

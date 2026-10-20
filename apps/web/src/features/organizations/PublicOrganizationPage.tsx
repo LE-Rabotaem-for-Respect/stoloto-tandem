@@ -37,26 +37,34 @@ function OrganizationEvents({ id }: { id: string }) {
       />
     );
   }
+  const { items, total } = events.data;
   return (
-    <ul className="org-events">
-      {events.data.items.map((event) => (
-        <li key={event.id} className="org-event">
-          <EventDate
-            startsAt={new Date(event.startsAt)}
-            endsAt={new Date(event.endsAt)}
-            now={now}
-            compact
-          />
-          <div className="org-event-text">
-            <Link to={`/events/${event.id}`}>{event.title}</Link>
-            <span>
-              {event.sport.name} · {event.area ? `${event.city}, ${event.area}` : event.city}
-            </span>
-            <StatusBadge view={EVENT_STATUS_VIEW[event.displayStatus]} compact />
-          </div>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="org-events">
+        {items.map((event) => (
+          <li key={event.id} className="org-event">
+            <EventDate
+              startsAt={new Date(event.startsAt)}
+              endsAt={new Date(event.endsAt)}
+              now={now}
+              compact
+            />
+            <div className="org-event-text">
+              <Link to={`/events/${event.id}`}>{event.title}</Link>
+              <span>
+                {event.sport.name} · {event.area ? `${event.city}, ${event.area}` : event.city}
+              </span>
+              <StatusBadge view={EVENT_STATUS_VIEW[event.displayStatus]} compact />
+            </div>
+          </li>
+        ))}
+      </ul>
+      {total > items.length && (
+        <p className="org-events-more">
+          Показаны ближайшие {items.length} из {total} — остальные найдутся в ленте
+        </p>
+      )}
+    </>
   );
 }
 
@@ -102,7 +110,7 @@ function PublicOrganization({ id }: { id: string }) {
       <h2>Контакты</h2>
       <p className="org-contacts">{data.contacts}</p>
       {data.website && (
-        <p>
+        <p className="org-website">
           {href ? (
             <a href={href} target="_blank" rel="noopener noreferrer nofollow">
               {data.website}

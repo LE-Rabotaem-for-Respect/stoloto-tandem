@@ -24,12 +24,14 @@
 
 .org-sport-category,
 .org-sports-empty,
+.org-events-more,
 .org-city {
   color: var(--color-ink-muted);
 }
 
 .org-description,
-.org-contacts {
+.org-contacts,
+.org-website {
   white-space: pre-line;
   overflow-wrap: anywhere;
 }

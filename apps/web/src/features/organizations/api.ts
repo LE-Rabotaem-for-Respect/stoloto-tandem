@@ -66,13 +66,15 @@ export function useOrganization<T extends PublicOrganization = PublicOrganizatio
   });
 }
 
-/** Мероприятия организации — из ленты: только опубликованные и не завершённые. */
+/** Ближайшие мероприятия организации — из ленты: только опубликованные и не завершённые. */
+export const ORGANIZATION_EVENTS_LIMIT = 50;
+
 export function useOrganizationEvents(id: string) {
   return useQuery({
     queryKey: ['organization', id, 'events'],
     queryFn: () =>
       apiRequest<{ items: OrganizationEvent[]; total: number }>(
-        `/events?organization=${encodeURIComponent(id)}&limit=50`,
+        `/events?organization=${encodeURIComponent(id)}&limit=${ORGANIZATION_EVENTS_LIMIT}`,
       ),
   });
 }
@@ -84,8 +86,11 @@ export function useOrganizationEvents(id: string) {
 export function useOrganizationActions(id: string) {
   const client = useQueryClient();
   const path = `/organizations/${encodeURIComponent(id)}`;
-  const store = (organization: OwnOrganization) =>
+  // Название и статус организации показывает и `/me` (шапка, профиль)
+  const store = (organization: OwnOrganization) => {
     client.setQueryData(organizationKey(id), organization);
+    void client.invalidateQueries({ queryKey: ME_KEY });
+  };
 
   const save = useMutation({
     mutationFn: (profile: OrganizationProfile) =>
@@ -97,11 +102,7 @@ export function useOrganizationActions(id: string) {
       store(await apiRequest<OwnOrganization>(path, { method: 'PATCH', body: profile }));
       return apiRequest<OwnOrganization>(`${path}/submit`, { method: 'POST' });
     },
-    onSuccess: (organization) => {
-      store(organization);
-      // Статус организации показывает и `/me`
-      void client.invalidateQueries({ queryKey: ME_KEY });
-    },
+    onSuccess: store,
   });
   return { save, submit };
 }

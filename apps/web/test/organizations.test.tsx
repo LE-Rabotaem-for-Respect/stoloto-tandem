@@ -58,6 +58,7 @@ interface FakeOptions {
   signedIn?: boolean;
   submitFields?: Record<string, string>;
   events?: unknown[];
+  eventsTotal?: number;
 }
 
 /** api в памяти: свой профиль организации, поиск направлений, лента её мероприятий. */
@@ -67,6 +68,7 @@ function fakeApi({
   signedIn = true,
   submitFields,
   events = [],
+  eventsTotal = events.length,
 }: FakeOptions = {}) {
   let current = organization;
   const calls: { call: string; body?: unknown }[] = [];
@@ -129,12 +131,22 @@ function fakeApi({
         return json(200, current);
       }
       if (call.startsWith('GET /api/sports?q=')) {
+        // Как у сервера: запрос длиннее предела — ошибка поля
+        if (decodeURIComponent(url.split('q=')[1]?.split('&')[0] ?? '').includes('!')) {
+          return json(400, {
+            code: 'validation_failed',
+            message: 'В запросе есть недопустимые символы',
+          });
+        }
         return json(200, {
-          items: [{ id: 's-padel', name: 'Падел', category: 'other', isCustom: false }],
+          items: [
+            { id: 's-padel', name: 'Падел', category: 'other', isCustom: false },
+            { id: 's-tennis', name: 'Теннис', category: 'other', isCustom: false },
+          ],
         });
       }
       if (call === `GET /api/events?organization=${ORG_ID}&limit=50`) {
-        return json(200, { items: events, total: events.length, limit: 50, offset: 0 });
+        return json(200, { items: events, total: eventsTotal, limit: 50, offset: 0 });
       }
       return json(404, { code: 'not_found', message: 'Не найдено' });
     }),
@@ -263,6 +275,60 @@ describe('своя организация: /organization', () => {
     expect(screen.queryByRole('button', { name: 'Отправить на проверку' })).toBeNull();
   });
 
+  it('направления с клавиатуры: фокус не теряется после «Добавить» и «Убрать»', async () => {
+    const user = userEvent.setup();
+    fakeApi();
+    renderApp('/organization');
+    const search = await screen.findByLabelText('Найти направление');
+    expect(search.getAttribute('maxlength')).toBe('50');
+
+    await user.type(search, 'пад');
+    await user.click(await screen.findByRole('button', { name: /Добавить «Падел»/ }));
+    expect(document.activeElement).toBe(search);
+    await user.type(search, 'тен');
+    await user.click(await screen.findByRole('button', { name: /Добавить «Теннис»/ }));
+
+    await user.click(screen.getByRole('button', { name: 'Убрать «Падел»' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Убрать «Теннис»' }));
+    await user.click(screen.getByRole('button', { name: 'Убрать «Теннис»' }));
+    expect(document.activeElement).toBe(search);
+  });
+
+  it('ошибка поиска направлений видна, прошлые результаты не остаются', async () => {
+    const user = userEvent.setup();
+    fakeApi();
+    renderApp('/organization');
+    const search = await screen.findByLabelText('Найти направление');
+    await user.type(search, 'пад');
+    expect(await screen.findByRole('button', { name: /Добавить «Падел»/ })).toBeTruthy();
+    await user.type(search, '!');
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'В запросе есть недопустимые символы',
+    );
+    expect(screen.queryByRole('button', { name: /Добавить «Падел»/ })).toBeNull();
+  });
+
+  it('после «Сохранить» название в /me обновляется', async () => {
+    const user = userEvent.setup();
+    const { calls } = fakeApi({ organization: complete });
+    renderApp('/organization');
+    const name = await screen.findByLabelText('Название');
+    const before = calls.filter(({ call }) => call === 'GET /api/me').length;
+    await user.clear(name);
+    await user.type(name, 'Падел-клуб');
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() =>
+      expect(calls.filter(({ call }) => call === 'GET /api/me').length).toBeGreaterThan(before),
+    );
+  });
+
+  it('у сайта — предел длины, как у api', async () => {
+    fakeApi();
+    renderApp('/organization');
+    const website = await screen.findByLabelText('Сайт (необязательно)');
+    expect(website.getAttribute('maxlength')).toBe('300');
+  });
+
   it('аккаунт человека: раздел не для него', async () => {
     fakeApi({ role: 'user', organization: null });
     renderApp('/organization');
@@ -309,6 +375,35 @@ describe('публичная страница: /organizations/:id', () => {
     expect(link.getAttribute('href')).toBe('/events/e1');
     expect(screen.getByText('Падел · Красноярск, Октябрьский')).toBeTruthy();
     expect(screen.getByText('Набор открыт')).toBeTruthy();
+  });
+
+  it('мероприятий больше, чем показано, — подсказка про ленту', async () => {
+    fakeApi({
+      signedIn: false,
+      organization: { ...complete, status: 'approved' },
+      events: [event],
+      eventsTotal: 64,
+    });
+    renderApp(`/organizations/${ORG_ID}`);
+    expect(
+      await screen.findByText('Показаны ближайшие 1 из 64 — остальные найдутся в ленте'),
+    ).toBeTruthy();
+  });
+
+  it('длинный адрес сайта переносится, а не раздвигает страницу', async () => {
+    fakeApi({
+      signedIn: false,
+      organization: {
+        ...complete,
+        status: 'approved',
+        website: 'https://www.instagram.com/padel_krasnoyarsk_official_club/',
+      },
+    });
+    renderApp(`/organizations/${ORG_ID}`);
+    const link = await screen.findByRole('link', {
+      name: 'https://www.instagram.com/padel_krasnoyarsk_official_club/',
+    });
+    expect(link.parentElement?.className).toBe('org-website');
   });
 
   it('нет открытых мероприятий — пустое состояние', async () => {
