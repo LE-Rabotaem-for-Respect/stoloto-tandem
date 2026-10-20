@@ -17,6 +17,33 @@ const SPORTS = [
   { id: 'sport-ski', name: 'Беговые лыжи', category: 'winter', isCustom: false },
 ];
 
+// Карточка созданного мероприятия — её показывает экран, куда ведёт «Опубликовать»
+const createdCard = {
+  id: 'event-1',
+  title: 'Созданное мероприятие',
+  description: '',
+  sport: { id: 'sport-run', name: 'Бег', category: 'endurance', isCustom: false },
+  organizer: { kind: 'user', id: 'u1', name: 'Анна' },
+  startsAt: '2026-10-24T12:00:00Z',
+  endsAt: '2026-10-24T13:30:00Z',
+  previousStartsAt: null,
+  city: 'Красноярск',
+  area: 'Центральный',
+  placeText: 'Набережная',
+  mode: 'free',
+  applyQuestion: null,
+  level: 'any',
+  status: 'published',
+  statusReason: null,
+  displayStatus: 'open',
+  participation: null,
+  participationReason: null,
+  participantInfo: null,
+  capacity: null,
+  confirmedCount: 0,
+  actions: [],
+};
+
 /** Api в памяти: вошедшая Анна, подсказки направлений и создание мероприятия. */
 function fakeApi(createResponse: () => Response = () => json(201, { id: 'event-1' })) {
   const created: unknown[] = [];
@@ -39,6 +66,8 @@ function fakeApi(createResponse: () => Response = () => json(201, { id: 'event-1
         const items = SPORTS.filter((sport) => sport.name.toLowerCase().startsWith(q));
         return json(200, { items, exactMatch: items.some((s) => s.name.toLowerCase() === q) });
       }
+      const card = /^\/api\/events\/(event-\d+)$/.exec(pathname);
+      if (method === 'GET' && card) return json(200, { ...createdCard, id: card[1] });
       if (method === 'POST' && pathname === '/api/events') {
         created.push(JSON.parse(String(init?.body)));
         return createResponse();
@@ -135,7 +164,7 @@ describe('создание мероприятия', { timeout: 15_000 }, () => {
     preview.getByText('Красноярск, Центральный, Набережная у Коммунального моста');
 
     await user.click(screen.getByRole('button', { name: 'Опубликовать' }));
-    await screen.findByRole('heading', { name: 'Мероприятие' });
+    await screen.findByRole('heading', { name: 'Созданное мероприятие', level: 1 });
     expect(created).toEqual([
       {
         title: 'Пробежка по набережной',
@@ -274,7 +303,7 @@ describe('создание мероприятия', { timeout: 15_000 }, () => {
     expect(question.hasAttribute('aria-invalid')).toBe(false);
 
     await user.click(screen.getByRole('button', { name: 'Опубликовать' }));
-    await screen.findByRole('heading', { name: 'Мероприятие' });
+    await screen.findByRole('heading', { name: 'Созданное мероприятие', level: 1 });
     expect(created).toHaveLength(2);
     expect(created[1]).toMatchObject({
       startsAt: '2026-10-25T12:30:00.000Z',

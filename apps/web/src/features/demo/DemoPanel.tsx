@@ -1,6 +1,6 @@
 import { TIME_ZONE } from '@tandem/domain';
 import { useEffect, useId, useRef, useState } from 'react';
-import { useMatch } from 'react-router';
+import { Link, useMatch } from 'react-router';
 import { ApiRequestError } from '../../shared/api';
 import { useClock, useStandInfo } from '../../shared/clock';
 import { useEventTimes, useResetDemo, useShiftClock } from './api';
@@ -171,6 +171,7 @@ export function DemoPanel() {
             <FinishEvent eventId={eventPage.params.id} now={now} shift={shift} />
           )}
           <ResetDemo />
+          <Link to="/check">Как проверить</Link>
         </div>
         {shift.isError && (
           <p className="demo-note" role="alert">
