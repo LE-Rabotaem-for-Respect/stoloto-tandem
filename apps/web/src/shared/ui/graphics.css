@@ -1,0 +1,378 @@
+/* Компоненты графики (docs/design.md, «Компоненты графики»); образец — docs/design/event-card.html. */
+
+/* Листок даты и время */
+.when {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+[data-text='large'] .when {
+  flex-wrap: wrap;
+}
+
+.date-leaf {
+  flex: none;
+  display: grid;
+  justify-items: center;
+  width: calc(4.5rem * var(--text-scale));
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  overflow: hidden;
+  text-align: center;
+}
+
+.date-leaf-compact {
+  width: calc(3.5rem * var(--text-scale));
+}
+
+.date-leaf-compact .leaf-day {
+  font-size: var(--fs-title);
+}
+
+.leaf-month {
+  position: relative;
+  width: 100%;
+  padding: var(--space-2) 0 var(--space-1);
+  background: var(--color-marker);
+  color: var(--color-on-marker);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Пробивки отрывного календаря */
+.leaf-month::before,
+.leaf-month::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-ink);
+}
+
+.leaf-month::before {
+  left: 22%;
+}
+
+.leaf-month::after {
+  right: 22%;
+}
+
+.leaf-day {
+  padding-top: var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--fs-display);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.leaf-weekday {
+  padding-bottom: var(--space-2);
+  color: var(--color-ink-muted);
+  font-size: var(--fs-caption);
+  line-height: 1;
+}
+
+.when-text {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.when-text .level {
+  margin-top: var(--space-1);
+}
+
+.when-time,
+.when-relative {
+  white-space: nowrap;
+}
+
+.when-time {
+  font-size: var(--fs-lead);
+  font-weight: 600;
+}
+
+.when-relative {
+  color: var(--color-ink-muted);
+  font-size: var(--fs-caption);
+}
+
+/* Шкала уровня */
+.level {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.level-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+
+.level-bars i {
+  width: calc(0.75rem * var(--text-scale));
+  border: 2px solid var(--color-line-strong);
+  border-radius: 3px;
+  background: var(--color-surface);
+}
+
+.level-bars i:nth-child(1) {
+  height: calc(0.875rem * var(--text-scale));
+}
+
+.level-bars i:nth-child(2) {
+  height: calc(1.25rem * var(--text-scale));
+}
+
+.level-bars i:nth-child(3) {
+  height: calc(1.625rem * var(--text-scale));
+}
+
+.level-bars i[data-on] {
+  border-color: var(--color-ink);
+  background: var(--color-marker);
+}
+
+.level-name {
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Бейдж режима записи */
+.mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-ink);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Статус: текст, пиктограмма и цвет */
+.status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid currentColor;
+  border-radius: var(--radius-control);
+  font-weight: 600;
+}
+
+.status--ok {
+  color: var(--status-ok-fg);
+  background: var(--status-ok-bg);
+}
+
+.status--wait {
+  color: var(--status-wait-fg);
+  background: var(--status-wait-bg);
+}
+
+.status--queue {
+  color: var(--status-queue-fg);
+  background: var(--status-queue-bg);
+}
+
+.status--bad {
+  color: var(--status-bad-fg);
+  background: var(--status-bad-bg);
+}
+
+.status--warn {
+  color: var(--status-warn-fg);
+  background: var(--status-warn-bg);
+}
+
+.status--off {
+  color: var(--status-off-fg);
+  background: var(--status-off-bg);
+}
+
+.status-text {
+  flex: 1;
+}
+
+/* Иконка по первой строке текста: (1.45em − 1.25em) / 2 */
+.status .icon {
+  margin-top: 0.1em;
+}
+
+.status-reason {
+  display: block;
+  font-weight: 400;
+}
+
+.status-compact {
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+/* Степпер */
+.stepper-box {
+  container-type: inline-size;
+}
+
+.stepper {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepper[data-steps='1'] {
+  grid-template-columns: max-content;
+}
+
+.stepper[data-steps='4'] {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.stepper li {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  color: var(--color-ink-muted);
+  font-size: var(--fs-caption);
+  text-align: center;
+}
+
+.stepper li + li::before {
+  content: '';
+  position: absolute;
+  top: calc(1.125rem * var(--text-scale));
+  right: 50%;
+  z-index: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--color-line-strong);
+}
+
+.stepper li[data-state='done'] + li::before {
+  background: var(--status-ok-fg);
+}
+
+.step-dot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: calc(2.25rem * var(--text-scale));
+  height: calc(2.25rem * var(--text-scale));
+  border: 2px solid var(--color-line-strong);
+  border-radius: 50%;
+  background: var(--color-surface);
+}
+
+.step-label {
+  display: grid;
+}
+
+.step-note {
+  font-weight: 400;
+}
+
+.stepper li[data-state='done'] {
+  color: var(--status-ok-fg);
+}
+
+.stepper li[data-state='done'] .step-dot {
+  border-color: var(--status-ok-fg);
+  background: var(--status-ok-bg);
+}
+
+.stepper li[data-state='current'] {
+  color: var(--status-wait-fg);
+  font-weight: 700;
+}
+
+.stepper li[data-state='current'] .step-dot {
+  border-width: 3px;
+  border-color: var(--status-wait-fg);
+  background: var(--status-wait-bg);
+}
+
+.stepper li[data-state='error'] {
+  color: var(--status-bad-fg);
+  font-weight: 700;
+}
+
+.stepper li[data-state='error'] .step-dot {
+  border-color: var(--status-bad-fg);
+  background: var(--status-bad-bg);
+}
+
+/* Степпер из 4 шагов в контейнере у́же 480 px — вертикальный: кружок слева, подпись справа */
+@container (max-width: 30rem) {
+  .stepper[data-steps='4'] {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  .stepper[data-steps='4'] li {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    justify-items: start;
+    gap: var(--space-3);
+    text-align: left;
+  }
+
+  .stepper[data-steps='4'] li + li::before {
+    top: calc(var(--space-3) * -1);
+    right: auto;
+    left: calc(1.125rem * var(--text-scale) - 1px);
+    width: 2px;
+    height: var(--space-3);
+  }
+}
+
+/* Главная кнопка: во всю ширину на мобильном, причина недоступности рядом */
+.primary-action {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.primary-action-reason {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+@media (min-width: 768px) {
+  .primary-action {
+    justify-items: start;
+  }
+}
+
+/* Пустое состояние */
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+}
+
+.empty-state-image {
+  width: calc(10rem * var(--text-scale));
+  height: auto;
+  border-radius: var(--radius-control);
+}
+
+[data-theme='contrast'] .empty-state-image {
+  filter: invert(1);
+}
+
+.empty-state p {
+  margin: 0;
+}
