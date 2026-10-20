@@ -20,6 +20,24 @@ const cardInclude = {
 
 export type EventWithCard = Prisma.EventGetPayload<{ include: typeof cardInclude }>;
 
+// Поля, которые меняет PATCH /events/:id (ТЗ 2.2): по ним видно, что изменилось
+const editableSelect = {
+  title: true,
+  description: true,
+  city: true,
+  area: true,
+  placeText: true,
+  participantInfo: true,
+  level: true,
+  mode: true,
+  capacity: true,
+  applyQuestion: true,
+} satisfies Prisma.EventSelect;
+
+export type EditableFields = {
+  [Field in keyof Prisma.EventGetPayload<{ select: typeof editableSelect }>]?:
+    Prisma.EventGetPayload<{ select: typeof editableSelect }>[Field] | undefined;
+};
 export interface ViewerParticipationRow {
   status: ParticipationStatus;
   decisionReason: string | null;
@@ -108,6 +126,15 @@ export class EventsRepository {
 
   create(data: Prisma.EventUncheckedCreateInput, tx: Db): Promise<{ id: string }> {
     return tx.event.create({ data, select: { id: true } });
+  }
+
+  /** Текущие значения изменяемых полей — внутри транзакции, где строка уже заблокирована. */
+  findEditable(id: string, tx: Db): Promise<EditableFields> {
+    return tx.event.findUniqueOrThrow({ where: { id }, select: editableSelect });
+  }
+
+  update(id: string, data: EditableFields, tx: Db): Promise<{ id: string }> {
+    return tx.event.update({ where: { id }, data, select: { id: true } });
   }
 
   /** Название и кто организатор: пользователь или организация (с её владельцем). */

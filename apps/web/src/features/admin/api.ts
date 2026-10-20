@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { EventStatus, OrganizationStatus, SportCategory } from '@tandem/domain';
+import type { Action, EventStatus, OrganizationStatus, SportCategory } from '@tandem/domain';
 import { apiRequest } from '../../shared/api';
 
 export interface AdminOverview {
@@ -21,6 +21,8 @@ export interface AdminOrganization {
   decisionReason: string | null;
   submittedAt: string | null;
   sports: { id: string; name: string }[];
+  /** `review_organization` — можно ли решать по заявке (DECISION-002). */
+  actions: Action[];
 }
 
 export interface AdminEvent {

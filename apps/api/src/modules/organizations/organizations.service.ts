@@ -5,7 +5,7 @@ import { Clock } from '../../core/clock';
 import { ApiError } from '../../core/errors';
 import { EventBus, domainEvent } from '../../core/event-bus';
 import type { Prisma } from '../../generated/prisma/client';
-import { canEditOrganization, canModerate } from '../../core/policies';
+import { canEditOrganization, canModerate, organizationActions } from '../../core/policies';
 import type { Actor, Decision } from '../../core/policies';
 import type { UpdateOrganizationDto } from './dto';
 import { toOwnView, toPublicView } from './organization-view';
@@ -62,7 +62,7 @@ export class OrganizationsService {
     const organization = await this.repository.find(id);
     if (!organization) throw new ApiError('not_found', undefined, NOT_FOUND);
     if (canEditOrganization(actor, id).allowed || actor.role === 'admin') {
-      return toOwnView(organization);
+      return toOwnView(organization, organizationActions(actor, organization));
     }
     if (organization.status !== 'approved') throw new ApiError('not_found', undefined, NOT_FOUND);
     return toPublicView(organization);
@@ -91,7 +91,8 @@ export class OrganizationsService {
       });
       if (Object.keys(missing).length > 0) throw new ApiError('validation_failed', missing);
     }
-    return toOwnView(await this.repository.updateProfile(id, changes, uniqueSports));
+    const updated = await this.repository.updateProfile(id, changes, uniqueSports);
+    return toOwnView(updated, organizationActions(actor, updated));
   }
 
   /** «Отправить на проверку»: черновик, отклонённую или возвращённую на правки. */
@@ -120,7 +121,7 @@ export class OrganizationsService {
         }),
       );
     });
-    return this.ownView(id);
+    return this.ownView(actor, id);
   }
 
   /**
@@ -161,7 +162,7 @@ export class OrganizationsService {
         }),
       );
     });
-    return this.ownView(id);
+    return this.ownView(actor, id);
   }
 
   /** Организации для администратора (ТЗ 2.10): заявка целиком — статус, причина, представитель. */
@@ -172,7 +173,13 @@ export class OrganizationsService {
   ): Promise<{ items: OwnOrganizationView[]; total: number; limit: number; offset: number }> {
     allowOrThrow(canModerate(actor));
     const { organizations, total } = await this.repository.adminSearch(filter, page);
-    return { items: organizations.map(toOwnView), total, ...page };
+    return {
+      items: organizations.map((organization) =>
+        toOwnView(organization, organizationActions(actor, organization)),
+      ),
+      total,
+      ...page,
+    };
   }
 
   /** Направления организаций при объединении дублей — в транзакции объединения. */
@@ -191,9 +198,9 @@ export class OrganizationsService {
     return organization && { name: organization.name, ownerUserId: organization.ownerUserId };
   }
 
-  private async ownView(id: string): Promise<OwnOrganizationView> {
+  private async ownView(actor: Actor, id: string): Promise<OwnOrganizationView> {
     const organization = await this.repository.find(id);
     if (!organization) throw new ApiError('not_found', undefined, NOT_FOUND);
-    return toOwnView(organization);
+    return toOwnView(organization, organizationActions(actor, organization));
   }
 }
