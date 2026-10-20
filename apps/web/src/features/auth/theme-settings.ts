@@ -22,26 +22,43 @@ const SAVE_THEME_KEY = ['save-theme'] as const;
 
 export const THEME_NOT_SAVED = 'Не сохранилось в аккаунте — выбор остался в этом браузере';
 
+/** Чьё оформление сохраняется: сбой одного аккаунта не показывается другому. */
+interface SaveThemeVariables {
+  userId: string;
+  patch: Partial<ThemeSettings>;
+}
+
 function useSaveTheme() {
   const client = useQueryClient();
   return useMutation({
     mutationKey: SAVE_THEME_KEY,
-    mutationFn: (patch: Partial<ThemeSettings>) =>
+    mutationFn: ({ patch }: SaveThemeVariables) =>
       apiRequest<Me>('/me/settings', { method: 'PATCH', body: patch }),
     onSuccess: (me) => client.setQueryData(ME_KEY, me),
   });
 }
 
+/** Последнее сохранение оформления этого аккаунта не удалось. */
+function useLastSaveFailed(userId: string | undefined): boolean {
+  const saves = useMutationState({
+    filters: { mutationKey: SAVE_THEME_KEY },
+    select: (mutation) => ({
+      status: mutation.state.status,
+      userId: (mutation.state.variables as SaveThemeVariables | undefined)?.userId,
+    }),
+  });
+  const last = saves.filter((save) => save.userId === userId).at(-1);
+  return Boolean(userId) && last?.status === 'error';
+}
+
 /**
  * Последнее сохранение оформления в аккаунт не удалось — общее для шапки и профиля:
- * переключатели в них разные, а сообщение о сбое должно быть видно у любого.
+ * переключатели в них разные, а сообщение о сбое должно быть видно у любого. Гостю и
+ * другому аккаунту после выхода оно не показывается.
  */
 export function useThemeSaveFailed(): boolean {
-  const statuses = useMutationState({
-    filters: { mutationKey: SAVE_THEME_KEY },
-    select: (mutation) => mutation.state.status,
-  });
-  return statuses.at(-1) === 'error';
+  const me = useMe();
+  return useLastSaveFailed(me.data?.id);
 }
 
 /**
@@ -53,9 +70,13 @@ export function useThemeSettings() {
   const theme = useTheme();
   const me = useMe();
   const save = useSaveTheme();
+  const userId = me.data?.id;
+  const failed = useLastSaveFailed(userId);
   const change = (patch: Partial<ThemeSettings>) => {
-    theme.setSettings({ largeText: theme.largeText, contrast: theme.contrast, ...patch });
-    if (me.data) save.mutate(patch);
+    const next = { largeText: theme.largeText, contrast: theme.contrast, ...patch };
+    theme.setSettings(next);
+    // После сбоя в аккаунте могло не сохраниться и прежнее переключение — отправляются оба
+    if (userId) save.mutate({ userId, patch: failed ? next : patch });
   };
   return {
     largeText: theme.largeText,

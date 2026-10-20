@@ -35,8 +35,7 @@ html {
 
 /* Сбой сохранения оформления — строкой под шапкой, с теми же отступами */
 .theme-save-error {
-  border-radius: 0;
-  padding-inline: var(--space-4);
+  margin-block-end: var(--space-4);
   overflow-wrap: anywhere;
 }
 

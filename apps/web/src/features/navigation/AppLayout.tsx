@@ -169,7 +169,6 @@ export function AppLayout() {
           <ThemeSwitches />
           <Account />
         </header>
-        <ThemeSaveError />
         <nav className="main-nav" aria-label="Основные разделы">
           <ul>
             {NAV_ITEMS.map((item) => (
@@ -193,6 +192,8 @@ export function AppLayout() {
       </div>
       <DemoPanel />
       <main id="main" className="app-main" tabIndex={-1}>
+        {/* В потоке страницы, а не в прилипающей шапке: не отнимает первый экран */}
+        <ThemeSaveError />
         <Outlet />
       </main>
     </div>

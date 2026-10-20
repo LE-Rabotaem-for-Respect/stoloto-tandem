@@ -44,6 +44,9 @@ function fakeApi({ signedIn = false, settings = {} as unknown, saveFails = false
         case 'POST /api/auth/login':
           me = anna(settings);
           return json(200, me);
+        case 'POST /api/auth/logout':
+          me = null;
+          return json(204);
         case 'PATCH /api/me/settings': {
           const patch = JSON.parse(String(init?.body)) as object;
           saved.push(patch);
@@ -212,5 +215,56 @@ describe('переключатели «Крупный текст» и «Высо
     await user.click(contrast);
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
     expect(section.textContent).toContain('Выбор запоминается в аккаунте');
+  });
+
+  it('сообщение в шапке — в потоке страницы, а не в прилипающей части', async () => {
+    fakeApi({ signedIn: true, saveFails: true });
+    const user = userEvent.setup();
+    renderApp('/');
+    await screen.findByRole('button', { name: 'Сменить аккаунт' });
+    await user.click(screen.getByRole('button', { name: /Крупный текст/ }));
+    const alert = await screen.findByRole('alert');
+    expect(alert.closest('.app-top')).toBeNull();
+    expect(alert.closest('main')).not.toBeNull();
+  });
+
+  it('в профиле сообщение стоит над кнопками', async () => {
+    fakeApi({ signedIn: true, saveFails: true });
+    const user = userEvent.setup();
+    renderApp('/profile');
+    const section = await screen.findByRole('region', { name: 'Оформление' });
+    const button = section.querySelector('button') as HTMLButtonElement;
+    await user.click(button);
+    const alert = await screen.findByRole('alert');
+    expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('после выхода сбой прежнего аккаунта не показывается', async () => {
+    fakeApi({ signedIn: true, saveFails: true });
+    const user = userEvent.setup();
+    renderApp('/');
+    await screen.findByRole('button', { name: 'Сменить аккаунт' });
+    await user.click(screen.getByRole('button', { name: /Крупный текст/ }));
+    expect(await screen.findByRole('alert')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Сменить аккаунт' }));
+    await screen.findByRole('heading', { name: 'Вход' });
+    expect(screen.queryByText(/Не сохранилось в аккаунте/)).toBeNull();
+  });
+
+  it('после сбоя следующее сохранение отправляет обе настройки', async () => {
+    const { saved, failures } = fakeApi({ signedIn: true, saveFails: true });
+    const user = userEvent.setup();
+    renderApp('/');
+    await screen.findByRole('button', { name: 'Сменить аккаунт' });
+    await user.click(screen.getByRole('button', { name: /Крупный текст/ }));
+    await screen.findByRole('alert');
+
+    failures.saveFails = false;
+    await user.click(screen.getByRole('button', { name: /Контраст/ }));
+    await waitFor(() => expect(saved).toHaveLength(2));
+    // Крупный текст не сохранился в первый раз — уходит вместе с контрастом
+    expect(saved[1]).toEqual({ largeText: true, contrast: true });
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
   });
 });
