@@ -533,6 +533,7 @@ describe('модерация мероприятий (ТЗ 2.10, сценарий
     const title = `Блиц ${tag} снятие`;
     const { event, organizer, member } = await eventWithParticipant(title);
     const reason = 'Турнир перенесён клубом, сведения устарели';
+    expect((await http().get('/events').query({ q: title })).body.total).toBe(1);
 
     const response = await moderate(cookie, event.id, {
       action: 'unpublish',
@@ -597,7 +598,7 @@ describe('модерация мероприятий (ТЗ 2.10, сценарий
 
   it('«Удалить» — мягко: строка остаётся со статусом deleted; повторно — 409', async () => {
     const cookie = await admin();
-    const { event, member } = await eventWithParticipant(`Блиц ${tag} удаление`);
+    const { event, organizer, member } = await eventWithParticipant(`Блиц ${tag} удаление`);
 
     const response = await moderate(cookie, event.id, {
       action: 'delete',
@@ -618,6 +619,14 @@ describe('модерация мероприятий (ТЗ 2.10, сценарий
       expect(again.status).toBe(409);
     }
     expect(await prisma.moderationLog.count({ where: { objectId: event.id } })).toBe(1);
+
+    await vi.waitFor(async () => {
+      const notified = await prisma.notification.findMany({
+        where: { type: 'event_deleted', link: `/events/${event.id}` },
+      });
+      expect(notified.map((n) => n.userId).sort()).toEqual([organizer.id, member.body.id].sort());
+      expect(notified[0]?.payload).toMatchObject({ reason: 'Мошенничество' });
+    });
   });
 
   it('снятое можно удалить; два решения одновременно — одно проходит, второе 409', async () => {
