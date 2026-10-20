@@ -63,7 +63,7 @@ export interface AdminSport {
 export interface ThreadMessage {
   id: string;
   author: { name: string };
-  /** Действия модерации для администратора: `hide_message`, `delete_message`. */
+  /** Действия модерации для администратора: `hide_message`, `moderate_delete_message`. */
   actions: { code: string; enabled: boolean }[];
   isOrganizer: boolean;
   text: string | null;

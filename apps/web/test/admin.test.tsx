@@ -110,7 +110,7 @@ function fakeAdminApi(
             text: 'Купите абонемент со скидкой',
             moderationReason: 'Реклама',
             createdAt: '2026-10-19T05:00:00Z',
-            actions: [{ code: 'delete_message', enabled: true }],
+            actions: [{ code: 'moderate_delete_message', enabled: true }],
           },
         ],
         total: 1,
@@ -129,7 +129,7 @@ function fakeAdminApi(
           createdAt: '2026-10-19T05:00:00Z',
           actions: [
             { code: 'hide_message', enabled: true },
-            { code: 'delete_message', enabled: true },
+            { code: 'moderate_delete_message', enabled: true },
           ],
           replies: [
             {

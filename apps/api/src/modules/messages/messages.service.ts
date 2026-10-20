@@ -69,7 +69,7 @@ function moderationActions(actor: Actor, status: MessageStatus): Action[] {
     actions.push({ code: 'hide_message', enabled: true });
   }
   if (messageMachine.canTransition(status, 'delete_by_moderator', { reason: 'в форме' })) {
-    actions.push({ code: 'delete_message', enabled: true });
+    actions.push({ code: 'moderate_delete_message', enabled: true });
   }
   return actions;
 }

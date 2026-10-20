@@ -557,9 +557,9 @@ describe('POST /events/:id/messages/:messageId/moderation', () => {
     const message = (await post(anna, event.id, { text: 'Вопрос' })).body;
     const codes = async () =>
       (await list(admin, event.id)).body[0].actions.map((action: { code: string }) => action.code);
-    expect(await codes()).toEqual(['hide_message', 'delete_message']);
+    expect(await codes()).toEqual(['hide_message', 'moderate_delete_message']);
     await moderate(admin, event.id, message.id, { action: 'hide', reason: 'Причина' });
-    expect(await codes()).toEqual(['delete_message']);
+    expect(await codes()).toEqual(['moderate_delete_message']);
     // Участнику действий модерации нет
     expect((await list(igor, event.id)).body[0].actions).toEqual([]);
   });

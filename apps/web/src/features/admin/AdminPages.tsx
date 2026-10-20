@@ -435,7 +435,7 @@ function Organizations() {
 
 const MODERATION = {
   hide: { code: 'hide_message', label: 'Скрыть', done: 'Сообщение скрыто' },
-  delete: { code: 'delete_message', label: 'Удалить', done: 'Сообщение удалено' },
+  delete: { code: 'moderate_delete_message', label: 'Удалить', done: 'Сообщение удалено' },
 } as const;
 type ModerationAction = keyof typeof MODERATION;
 
