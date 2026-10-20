@@ -79,11 +79,29 @@ function fakeStand(state: Partial<StandState> = {}, eventEndsAt = '2026-10-19T07
         case 'GET /api/events/e1':
           if (stand.eventFails)
             return json(502, { code: 'internal', message: 'Что-то пошло не так' });
+          // Карточка целиком: страница мероприятия — экран карточки
           return json(200, {
             id: 'e1',
             title: 'Футбол',
+            description: 'Играем на поле у школы',
+            sport: { id: 's1', name: 'Футбол', category: 'team', isCustom: false },
+            organizer: { kind: 'user', id: 'u2', name: 'Игорь' },
             startsAt: '2026-10-19T06:00:00Z',
             endsAt: eventEndsAt,
+            previousStartsAt: null,
+            city: 'Красноярск',
+            area: 'Центральный',
+            placeText: 'Поле у школы',
+            mode: 'free',
+            applyQuestion: null,
+            level: 'any',
+            status: 'published',
+            statusReason: null,
+            displayStatus: 'open',
+            participation: null,
+            participationReason: null,
+            participantInfo: null,
+            actions: [],
           });
         default:
           return json(404, { code: 'not_found', message: 'Не найдено' });
