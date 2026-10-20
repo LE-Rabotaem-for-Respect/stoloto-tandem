@@ -3,13 +3,14 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DEMO_ACCOUNT_KEYS, demoAccountEmail } from '@tandem/domain';
 import request from 'supertest';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/configure-app';
 import { REAL_TIME } from '../src/core/clock';
 import { STAND_CONFIG } from '../src/core/config';
 import { verifyPassword } from '../src/modules/auth/password';
 import { RESET_TABLES } from '../src/modules/demo';
+import { DemoService } from '../src/modules/demo/demo.service';
 import { runSeed } from '../src/seed';
 import { databaseUrl, prisma } from './db';
 
@@ -237,6 +238,64 @@ describe('POST /demo/clock — перемотка демо-часов', () => {
     const response = await request(app.getHttpServer()).post('/demo/clock').send({ addSeconds });
     expect(response.status).toBe(400);
     expect(response.body.code).toBe('validation_failed');
+  });
+});
+
+describe('частота сброса', () => {
+  async function startWithInterval(seconds: number, now: () => number) {
+    process.env.DATABASE_URL = databaseUrl;
+    process.env.SESSION_SECRET = 'test-session-secret-0123456789abcdef';
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(STAND_CONFIG)
+      .useValue({ demoMode: true, standId: 'stand-1', demoResetIntervalSeconds: seconds })
+      .overrideProvider(REAL_TIME)
+      .useValue(now)
+      .compile();
+    const started = configureApp(moduleRef.createNestApplication({ logger: false }));
+    await started.init();
+    return started;
+  }
+
+  it('два одновременных сброса — выполняется один, оба получают его результат', async () => {
+    app = await startWithInterval(0, () => realNow);
+    const reset = vi.spyOn(app.get(DemoService), 'reset');
+    const [first, second] = await Promise.all([
+      request(app.getHttpServer()).post('/demo/reset'),
+      request(app.getHttpServer()).post('/demo/reset'),
+    ]);
+    expect([first.status, second.status]).toEqual([200, 200]);
+    expect(second.body).toEqual(first.body);
+    expect(reset).toHaveBeenCalledTimes(1);
+  });
+
+  it('повтор в интервале — 429 с Retry-After, после интервала — снова можно', async () => {
+    let now = realNow;
+    app = await startWithInterval(10, () => now);
+    expect((await request(app.getHttpServer()).post('/demo/reset')).status).toBe(200);
+
+    now += 4_000;
+    const early = await request(app.getHttpServer()).post('/demo/reset');
+    expect(early.status).toBe(429);
+    expect(early.body.code).toBe('too_many_requests');
+    expect(early.headers['retry-after']).toBe('6');
+
+    now += 6_000;
+    expect((await request(app.getHttpServer()).post('/demo/reset')).status).toBe(200);
+
+    // Часы перевели назад: это не «только что сброшены»
+    now -= 3_600_000;
+    expect((await request(app.getHttpServer()).post('/demo/reset')).status).toBe(200);
+  });
+
+  it('сброс упал — 500, повтор сразу проходит: интервал считается от успешного сброса', async () => {
+    app = await startWithInterval(10, () => realNow);
+    vi.spyOn(app.get(DemoService), 'reset').mockRejectedValueOnce(new Error('база недоступна'));
+    const failed = await request(app.getHttpServer()).post('/demo/reset');
+    expect(failed.status).toBe(500);
+    const retry = await request(app.getHttpServer()).post('/demo/reset');
+    expect(retry.status).toBe(200);
+    // После успешного — снова интервал
+    expect((await request(app.getHttpServer()).post('/demo/reset')).status).toBe(429);
   });
 });
 

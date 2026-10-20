@@ -1,3 +1,5 @@
+import type { ErrorCode } from './errors';
+
 /** Закрытый список действий, которые API отдаёт в `actions[]` (ТЗ 4.4). */
 export const ACTION_CODES = [
   'join',
@@ -9,6 +11,8 @@ export const ACTION_CODES = [
   'reschedule_event',
   'cancel_event',
   'view_participant_info',
+  // Вкладка «Участники и заявки» (ТЗ 2.5): организатору и администратору
+  'view_participants',
   'post_message',
   'edit_message',
   'edit_organization',
@@ -32,5 +36,7 @@ export interface Action {
   code: ActionCode;
   enabled: boolean;
   reason?: string;
+  /** Код причины: по нему экран берёт короткую форму для панели действия (`shortErrorMessage`). */
+  reasonCode?: ErrorCode;
   requiresAuth?: boolean;
 }

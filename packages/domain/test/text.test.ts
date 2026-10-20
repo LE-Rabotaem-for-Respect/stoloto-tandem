@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MULTI_LINE_TEXT,
+  PLAIN_TEXT,
   SINGLE_LINE_TEXT,
   VISIBLE_TEXT,
   cleanSingleLine,
@@ -77,6 +78,9 @@ describe('разрешённые невидимые — только на сво
     ['тон кожи и соединитель', char(0x1f3c3, 0x1f3fd, 0x200d, 0x2642, 0xfe0f)],
     ['keycap', `1${char(0xfe0f, 0x20e3)} место`],
     ['сердце с селектором', `Йога ${char(0x2764, 0xfe0f)}`],
+    ['keycap решётки и звёздочки', `${char(0x23, 0xfe0f, 0x20e3, 0x2a, 0xfe0f, 0x20e3)}`],
+    ['текстовое начертание эмодзи FE0E', `Обмен ${char(0x2194, 0xfe0e)}`],
+    ['знак © с селектором', `${char(0xa9, 0xfe0f)} Клуб`],
     ['мягкий перенос между буквами', `Пробеж${char(0xad)}ка`],
   ])('пропускают: %s', (_, text) => {
     expect(SINGLE_LINE_TEXT.test(text)).toBe(true);
@@ -89,6 +93,11 @@ describe('разрешённые невидимые — только на сво
     ['соединитель после эмодзи без второго', `${char(0x1f3c3, 0x200d)} бег`],
     ['селектор после буквы', `Фут${char(0xfe0f)}бол`],
     ['селектор после селектора', `${char(0x2764, 0xfe0f, 0xfe0f)}`],
+    // Цифра с селектором без U+20E3 выглядит обычной цифрой, но поиск по числу её не находит
+    ['селектор после цифры без keycap', `Футбол 7${char(0xfe0f)}×7`],
+    ['селектор внутри числа', `Кубок 20${char(0xfe00)}26`],
+    ['селектор после решётки без keycap', `#${char(0xfe0f)}1`],
+    ['селектор FE00–FE0D после эмодзи', `Йога ${char(0x2764, 0xfe00)}`],
     ['мягкий перенос в начале слова', `${char(0xad)}Футбол`],
     ['мягкий перенос после пробела', `Футбол ${char(0xad)}`],
     ['пустой символ Брайля U+2800', char(0x2800)],
@@ -100,6 +109,22 @@ describe('разрешённые невидимые — только на сво
   ])('отклоняют: %s', (_, text) => {
     expect(SINGLE_LINE_TEXT.test(text)).toBe(false);
     expect(MULTI_LINE_TEXT.test(text)).toBe(false);
+  });
+});
+
+describe('PLAIN_TEXT: почта без единого невидимого символа', () => {
+  it('обычный адрес проходит', () => {
+    expect(PLAIN_TEXT.test('anna@mail.ru')).toBe(true);
+  });
+
+  it('мягкий перенос, соединитель и селектор не проходят даже на «своём» месте', () => {
+    for (const text of [
+      `an${char(0xad)}na@mail.ru`,
+      `${char(0x1f3c3)}${char(0x200d)}${char(0x1f3c3)}@mail.ru`,
+      `${char(0x2764, 0xfe0f)}@mail.ru`,
+    ]) {
+      expect(PLAIN_TEXT.test(text), JSON.stringify(text)).toBe(false);
+    }
   });
 });
 

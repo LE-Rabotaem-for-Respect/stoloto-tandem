@@ -38,7 +38,11 @@ export interface ThreadView extends MessageView {
   replies: MessageView[];
 }
 
-function isFromOrganizer(event: DiscussionEvent, message: MessageRecord): boolean {
+// Единственное правило «от организатора»: метка в обсуждении и уведомления о вопросах и ответах
+function isFromOrganizer(
+  event: Pick<PolicyEvent, 'organizerUserId' | 'organizerOrgId'>,
+  message: Pick<MessageRecord, 'asOrganizationId' | 'authorUserId'>,
+): boolean {
   if (event.organizerOrgId) return message.asOrganizationId === event.organizerOrgId;
   return message.asOrganizationId === null && message.authorUserId === event.organizerUserId;
 }
@@ -55,6 +59,25 @@ export class MessagesService {
     private readonly clock: Clock,
     private readonly bus: EventBus,
   ) {}
+
+  /** Кто написал сообщение и на чьё оно ответ (уведомления о вопросах и ответах, ТЗ 3.3). */
+  async authorship(id: string): Promise<{
+    /** От организатора мероприятия — по тому же правилу, что метка «Организатор». */
+    fromOrganizer: boolean;
+    parentAuthorUserId: string | null;
+  } | null> {
+    const message = await this.messages.find(id);
+    if (!message) return null;
+    const [event, parent] = await Promise.all([
+      this.events.organizerOf(message.eventId),
+      message.parentId ? this.messages.find(message.parentId) : null,
+    ]);
+    if (!event) return null;
+    return {
+      fromOrganizer: isFromOrganizer(event, message),
+      parentAuthorUserId: parent?.authorUserId ?? null,
+    };
+  }
 
   async list(actor: Actor, eventId: string): Promise<ThreadView[]> {
     const event = await this.visibleEvent(actor, eventId);

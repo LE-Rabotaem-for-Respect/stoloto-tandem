@@ -11,6 +11,8 @@ import {
   useThemeFromAccount,
   useThemeSettings,
 } from '../auth';
+import { DemoPanel } from '../demo';
+import { UnreadBadge } from '../notifications';
 
 /** Пять пунктов (ТЗ 2.8): нижняя панель на мобильном, верхнее меню на компьютере. */
 // Мягкий перенос: слово, которое не помещается в пятую часть ширины, переносится по
@@ -164,12 +166,14 @@ export function AppLayout() {
                   ) : (
                     <span>{item.label}</span>
                   )}
+                  {item.to === '/notifications' && <UnreadBadge />}
                 </NavLink>
               </li>
             ))}
           </ul>
         </nav>
       </div>
+      <DemoPanel />
       <main id="main" className="app-main" tabIndex={-1}>
         <Outlet />
       </main>

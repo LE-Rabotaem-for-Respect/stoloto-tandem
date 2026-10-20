@@ -162,6 +162,12 @@ export class OrganizationsService {
     return this.ownView(id);
   }
 
+  /** Название и владелец — кому сообщить о решении администратора (уведомления, ТЗ 3.3). */
+  async owner(id: string): Promise<{ name: string; ownerUserId: string } | null> {
+    const organization = await this.repository.find(id);
+    return organization && { name: organization.name, ownerUserId: organization.ownerUserId };
+  }
+
   private async ownView(id: string): Promise<OwnOrganizationView> {
     const organization = await this.repository.find(id);
     if (!organization) throw new ApiError('not_found', undefined, NOT_FOUND);

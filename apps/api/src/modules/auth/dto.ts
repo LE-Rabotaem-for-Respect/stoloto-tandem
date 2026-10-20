@@ -11,10 +11,7 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
-import { singleLine } from '../../core/validation';
-
-const trim = () =>
-  Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
+import { cleanLine, plainLine, singleLine, visible } from '../../core/validation';
 
 const email = () =>
   Transform(({ value }: { value: unknown }) =>
@@ -29,26 +26,29 @@ export class RegisterDto {
   @IsIn(ACCOUNT_TYPES, { message: 'Выберите: человек или организация' })
   accountType!: AccountType;
 
-  @trim()
-  @IsString({ message: 'Укажите имя' })
-  @Length(2, 80, { message: 'Имя — от 2 до 80 символов' })
+  @cleanLine()
+  @visible()
   @singleLine()
+  @Length(2, 80, { message: 'Имя — от 2 до 80 символов' })
+  @IsString({ message: 'Укажите имя' })
   name!: string;
 
   @email()
+  @plainLine()
   @MaxLength(254, { message: 'Слишком длинная почта' })
   @IsEmail({}, { message: 'Укажите почту, например anna@mail.ru' })
   email!: string;
 
-  @IsString({ message: 'Придумайте пароль' })
   @Length(8, 128, { message: 'Пароль — от 8 до 128 символов' })
+  @IsString({ message: 'Придумайте пароль' })
   password!: string;
 
   @ValidateIf((dto: RegisterDto) => dto.accountType === 'organization')
-  @trim()
-  @IsString({ message: 'Укажите название организации' })
-  @Length(2, 120, { message: 'Название организации — от 2 до 120 символов' })
+  @cleanLine()
+  @visible()
   @singleLine()
+  @Length(2, 120, { message: 'Название организации — от 2 до 120 символов' })
+  @IsString({ message: 'Укажите название организации' })
   organizationName?: string;
 }
 
