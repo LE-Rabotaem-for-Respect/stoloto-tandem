@@ -1,5 +1,6 @@
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
 import {
+  AppearanceSettings,
   LoginForm,
   QuickLogin,
   RegisterForm,
@@ -9,6 +10,7 @@ import {
   useMe,
 } from '../features/auth';
 import { EventCardScreen } from '../features/event-card';
+import { CreateEventForm } from '../features/events';
 import { NotificationCenter } from '../features/notifications';
 import { MyParticipations } from '../features/participations';
 
@@ -98,7 +100,10 @@ export const MyParticipationsPage = () => (
 
 export const CreateEventPage = () => (
   <RequireAuth>
-    <Section title="Создать мероприятие" text="Здесь будет форма создания мероприятия." />
+    <div className="page page-narrow">
+      <h1>Создать мероприятие</h1>
+      <CreateEventForm />
+    </div>
   </RequireAuth>
 );
 
@@ -135,6 +140,14 @@ function Profile() {
           </>
         )}
       </dl>
+      <AppearanceSettings />
+      {me.data.role === 'admin' && (
+        <p>
+          <Link className="button" to="/admin">
+            Админка: заявки организаций и поиск
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

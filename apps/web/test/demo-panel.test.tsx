@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppProviders, AppRoutes, createQueryClient } from '../src/App';
+import { CLOCK_KEY } from '../src/shared/clock';
 
 const json = (status: number, body?: unknown) =>
   new Response(body === undefined ? null : JSON.stringify(body), {
@@ -111,9 +112,9 @@ function fakeStand(state: Partial<StandState> = {}, eventEndsAt = '2026-10-19T07
   return { calls, bodies, stand };
 }
 
-function renderAt(path: string) {
+function renderAt(path: string, client = createQueryClient()) {
   return render(
-    <AppProviders client={createQueryClient()}>
+    <AppProviders client={client}>
       <MemoryRouter initialEntries={[path]}>
         <AppRoutes />
       </MemoryRouter>
@@ -131,9 +132,12 @@ afterEach(() => {
 describe('демо-панель (ТЗ 4.6)', () => {
   it('вне демо-режима панели нет', async () => {
     fakeStand({ demoMode: false });
-    renderAt('/');
+    const client = createQueryClient();
+    renderAt('/', client);
+    // Сначала ответ /clock получен и отрисован, и только потом — панели нет
+    await waitFor(() => expect(client.getQueryState(CLOCK_KEY)?.status).toBe('success'));
     await screen.findByRole('navigation', { name: 'Основные разделы' });
-    await waitFor(() => expect(screen.queryByRole('region', { name: 'Демо-панель' })).toBeNull());
+    expect(screen.queryByRole('region', { name: 'Демо-панель' })).toBeNull();
   });
 
   it('показывает номер стенда, время последнего сброса и время стенда по Красноярску', async () => {

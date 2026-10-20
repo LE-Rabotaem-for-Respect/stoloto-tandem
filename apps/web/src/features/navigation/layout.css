@@ -7,8 +7,6 @@
 /* Переменные — на html: scroll-padding ниже читает их там, а не на .app */
 html {
   --nav-height: 64px;
-  /* Подписи нижней панели: пятая часть ширины 360 px */
-  --nav-label-size: 0.8125rem;
   /* Фокус при обходе Tab не прячется ни под шапкой, ни под нижней панелью */
   scroll-padding-top: calc(var(--app-top-height, 0px) + var(--space-2));
   scroll-padding-bottom: calc(var(--app-nav-height, var(--nav-height)) + var(--space-2));
@@ -33,6 +31,13 @@ html {
 
 .skip-link:focus {
   top: var(--space-2);
+}
+
+/* Сбой сохранения оформления — строкой под шапкой, с теми же отступами */
+.theme-save-error {
+  border-radius: 0;
+  padding-inline: var(--space-4);
+  overflow-wrap: anywhere;
 }
 
 .app-header {
@@ -167,7 +172,9 @@ html {
 
 .main-nav ul {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  /* minmax(0, …): колонка не растягивается по длинному слову — иначе пятый пункт
+     в «Крупном тексте» выходит за край 360 px */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 0;
   padding: 0;
   list-style: none;
@@ -190,8 +197,9 @@ html {
 }
 
 .main-nav-link .icon {
-  width: 1.5rem;
-  height: 1.5rem;
+  /* Пиктограмма растёт вместе с темой «Крупный текст» */
+  width: calc(1.5rem * var(--text-scale));
+  height: calc(1.5rem * var(--text-scale));
 }
 
 .main-nav-link[aria-current='page'] {
@@ -200,11 +208,17 @@ html {
   box-shadow: inset 0 3px 0 var(--color-marker);
 }
 
-/* «Крупный текст» на узком экране: подписи панели не помещаются в пятую часть ширины.
-   Только для нижней панели — верхнее меню остаётся размером основного текста */
+/* Нижняя панель до 768 px: подпись — токен --fs-nav (13 px, ×1,25 в «Крупном тексте»),
+   пиктограмма — от размера подписи, так панель растёт ровно на 25 % и остаётся в пределах
+   высоты из docs/design.md. Верхнее меню — размером основного текста */
 @media (max-width: 767px) {
-  [data-text='large'] .main-nav-link {
-    font-size: calc(var(--nav-label-size) * var(--text-scale));
+  .main-nav-link {
+    font-size: var(--fs-nav);
+  }
+
+  .main-nav-link .icon {
+    width: 1.5em;
+    height: 1.5em;
   }
 }
 
