@@ -355,6 +355,7 @@ describe('actions[]: пример для карточки события', () =>
     expect(codes).toEqual([
       'join',
       'post_message',
+      'edit_event',
       'reschedule_event',
       'cancel_event',
       'view_participants',

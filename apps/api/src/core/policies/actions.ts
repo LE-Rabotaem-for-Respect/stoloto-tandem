@@ -82,6 +82,7 @@ export function eventActions(
   }
   actions.push(toAction('post_message', canPostMessage(actor, event)));
   if (canManageEvent(actor, event).allowed) {
+    actions.push(eventAction('edit_event', 'edit', event, now));
     actions.push(eventAction('reschedule_event', 'reschedule', event, now));
     actions.push(eventAction('cancel_event', 'cancel', event, now));
   }

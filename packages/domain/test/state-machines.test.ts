@@ -166,6 +166,7 @@ describe('автомат мероприятия (Event)', () => {
       EVENT_ACTIONS,
       {
         publish: { none: 'published' },
+        edit: { published: 'published' },
         reschedule: { published: 'published' },
         cancel: { published: 'cancelled' },
         unpublish: { published: 'unpublished' },
@@ -182,9 +183,9 @@ describe('автомат мероприятия (Event)', () => {
     expect(error.message).toBe('Время начала должно быть в будущем');
   });
 
-  it('перенести и отменить можно только до начала', () => {
+  it('изменить, перенести и отменить можно только до начала', () => {
     const started = { ...ok, startsAt: new Date('2026-10-19T09:00:00Z') };
-    for (const action of ['reschedule', 'cancel'] as const) {
+    for (const action of ['edit', 'reschedule', 'cancel'] as const) {
       expect(eventMachine.canTransition('published', action, started), action).toBe(false);
       const error = errorOf(() => eventMachine.nextState('published', action, started));
       expect(error.code, action).toBe('event_started');
