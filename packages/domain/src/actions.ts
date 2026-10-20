@@ -18,7 +18,10 @@ export const ACTION_CODES = [
   'edit_organization',
   'submit_organization',
   'hide_message',
+  // Своё сообщение — автор (DELETE), чужое — администратор с причиной (модерация):
+  // разные запросы, поэтому разные коды
   'delete_message',
+  'moderate_delete_message',
   'unpublish_event',
   'delete_event',
   'restore_event',

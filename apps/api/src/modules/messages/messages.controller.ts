@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import type { Actor } from '../../core/policies';
-import { CurrentActor, Public, SignedIn } from '../auth';
-import { CreateMessageDto, EditMessageDto } from './messages.dto';
+import { CurrentActor, Public, Roles, SignedIn } from '../auth';
+import { CreateMessageDto, EditMessageDto, ModerateMessageDto } from './messages.dto';
 import { MessagesService } from './messages.service';
 import type { MessageView, ThreadView } from './messages.service';
 
@@ -46,5 +46,18 @@ export class MessagesController {
     @Param('messageId') messageId: string,
   ): Promise<MessageView> {
     return this.messages.remove(actor, id, messageId);
+  }
+
+  // Скрыть или удалить чужое сообщение — только администратору (ТЗ 2.10)
+  @Roles('admin')
+  @HttpCode(200)
+  @Post(':messageId/moderation')
+  moderate(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Param('messageId') messageId: string,
+    @Body() dto: ModerateMessageDto,
+  ): Promise<MessageView> {
+    return this.messages.moderate(actor, id, messageId, dto);
   }
 }

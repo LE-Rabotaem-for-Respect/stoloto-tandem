@@ -46,6 +46,7 @@ export interface AdminHiddenMessage {
   text: string;
   moderationReason: string | null;
   createdAt: string;
+  actions: { code: string; enabled: boolean }[];
 }
 
 /** Направление каталога: прежние имена, статус и сколько на нём мероприятий. */
@@ -63,6 +64,8 @@ export interface AdminSport {
 export interface ThreadMessage {
   id: string;
   author: { name: string };
+  /** Действия модерации для администратора: `hide_message`, `moderate_delete_message`. */
+  actions: { code: string; enabled: boolean }[];
   isOrganizer: boolean;
   text: string | null;
   placeholder: string | null;
@@ -169,6 +172,26 @@ export function useEventModeration() {
     mutationFn: ({ id, ...body }: EventModerationBody) =>
       apiRequest<AdminEvent>(`/admin/events/${id}/moderation`, { method: 'POST', body }),
     onSuccess: () => client.invalidateQueries(),
+  });
+}
+
+export interface ModerationBody {
+  eventId: string;
+  messageId: string;
+  action: 'hide' | 'delete';
+  reason: string;
+}
+
+/** Скрыть или удалить сообщение (ТЗ 2.7, 2.10); списки админки перечитываются. */
+export function useModerateMessage() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ eventId, messageId, action, reason }: ModerationBody) =>
+      apiRequest<unknown>(`/events/${eventId}/messages/${messageId}/moderation`, {
+        method: 'POST',
+        body: { action, reason },
+      }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ADMIN_KEY }),
   });
 }
 

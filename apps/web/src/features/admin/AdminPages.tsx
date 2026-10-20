@@ -28,6 +28,7 @@ import {
   useAdminSports,
   useDiscussion,
   useEventModeration,
+  useModerateMessage,
   useOrganizationDecision,
   useSportChange,
   useSportSuggestions,
@@ -440,6 +441,134 @@ function Organizations() {
   );
 }
 
+const MODERATION = {
+  hide: { code: 'hide_message', label: 'Скрыть', done: 'Сообщение скрыто' },
+  delete: { code: 'moderate_delete_message', label: 'Удалить', done: 'Сообщение удалено' },
+} as const;
+type ModerationAction = keyof typeof MODERATION;
+
+/**
+ * «Скрыть» и «Удалить» сообщение с причиной (ТЗ 2.7, 2.10): кнопки — по `actions[]` из api,
+ * причина обязательна, удалённое не восстанавливается — об этом сказано до подтверждения.
+ */
+function ModerateMessage({
+  eventId,
+  messageId,
+  codes,
+}: {
+  eventId: string;
+  messageId: string;
+  codes: readonly string[];
+}) {
+  const id = useId();
+  const moderate = useModerateMessage();
+  const [action, setAction] = useState<ModerationAction | null>(null);
+  const [reason, setReason] = useState('');
+  const [done, setDone] = useState<string>();
+  // Куда перевести фокус после смены вида: кнопка или форма исчезает, и без этого фокус
+  // уходил бы на body
+  // Счётчик: повторный запрос той же цели (снова в поле причины после ошибки) тоже срабатывает
+  const [focus, setFocusRequest] = useState<{
+    target: 'reason' | 'buttons' | 'done' | null;
+    seq: number;
+  }>({ target: null, seq: 0 });
+  const setFocus = (target: 'reason' | 'buttons' | 'done') =>
+    setFocusRequest((current) => ({ target, seq: current.seq + 1 }));
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
+  const buttonsRef = useRef<HTMLDivElement>(null);
+  const doneRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (focus.target === 'reason') reasonRef.current?.focus();
+    if (focus.target === 'buttons') buttonsRef.current?.querySelector('button')?.focus();
+    if (focus.target === 'done') doneRef.current?.focus();
+  }, [focus]);
+
+  const available = (Object.keys(MODERATION) as ModerationAction[]).filter((key) =>
+    codes.includes(MODERATION[key].code),
+  );
+  const error = moderate.error instanceof ApiRequestError ? moderate.error : null;
+  // Итог решения — объявляется диктору и получает фокус
+  const status = done && (
+    <p className="admin-moderation-done" role="status" tabIndex={-1} ref={doneRef}>
+      {done}
+    </p>
+  );
+  if (available.length === 0) return status || null;
+
+  const open = (key: ModerationAction) => {
+    setDone(undefined);
+    setAction(key);
+    setFocus('reason');
+  };
+  const cancel = () => {
+    setAction(null);
+    setFocus('buttons');
+  };
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!action) return;
+    moderate.mutate(
+      { eventId, messageId, action, reason },
+      {
+        onSuccess: () => {
+          setDone(MODERATION[action].done);
+          setAction(null);
+          setReason('');
+          setFocus('done');
+        },
+        // Кнопка на время запроса отключена — фокус возвращается в поле причины
+        onError: () => setFocus('reason'),
+      },
+    );
+  };
+
+  if (!action) {
+    return (
+      <>
+        {status}
+        <div className="admin-moderation" ref={buttonsRef}>
+          {available.map((key) => (
+            <button key={key} className="button" type="button" onClick={() => open(key)}>
+              {MODERATION[key].label}
+            </button>
+          ))}
+        </div>
+      </>
+    );
+  }
+  return (
+    <form className="admin-moderation-form" onSubmit={submit} noValidate>
+      <div className="field">
+        <label htmlFor={`${id}-reason`}>
+          Причина — {action === 'hide' ? 'её увидит автор' : 'удаление не отменить'}
+        </label>
+        <textarea
+          id={`${id}-reason`}
+          ref={reasonRef}
+          rows={2}
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          aria-invalid={error?.fields.reason ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+        />
+      </div>
+      {error && (
+        <p className="form-error" role="alert" id={`${id}-error`}>
+          {error.fields.reason ?? error.message}
+        </p>
+      )}
+      <div className="admin-moderation">
+        <button className="button button-primary" type="submit" disabled={moderate.isPending}>
+          {MODERATION[action].label}
+        </button>
+        <button className="button" type="button" onClick={cancel}>
+          Отмена
+        </button>
+      </div>
+    </form>
+  );
+}
+
 /** Обсуждение мероприятия прямо в строке: экран карточки делается отдельно. */
 function Discussion({ eventId }: { eventId: string }) {
   const [open, setOpen] = useState(false);
@@ -468,12 +597,22 @@ function Discussion({ eventId }: { eventId: string }) {
                     <strong>{thread.author.name}</strong>
                     {thread.isOrganizer && ' (организатор)'}: {thread.text ?? thread.placeholder}
                   </p>
+                  <ModerateMessage
+                    eventId={eventId}
+                    messageId={thread.id}
+                    codes={thread.actions.map((action) => action.code)}
+                  />
                   {thread.replies.length > 0 && (
                     <ul>
                       {thread.replies.map((reply) => (
                         <li key={reply.id}>
                           <strong>{reply.author.name}</strong>
                           {reply.isOrganizer && ' (организатор)'}: {reply.text ?? reply.placeholder}
+                          <ModerateMessage
+                            eventId={eventId}
+                            messageId={reply.id}
+                            codes={reply.actions.map((action) => action.code)}
+                          />
                         </li>
                       ))}
                     </ul>
@@ -488,15 +627,15 @@ function Discussion({ eventId }: { eventId: string }) {
   );
 }
 
-type ModerationAction = EventModerationBody['action'];
+type EventModerationAction = EventModerationBody['action'];
 
-const MODERATION_TEXT: Record<ModerationAction, { button: string; submit: string }> = {
+const MODERATION_TEXT: Record<EventModerationAction, { button: string; submit: string }> = {
   unpublish: { button: 'Снять с публикации', submit: 'Снять с этой причиной' },
   delete: { button: 'Удалить', submit: 'Удалить с этой причиной' },
 };
 
 // Код в `actions[]` строки → действие запроса модерации
-const MODERATION_CODE: Record<ModerationAction, ActionCode> = {
+const MODERATION_CODE: Record<EventModerationAction, ActionCode> = {
   unpublish: 'unpublish_event',
   delete: 'delete_event',
 };
@@ -507,11 +646,11 @@ const MODERATION_CODE: Record<ModerationAction, ActionCode> = {
  */
 function Moderation({ event }: { event: AdminEvent }) {
   const moderate = useEventModeration();
-  const [action, setAction] = useState<ModerationAction | null>(null);
+  const [action, setAction] = useState<EventModerationAction | null>(null);
   const [reason, setReason] = useState('');
   // Кнопка заменяется формой и обратно: фокус — на поле причины, после «Отмены» и решения —
   // на кнопку действия (или первую оставшуюся), а не на body
-  const [returnTo, setReturnTo] = useState<ModerationAction | null>(null);
+  const [returnTo, setReturnTo] = useState<EventModerationAction | null>(null);
   const reasonField = useRef<HTMLTextAreaElement>(null);
   const buttons = useRef<HTMLDivElement>(null);
   const close = () => {
@@ -722,6 +861,11 @@ function HiddenMessageRow({ message }: { message: AdminHiddenMessage }) {
         )}
       </dl>
       <blockquote className="admin-quote">{message.text}</blockquote>
+      <ModerateMessage
+        eventId={message.eventId}
+        messageId={message.id}
+        codes={message.actions.map((action) => action.code)}
+      />
     </li>
   );
 }

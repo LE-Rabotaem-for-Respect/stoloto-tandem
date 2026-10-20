@@ -157,6 +157,7 @@ function fakeAdminApi(
             text: 'Купите абонемент со скидкой',
             moderationReason: 'Реклама',
             createdAt: '2026-10-19T05:00:00Z',
+            actions: [{ code: 'moderate_delete_message', enabled: true }],
           },
         ],
         total: 1,
@@ -173,6 +174,10 @@ function fakeAdminApi(
           text: 'Нужна своя ракетка?',
           placeholder: null,
           createdAt: '2026-10-19T05:00:00Z',
+          actions: [
+            { code: 'hide_message', enabled: true },
+            { code: 'moderate_delete_message', enabled: true },
+          ],
           replies: [
             {
               id: 't2',
@@ -181,10 +186,21 @@ function fakeAdminApi(
               text: 'Дадим на месте',
               placeholder: null,
               createdAt: '2026-10-19T06:00:00Z',
+              actions: [],
             },
           ],
         },
       ]);
+    }
+    if (call.endsWith('/moderation')) {
+      const { reason } = body as { reason: string };
+      return reason.trim()
+        ? json(200, {})
+        : json(400, {
+            code: 'validation_failed',
+            message: 'Проверьте поля формы',
+            fields: { reason: 'Укажите причину' },
+          });
     }
     return json(404, { code: 'not_found', message: 'Не найдено' });
   });
@@ -395,6 +411,57 @@ describe('админка', () => {
     expect(screen.getByText('Реклама')).toBeTruthy();
     expect(screen.getByText('Пётр')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Турнир по паделу' })).toBeTruthy();
+  });
+
+  it('модерация в обсуждении: кнопки по actions[], причина обязательна', async () => {
+    const calls = fakeAdminApi();
+    const user = userEvent.setup();
+    renderAt('/admin/events');
+    await user.click(await screen.findByRole('button', { name: 'Обсуждение' }));
+    await screen.findByText(/Нужна своя ракетка?/);
+    // У ответа организатора действий нет — кнопок одна пара, у вопроса
+    expect(screen.getAllByRole('button', { name: 'Скрыть' })).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'Скрыть' }));
+    // Фокус — в поле причины; «Отмена» возвращает его на кнопку
+    expect(screen.getByLabelText('Причина — её увидит автор')).toBe(document.activeElement);
+    await user.click(screen.getByRole('button', { name: 'Отмена' }));
+    expect(screen.getByRole('button', { name: 'Скрыть' })).toBe(document.activeElement);
+
+    await user.click(screen.getByRole('button', { name: 'Скрыть' }));
+    await user.click(screen.getByRole('button', { name: 'Скрыть' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Укажите причину');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Причина — её увидит автор')).toBe(document.activeElement),
+    );
+
+    await user.type(screen.getByLabelText('Причина — её увидит автор'), 'Оскорбление');
+    await user.click(screen.getByRole('button', { name: 'Скрыть' }));
+    await waitFor(() =>
+      expect(calls).toContainEqual({
+        call: 'POST /api/events/e1/messages/t1/moderation',
+        body: { action: 'hide', reason: 'Оскорбление' },
+      }),
+    );
+    // Итог — объявлен и получает фокус
+    const done = await screen.findByText('Сообщение скрыто');
+    expect(done.getAttribute('role')).toBe('status');
+    expect(done).toBe(document.activeElement);
+  });
+
+  it('скрытое сообщение в админке можно удалить с причиной', async () => {
+    const calls = fakeAdminApi();
+    const user = userEvent.setup();
+    renderAt('/admin/messages');
+    await user.click(await screen.findByRole('button', { name: 'Удалить' }));
+    await user.type(screen.getByLabelText('Причина — удаление не отменить'), 'Спам');
+    await user.click(screen.getByRole('button', { name: 'Удалить' }));
+    await waitFor(() =>
+      expect(calls).toContainEqual({
+        call: 'POST /api/events/e1/messages/m1/moderation',
+        body: { action: 'delete', reason: 'Спам' },
+      }),
+    );
   });
 
   it('в профиле администратора — ссылка на админку', async () => {
