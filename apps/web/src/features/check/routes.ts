@@ -73,6 +73,7 @@ export const CHECK_ROUTES: readonly CheckRoute[] = [
         who: admin,
         action: 'Админка → заявки организаций → «Падел-клуб Енисей» → «Одобрить»',
         expected: 'Заявка ушла из очереди',
+        path: '/admin/organizations?status=pending',
       },
       {
         who: { account: 'padel' },
@@ -90,6 +91,7 @@ export const CHECK_ROUTES: readonly CheckRoute[] = [
         who: admin,
         action: '«Столбы» → «Отклонить» без причины, затем с причиной',
         expected: 'Без причины нельзя; с причиной заявка ушла из очереди',
+        path: '/admin/organizations?status=pending',
       },
       {
         who: { account: 'stolby' },
@@ -191,6 +193,7 @@ export const CHECK_ROUTES: readonly CheckRoute[] = [
         who: admin,
         action: 'Админка → «Блиц-турнир» → «Снять с публикации» без причины, затем с причиной',
         expected: 'Без причины нельзя; с причиной — «Снято с публикации модератором»',
+        path: '/admin/events',
       },
       {
         who: anna,
