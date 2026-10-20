@@ -14,5 +14,11 @@ export {
   isEventOrganizer,
 } from './policies';
 export type { Actor, Decision, PolicyEvent, ViewerParticipation } from './policies';
-export { eventActions, organizationActions, participationActions, toAction } from './actions';
+export {
+  eventActions,
+  moderationActions,
+  organizationActions,
+  participationActions,
+  toAction,
+} from './actions';
 export type { CardEvent } from './actions';

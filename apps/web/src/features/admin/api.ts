@@ -35,6 +35,7 @@ export interface AdminEvent {
   status: EventStatus;
   statusReason: string | null;
   createdAt: string;
+  actions: Action[];
 }
 
 export interface AdminHiddenMessage {

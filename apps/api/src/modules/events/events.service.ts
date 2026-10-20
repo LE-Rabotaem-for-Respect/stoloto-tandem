@@ -31,6 +31,7 @@ import {
   canSeeParticipantInfo,
   canViewEvent,
   eventActions,
+  moderationActions,
 } from '../../core/policies';
 import type { Actor } from '../../core/policies';
 import { EventTermsService } from '../participations/event-terms.service';
@@ -77,6 +78,8 @@ export interface AdminEventItem {
   status: EventStatus;
   statusReason: string | null;
   createdAt: Date;
+  /** «Снять с публикации», «Вернуть», «Удалить» — по политике и автомату Event (DECISION-002). */
+  actions: Action[];
 }
 
 export interface AdminEventList {
@@ -161,7 +164,7 @@ function feedItem(event: EventWithCard, now: Date, confirmed: number): EventFeed
 }
 
 // Админка видит настоящее название направления, даже скрытого
-function adminItem(event: EventWithCard): AdminEventItem {
+function adminItem(event: EventWithCard, actor: Actor, now: Date): AdminEventItem {
   return {
     id: event.id,
     title: event.title,
@@ -172,6 +175,7 @@ function adminItem(event: EventWithCard): AdminEventItem {
     status: event.status,
     statusReason: event.statusReason,
     createdAt: event.createdAt,
+    actions: moderationActions(actor, event, now),
   };
 }
 
@@ -441,7 +445,8 @@ export class EventsService {
       },
       page,
     );
-    return { items: events.map(adminItem), total, ...page };
+    const now = this.clock.now();
+    return { items: events.map((event) => adminItem(event, actor, now)), total, ...page };
   }
 
   /**
@@ -496,7 +501,7 @@ export class EventsService {
     );
     const changed = await this.events.findCard(id);
     if (!changed) throw new ApiError('not_found', undefined, EVENT_NOT_FOUND);
-    return adminItem(changed);
+    return adminItem(changed, actor, now);
   }
 
   /** Сколько мероприятий снято с публикации за последние 7 дней (обзор админки). */

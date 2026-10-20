@@ -374,7 +374,9 @@ describe('поиск', () => {
       statusReason: 'Реклама',
       organizer: { kind: 'user', id: organizer.id, name: 'Анна' },
     });
+    // Кроме полей строки — только её actions[] (DECISION-002): кнопки модерации по ним
     expect(Object.keys(all.body.items[1] as object).sort()).toEqual([
+      'actions',
       'city',
       'createdAt',
       'id',
@@ -616,6 +618,16 @@ describe('модерация мероприятий (ТЗ 2.10, сценарий
     });
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ status: 'deleted', statusReason: 'Мошенничество' });
+    // Удалённое ни снять, ни удалить: кнопок в строке нет
+    expect(
+      (response.body.actions as { code: string; enabled: boolean }[]).map(({ code, enabled }) => [
+        code,
+        enabled,
+      ]),
+    ).toEqual([
+      ['unpublish_event', false],
+      ['delete_event', false],
+    ]);
     expect(await prisma.event.findUnique({ where: { id: event.id } })).toMatchObject({
       status: 'deleted',
       statusChangedAt: new Date(NOW),
@@ -647,6 +659,11 @@ describe('модерация мероприятий (ТЗ 2.10, сценарий
       moderate(cookie, event.id, { action: 'unpublish', reason: 'Спам' }),
     ]);
     expect(both.map((r) => r.status).sort()).toEqual([200, 409]);
+    const unpublished = both.find((r) => r.status === 200);
+    expect(unpublished?.body.actions).toEqual([
+      { code: 'restore_event', enabled: true },
+      { code: 'delete_event', enabled: true },
+    ]);
     expect(await prisma.moderationLog.count({ where: { objectId: event.id } })).toBe(1);
 
     const deleted = await moderate(cookie, event.id, { action: 'delete', reason: 'Дубль' });

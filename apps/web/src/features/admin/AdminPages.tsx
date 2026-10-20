@@ -1,10 +1,5 @@
-import {
-  EVENT_STATUSES,
-  ORGANIZATION_STATUSES,
-  ORGANIZATION_STATUS_VIEW,
-  eventMachine,
-} from '@tandem/domain';
-import type { EventStatus, OrganizationStatus, StatusTone } from '@tandem/domain';
+import { EVENT_STATUSES, ORGANIZATION_STATUSES, ORGANIZATION_STATUS_VIEW } from '@tandem/domain';
+import type { ActionCode, EventStatus, OrganizationStatus, StatusTone } from '@tandem/domain';
 import { useId, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -481,19 +476,23 @@ const MODERATION_TEXT: Record<ModerationAction, { button: string; submit: string
   delete: { button: 'Удалить', submit: 'Удалить с этой причиной' },
 };
 
+// Код в `actions[]` строки → действие запроса модерации
+const MODERATION_CODE: Record<ModerationAction, ActionCode> = {
+  unpublish: 'unpublish_event',
+  delete: 'delete_event',
+};
+
 /**
  * «Снять с публикации» и «Удалить» (ТЗ 2.10) — только с причиной: её увидят организатор и
- * записавшиеся. Какие действия доступны в статусе, решает тот же автомат, что и api.
+ * записавшиеся. Кнопки — по `actions[]` строки: интерфейс сам права не проверяет (DECISION-002).
  */
 function Moderation({ event }: { event: AdminEvent }) {
   const moderate = useEventModeration();
   const [action, setAction] = useState<ModerationAction | null>(null);
   const [reason, setReason] = useState('');
   const id = useId();
-  // Доступность кнопки до ввода: причину администратор укажет в форме
-  const startsAt = new Date(event.startsAt);
   const available = (['unpublish', 'delete'] as const).filter((code) =>
-    eventMachine.canTransition(event.status, code, { now: startsAt, startsAt, reason: 'в форме' }),
+    event.actions.some((item) => item.code === MODERATION_CODE[code] && item.enabled),
   );
   const fieldError =
     moderate.error instanceof ApiRequestError ? moderate.error.fields.reason : undefined;

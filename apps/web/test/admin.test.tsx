@@ -54,7 +54,26 @@ const event = {
   createdAt: '2026-10-19T05:00:00Z',
 };
 
-type EventRow = Omit<typeof event, 'statusReason'> & { statusReason: string | null };
+type EventRow = Omit<typeof event, 'statusReason'> & {
+  statusReason: string | null;
+  /** Без них — как посчитал бы api по статусу. */
+  actions?: { code: string; enabled: boolean; reason?: string }[];
+};
+
+// Как api (moderationActions): у снятого — «Вернуть», удалённое не снять и не удалить
+const moderationActions = (status: string) => {
+  const done = 'Мероприятие удалено';
+  if (status === 'deleted') {
+    return [
+      { code: 'unpublish_event', enabled: false, reason: done },
+      { code: 'delete_event', enabled: false, reason: done },
+    ];
+  }
+  return [
+    { code: status === 'unpublished' ? 'restore_event' : 'unpublish_event', enabled: true },
+    { code: 'delete_event', enabled: true },
+  ];
+};
 
 /** api админки в памяти: решения меняют статусы, запросы записываются. */
 function fakeAdminApi(
@@ -64,7 +83,10 @@ function fakeAdminApi(
     events: eventRows = [event],
   }: { organizations?: (typeof pending)[]; events?: EventRow[] } = {},
 ) {
-  const events = eventRows.map((row) => ({ ...row }));
+  const events = eventRows.map((row) => ({
+    ...row,
+    actions: row.actions ?? moderationActions(row.status),
+  }));
   const calls: { call: string; body?: unknown }[] = [];
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     const call = `${init?.method ?? 'GET'} ${url}`;
@@ -116,9 +138,11 @@ function fakeAdminApi(
         });
       }
       const row = events.find(({ id }) => id === moderation[1]);
+      const status = action === 'unpublish' ? 'unpublished' : 'deleted';
       Object.assign(row ?? {}, {
-        status: action === 'unpublish' ? 'unpublished' : 'deleted',
+        status,
         statusReason: reason.trim(),
+        actions: moderationActions(status),
       });
       return json(200, row);
     }
@@ -324,6 +348,25 @@ describe('админка', () => {
     // Снятое можно только удалить
     expect(screen.queryByRole('button', { name: 'Снять с публикации' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Удалить' })).toBeTruthy();
+  });
+
+  it('кнопки — по actions[] строки, а не по статусу: недоступное действие не показывается', async () => {
+    fakeAdminApi(adminMe, {
+      events: [
+        {
+          ...event,
+          status: 'published',
+          statusReason: null,
+          actions: [
+            { code: 'unpublish_event', enabled: false, reason: 'Нельзя' },
+            { code: 'delete_event', enabled: true },
+          ],
+        },
+      ],
+    });
+    renderAt('/admin/events');
+    expect(await screen.findByRole('button', { name: 'Удалить' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Снять с публикации' })).toBeNull();
   });
 
   it('удалённому — ни снятия, ни удаления; «Отмена» закрывает форму без запроса', async () => {
