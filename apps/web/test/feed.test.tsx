@@ -319,6 +319,48 @@ describe('лента и поиск', { timeout: 15_000 }, () => {
     release();
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Повторить' })).toBeNull());
     expect(screen.queryByText('Загрузка…')).toBeNull();
+    // Кнопка с фокусом исчезла — фокус на первой карточке, а не на body
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('link', { name: /Пробежка 5 км на Татышеве/ }),
+      ),
+    );
+  });
+
+  it('фильтр сменили, пока шла догрузка: её ответ фокус с фильтров не уводит', async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // 1 — лента, 2 — «Показать ещё», 3 — «Сегодня», 4 — «Показать ещё» на «Сегодня» (задержан)
+    fakeApi(
+      45,
+      () => false,
+      (attempt) => (attempt === 4 ? held : undefined),
+    );
+    const user = userEvent.setup();
+    renderFeed();
+    await screen.findByText('Найдено: 45');
+    await user.click(screen.getByRole('button', { name: 'Показать ещё' }));
+    await waitFor(() => expect(document.activeElement?.textContent).toContain('Событие 21'));
+    await user.click(screen.getByRole('radio', { name: 'Сегодня' }));
+    await waitFor(() =>
+      expect(screen.getAllByRole('listitem').filter((li) => li.matches('.feed-card'))).toHaveLength(
+        20,
+      ),
+    );
+    await user.click(screen.getByRole('button', { name: 'Показать ещё' }));
+    // Вернулся к «Любому дню» — там из кеша 40 карточек, и 21-я есть
+    const anyDay = screen.getByRole('radio', { name: 'Любой день' });
+    await user.click(anyDay);
+    await waitFor(() =>
+      expect(screen.getAllByRole('listitem').filter((li) => li.matches('.feed-card'))).toHaveLength(
+        40,
+      ),
+    );
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(document.activeElement).toBe(anyDay);
   });
 
   it('фокус на первой новой карточке и после смены фильтров с тем же индексом', async () => {
