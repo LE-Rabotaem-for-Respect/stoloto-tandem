@@ -286,9 +286,9 @@ describe('лента и поиск', { timeout: 15_000 }, () => {
     const third = new Promise<void>((resolve) => {
       release = resolve;
     });
-    // Лента загрузилась, повторная загрузка упала (например, после сброса демо-данных),
+    // Лента загрузилась, перечитывание упало (например, после перемотки демо-часов),
     // «Повторить» — третий запрос, его ответ задержан
-    fakeApi(
+    const { feedRequests } = fakeApi(
       1,
       (_offset, attempt) => attempt === 2,
       (attempt) => (attempt === 3 ? third : undefined),
@@ -308,7 +308,12 @@ describe('лента и поиск', { timeout: 15_000 }, () => {
     await user.click(screen.getByRole('button', { name: 'Повторить' }));
 
     expect(await screen.findByText('Загрузка…')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Повторить' })).toHaveProperty('disabled', true);
+    const retry = screen.getByRole('button', { name: 'Повторить' });
+    expect(retry.getAttribute('aria-disabled')).toBe('true');
+    // Повторное нажатие, пока идёт запрос, нового запроса не делает
+    const requests = feedRequests.length;
+    await user.click(retry);
+    expect(feedRequests).toHaveLength(requests);
     expect(screen.queryByRole('alert')).toBeNull();
 
     release();

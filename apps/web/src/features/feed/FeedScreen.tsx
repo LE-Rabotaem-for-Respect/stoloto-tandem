@@ -250,7 +250,9 @@ export function FeedScreen() {
   useEffect(() => {
     if (focusRequest) focusTarget.current?.focus();
   }, [focusRequest]);
-  // «Повторить» после ошибки первой загрузки: ошибка ещё в состоянии, но запрос уже идёт
+  // «Повторить» после сбоя перечитывания уже загруженной ленты (например, после перемотки
+  // демо-часов): ошибка ещё в состоянии, но запрос уже идёт. При первой загрузке без данных
+  // запрос сам возвращается в «pending»
   const retrying = feed.isError && !feed.isFetchNextPageError && feed.isFetching;
 
   return (
@@ -266,11 +268,14 @@ export function FeedScreen() {
               {errorText(feed.error)}
             </p>
           )}
+          {/* aria-disabled, а не disabled: фокус остаётся на кнопке, если повтор снова не удался */}
           <button
             className="button"
             type="button"
-            disabled={retrying}
-            onClick={() => void feed.refetch()}
+            aria-disabled={retrying || undefined}
+            onClick={() => {
+              if (!retrying) void feed.refetch();
+            }}
           >
             Повторить
           </button>
