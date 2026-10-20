@@ -122,12 +122,18 @@ export function usePendingActionRelay() {
     if (slot && (slot.path !== pathname || slot.userId !== userId)) setSlot(null);
   }, [pathname, search, hash, key, state, userId, navigate]);
 
-  // Каркас размонтирован — оставленное действие никому не принадлежит
-  useEffect(
-    () => () => {
+  // Каркас размонтирован или страница ушла с сайта — оставленное действие никому не
+  // принадлежит. pagehide: после ухода на другой адрес «Назад» достаёт страницу из bfcache
+  // вместе с памятью, и брошенный вход сработал бы для того, кто войдёт следующим
+  useEffect(() => {
+    const discard = () => {
       issuedToken = null;
       setSlot(null);
-    },
-    [],
-  );
+    };
+    window.addEventListener('pagehide', discard);
+    return () => {
+      window.removeEventListener('pagehide', discard);
+      discard();
+    };
+  }, []);
 }

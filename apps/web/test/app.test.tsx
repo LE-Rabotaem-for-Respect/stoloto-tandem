@@ -877,6 +877,24 @@ describe('отложенное действие — только ответ на
     expect(onJoin).not.toHaveBeenCalled();
   });
 
+  it('гость ушёл со входа на другой сайт: страница из bfcache и вход другого действие не запускают', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp('/events/1', routes(<JoinButton onJoin={onJoin} />));
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    await screen.findByLabelText('Почта');
+    // Ушёл по адресной строке: роутер этого не видит, страница уходит в bfcache вместе с
+    // памятью и по «Назад» возвращается той же — с экраном входа и его state
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+      window.dispatchEvent(new Event('pageshow'));
+    });
+    await signIn('igor@demo');
+    await screen.findByRole('button', { name: 'Записаться' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).not.toHaveBeenCalled();
+  });
+
   it('гость бросил вход, не войдя: «Назад» к этому входу и вход другого действие не запускает', async () => {
     fakeApi();
     const onJoin = vi.fn();
