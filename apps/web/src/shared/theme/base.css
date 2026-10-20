@@ -137,6 +137,7 @@ a {
 }
 
 .field input,
+.field select,
 .field textarea {
   min-height: var(--tap-min);
   padding: var(--space-2) var(--space-3);
