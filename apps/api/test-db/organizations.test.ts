@@ -199,9 +199,13 @@ describe('профиль организации', () => {
     const response = await http()
       .patch(`/organizations/${id}`)
       .set('Cookie', cookie)
-      .send({ name: 5, city: 5 });
+      .send({ name: 5, city: 5, website: 5 });
     expect(response.status).toBe(400);
-    expect(response.body.fields).toEqual({ name: 'Укажите название', city: 'Укажите город' });
+    expect(response.body.fields).toEqual({
+      name: 'Укажите название',
+      city: 'Укажите город',
+      website: 'Ссылка на сайт или соцсеть, например https://vk.com/club',
+    });
   });
 
   it('эмодзи, переводы строк в описании и контактах допустимы; переводы строк Windows — как обычные', async () => {

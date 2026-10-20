@@ -57,6 +57,7 @@ export class UpdateOrganizationDto {
     { message: 'Ссылка на сайт или соцсеть, например https://vk.com/club' },
   )
   @MaxLength(300, { message: 'Ссылка — не длиннее 300 символов' })
+  @IsString({ message: 'Ссылка на сайт или соцсеть, например https://vk.com/club' })
   website?: string;
 
   @IsOptional()
