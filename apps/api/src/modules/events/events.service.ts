@@ -319,13 +319,18 @@ export class EventsService {
   /** Поиск мероприятий для администратора (ТЗ 2.10): все статусы, новые сверху. */
   async adminList(
     actor: Actor,
-    filter: { text?: string; status?: EventStatus; organizationId?: string },
+    filter: { text?: string; status?: EventStatus; organizationId?: string; lastWeek?: boolean },
     page: { limit: number; offset: number },
   ): Promise<AdminEventList> {
     const decision = canModerate(actor);
     if (!decision.allowed) throw new ApiError(decision.code);
     const { events, total } = await this.events.adminSearch(
-      { text: filter.text, status: filter.status, organizerOrgId: filter.organizationId },
+      {
+        text: filter.text,
+        status: filter.status,
+        organizerOrgId: filter.organizationId,
+        statusChangedSince: filter.lastWeek ? this.weekAgo() : undefined,
+      },
       page,
     );
     return {
@@ -347,8 +352,16 @@ export class EventsService {
 
   /** Сколько мероприятий снято с публикации за последние 7 дней (обзор админки). */
   countUnpublishedLastWeek(): Promise<number> {
-    const weekAgo = new Date(this.clock.now().getTime() - 7 * 24 * 60 * 60 * 1000);
-    return this.events.countStatusSince('unpublished', weekAgo);
+    return this.events.countStatusSince('unpublished', this.weekAgo());
+  }
+
+  /** Названия мероприятий по id — для списков других модулей (сообщения в админке). */
+  titles(ids: readonly string[]): Promise<Map<string, string>> {
+    return this.events.titles(ids);
+  }
+
+  private weekAgo(): Date {
+    return new Date(this.clock.now().getTime() - 7 * 24 * 60 * 60 * 1000);
   }
 
   private startsRange(query: EventFeedQuery, now: Date): Partial<TimeRange> | undefined {

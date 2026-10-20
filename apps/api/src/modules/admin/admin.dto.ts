@@ -57,6 +57,27 @@ export class AdminEventsQuery extends AdminPageQuery {
   @IsOptional()
   @IsUUID('all', { message: 'Неверная организация' })
   organizationId?: string;
+
+  /** `week` — статус сменился за последние 7 дней (плитка «События сняты за неделю»). */
+  @IsOptional()
+  @IsIn(['week'], { message: 'Период: week' })
+  period?: 'week';
+}
+
+export class AdminMessagesQuery {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Лимит — целое число' })
+  @Min(1, { message: 'Лимит — от 1 до 50' })
+  @Max(50, { message: 'Лимит — от 1 до 50' })
+  limit?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Смещение — целое число' })
+  @Min(0, { message: 'Смещение — от 0 до 10000' })
+  @Max(10_000, { message: 'Смещение — от 0 до 10000' })
+  offset?: number;
 }
 
 export const ORGANIZATION_DECISIONS = ['approve', 'reject'] as const;

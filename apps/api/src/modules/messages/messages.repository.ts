@@ -25,6 +25,25 @@ export type MessageRecord = Prisma.MessageGetPayload<{ select: typeof messageSel
 export class MessagesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Сообщения с этим статусом, новые сверху (админка). */
+  async listByStatus(
+    status: MessageStatus,
+    page: { offset: number; limit: number },
+  ): Promise<{ messages: MessageRecord[]; total: number }> {
+    const where = { status };
+    const [messages, total] = await Promise.all([
+      this.prisma.message.findMany({
+        where,
+        select: messageSelect,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: page.offset,
+        take: page.limit,
+      }),
+      this.prisma.message.count({ where }),
+    ]);
+    return { messages, total };
+  }
+
   countByStatus(status: MessageStatus): Promise<number> {
     return this.prisma.message.count({ where: { status } });
   }

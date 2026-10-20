@@ -93,6 +93,7 @@ describe('доступ к админке', () => {
       () => http().get('/admin/overview'),
       () => http().get('/admin/organizations'),
       () => http().get('/admin/events'),
+      () => http().get('/admin/messages'),
       () =>
         http().post(`/admin/organizations/${randomUUID()}/decision`).send({ decision: 'approve' }),
     ];
@@ -241,6 +242,18 @@ describe('очередь заявок организаций', () => {
     });
   });
 
+  it('черновик одобрить нельзя — 409, статус не меняется', async () => {
+    const cookie = await admin();
+    const { body } = await signUp('organization', `Черновик ${tag}`);
+    const id = body.organization?.id ?? '';
+    const approve = await http()
+      .post(`/admin/organizations/${id}/decision`)
+      .set('Cookie', cookie)
+      .send({ decision: 'approve' });
+    expect(approve.status).toBe(409);
+    expect((await prisma.organization.findUniqueOrThrow({ where: { id } })).status).toBe('draft');
+  });
+
   it('неизвестное решение и неверный адрес — ошибка поля и 404', async () => {
     const cookie = await admin();
     const organization = await pendingOrganization(`Ошибки ${tag}`);
@@ -373,5 +386,103 @@ describe('поиск', () => {
       id: organization.id,
       name: `Организатор ${tag}`,
     });
+  });
+});
+
+describe('плитки ведут к своим спискам', () => {
+  it('снятые за неделю: period=week — только сменившие статус за 7 дней', async () => {
+    const cookie = await admin();
+    const [organizer, sport] = await Promise.all([createUser(), createSport()]);
+    const base = {
+      organizerUserId: organizer.id,
+      sportId: sport.id,
+      description: 'Описание',
+      startsAt: new Date(Date.parse(NOW) + DAY),
+      endsAt: new Date(Date.parse(NOW) + DAY + 3_600_000),
+      city: 'Красноярск',
+      area: 'Центр',
+      placeText: 'Стадион',
+      status: 'unpublished' as const,
+      createdAt: new Date(Date.parse(NOW) - 30 * DAY),
+    };
+    const recent = await prisma.event.create({
+      data: { ...base, title: `Недавно ${tag}`, statusChangedAt: new Date(Date.parse(NOW) - DAY) },
+    });
+    await prisma.event.create({
+      data: {
+        ...base,
+        title: `Давно ${tag}`,
+        statusChangedAt: new Date(Date.parse(NOW) - 9 * DAY),
+      },
+    });
+    const week = await http()
+      .get('/admin/events')
+      .query({ q: tag, status: 'unpublished', period: 'week' })
+      .set('Cookie', cookie);
+    expect((week.body.items as { id: string }[]).map((item) => item.id)).toEqual([recent.id]);
+  });
+
+  it('скрытые сообщения: текст, причина, автор и мероприятие — только администратору', async () => {
+    const cookie = await admin();
+    const [author, organizer, sport] = await Promise.all([
+      createUser(),
+      createUser(),
+      createSport(),
+    ]);
+    const event = await prisma.event.create({
+      data: {
+        organizerUserId: organizer.id,
+        sportId: sport.id,
+        title: `Обсуждаемое ${tag}`,
+        description: 'Описание',
+        startsAt: new Date(Date.parse(NOW) + DAY),
+        endsAt: new Date(Date.parse(NOW) + DAY + 3_600_000),
+        city: 'Красноярск',
+        area: 'Центр',
+        placeText: 'Стадион',
+        statusChangedAt: new Date(NOW),
+        createdAt: new Date(NOW),
+      },
+    });
+    const hidden = await prisma.message.create({
+      data: {
+        eventId: event.id,
+        authorUserId: author.id,
+        text: `Реклама ${tag}`,
+        status: 'hidden_by_moderator',
+        moderationReason: 'Реклама',
+        createdAt: new Date(NOW),
+      },
+    });
+    await prisma.message.create({
+      data: {
+        eventId: event.id,
+        authorUserId: author.id,
+        text: 'Видимое',
+        createdAt: new Date(NOW),
+      },
+    });
+
+    const list = await http().get('/admin/messages').query({ limit: 50 }).set('Cookie', cookie);
+    expect(list.status).toBe(200);
+    const item = (list.body.items as { id: string }[]).find((entry) => entry.id === hidden.id);
+    expect(item).toEqual({
+      id: hidden.id,
+      eventId: event.id,
+      eventTitle: `Обсуждаемое ${tag}`,
+      author: { kind: 'user', id: author.id, name: 'Анна' },
+      text: `Реклама ${tag}`,
+      moderationReason: 'Реклама',
+      createdAt: new Date(NOW).toISOString(),
+    });
+    expect((list.body.items as { text: string }[]).some((entry) => entry.text === 'Видимое')).toBe(
+      false,
+    );
+  });
+
+  it('ответы админки не кешируются', async () => {
+    const cookie = await admin();
+    const overview = await http().get('/admin/overview').set('Cookie', cookie);
+    expect(overview.headers['cache-control']).toContain('no-store');
   });
 });

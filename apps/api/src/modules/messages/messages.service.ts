@@ -5,7 +5,7 @@ import { isUUID } from 'class-validator';
 import { Clock } from '../../core/clock';
 import { ApiError } from '../../core/errors';
 import { EventBus, domainEvent } from '../../core/event-bus';
-import { canEditMessage, canPostMessage, toAction } from '../../core/policies';
+import { canEditMessage, canModerate, canPostMessage, toAction } from '../../core/policies';
 import type { Actor, PolicyEvent } from '../../core/policies';
 import { EventsService } from '../events/events.service';
 import type { CreateMessageDto, EditMessageDto } from './messages.dto';
@@ -34,6 +34,17 @@ export interface MessageView {
   actions: Action[];
 }
 
+/** Скрытое сообщение в админке: текст виден администратору. */
+export interface AdminMessageItem {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  author: { kind: 'user' | 'organization'; id: string; name: string };
+  text: string;
+  moderationReason: string | null;
+  createdAt: Date;
+}
+
 export interface ThreadView extends MessageView {
   replies: MessageView[];
 }
@@ -55,6 +66,39 @@ export class MessagesService {
     private readonly clock: Clock,
     private readonly bus: EventBus,
   ) {}
+
+  /**
+   * Скрытые модератором сообщения для администратора (ТЗ 2.10): текст, причина,
+   * автор и мероприятие. Посторонним текст скрытого не виден — только здесь.
+   */
+  async adminHidden(
+    actor: Actor,
+    page: { limit: number; offset: number },
+  ): Promise<{ items: AdminMessageItem[]; total: number; limit: number; offset: number }> {
+    const decision = canModerate(actor);
+    if (!decision.allowed) throw new ApiError(decision.code);
+    const { messages, total } = await this.messages.listByStatus('hidden_by_moderator', page);
+    const titles = await this.events.titles([...new Set(messages.map((m) => m.eventId))]);
+    return {
+      items: messages.map((message) => ({
+        id: message.id,
+        eventId: message.eventId,
+        eventTitle: titles.get(message.eventId) ?? '',
+        author: message.asOrganization
+          ? {
+              kind: 'organization',
+              id: message.asOrganization.id,
+              name: message.asOrganization.name,
+            }
+          : { kind: 'user', id: message.author.id, name: message.author.name },
+        text: message.text,
+        moderationReason: message.moderationReason,
+        createdAt: message.createdAt,
+      })),
+      total,
+      ...page,
+    };
+  }
 
   /** Сообщения, скрытые модератором (обзор админки). */
   countHidden(): Promise<number> {

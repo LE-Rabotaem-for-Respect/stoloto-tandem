@@ -5,8 +5,14 @@ import { CurrentActor, Roles } from '../auth';
 import type { AdminEventList } from '../events/events.service';
 import { EventsService } from '../events/events.service';
 import type { OwnOrganizationView } from '../organizations/organization-view';
+import { MessagesService } from '../messages/messages.service';
 import { OrganizationsService } from '../organizations/organizations.service';
-import { AdminEventsQuery, AdminOrganizationsQuery, OrganizationDecisionDto } from './admin.dto';
+import {
+  AdminEventsQuery,
+  AdminMessagesQuery,
+  AdminOrganizationsQuery,
+  OrganizationDecisionDto,
+} from './admin.dto';
 import { AdminService } from './admin.service';
 import type { AdminOverview } from './admin.service';
 
@@ -24,6 +30,7 @@ export class AdminController {
     private readonly admin: AdminService,
     private readonly organizations: OrganizationsService,
     private readonly events: EventsService,
+    private readonly messages: MessagesService,
   ) {}
 
   @Get('overview')
@@ -62,8 +69,19 @@ export class AdminController {
   ): Promise<AdminEventList> {
     return this.events.adminList(
       actor,
-      { text: query.q || undefined, status: query.status, organizationId: query.organizationId },
+      {
+        text: query.q || undefined,
+        status: query.status,
+        organizationId: query.organizationId,
+        lastWeek: query.period === 'week',
+      },
       page(query),
     );
+  }
+
+  @Get('messages')
+  @Roles('admin')
+  hiddenMessages(@CurrentActor() actor: Actor, @Query() query: AdminMessagesQuery) {
+    return this.messages.adminHidden(actor, page(query));
   }
 }

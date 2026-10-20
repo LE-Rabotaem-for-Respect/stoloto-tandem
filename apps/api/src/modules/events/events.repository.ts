@@ -87,6 +87,8 @@ export interface AdminEventFilter {
   text?: string;
   status?: EventStatus;
   organizerOrgId?: string;
+  /** Статус сменился не раньше этого момента. */
+  statusChangedSince?: Date;
 }
 
 @Injectable()
@@ -132,6 +134,7 @@ export class EventsRepository {
     const where: Prisma.EventWhereInput = {
       ...(filter.status && { status: filter.status }),
       ...(filter.organizerOrgId && { organizerOrgId: filter.organizerOrgId }),
+      ...(filter.statusChangedSince && { statusChangedAt: { gte: filter.statusChangedSince } }),
       ...(filter.text && {
         title: { contains: escapeLike(filter.text), mode: 'insensitive' as const },
       }),
@@ -147,6 +150,14 @@ export class EventsRepository {
       this.prisma.event.count({ where }),
     ]);
     return { events, total };
+  }
+
+  async titles(ids: readonly string[]): Promise<Map<string, string>> {
+    const rows = await this.prisma.event.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, title: true },
+    });
+    return new Map(rows.map((row) => [row.id, row.title]));
   }
 
   /** Сколько мероприятий перешло в этот статус начиная с момента `since`. */
