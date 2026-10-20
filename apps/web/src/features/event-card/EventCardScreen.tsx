@@ -1,6 +1,6 @@
 import { PARTICIPATION_STATUS_VIEW } from '@tandem/domain';
 import type { Action } from '@tandem/domain';
-import { useId, useState } from 'react';
+import { useId, useState, useSyncExternalStore } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { ApiRequestError } from '../../shared/api';
@@ -15,10 +15,12 @@ import {
   ModeBadge,
   ParticipationStepper,
   PrimaryButton,
+  Seats,
   StatusBadge,
   TextAreaField,
 } from '../../shared/ui';
 import { loginPath, useAuthAction } from '../auth';
+import { Discussion } from '../discussion';
 import { useEventCard, useParticipationAction } from './api';
 import type { EventCardView } from './api';
 import { actionLabel, actionTarget, findAction, primaryAction, secondaryActions } from './actions';
@@ -248,13 +250,29 @@ function Organizer({ organizer }: { organizer: EventCardView['organizer'] }) {
   );
 }
 
+// От 768 px панель действия — в потоке карточки, и статус в ней — полным текстом
+// (docs/design.md, «Первый экран карточки события»): строка полного статуса не нужна
+const WIDE = '(min-width: 768px)';
+
+function subscribeWide(onChange: () => void) {
+  const query = window.matchMedia?.(WIDE);
+  query?.addEventListener('change', onChange);
+  return () => query?.removeEventListener('change', onChange);
+}
+
+const useWide = () =>
+  useSyncExternalStore(subscribeWide, () => window.matchMedia?.(WIDE).matches ?? false);
+
 function CardBody({ event }: { event: EventCardView }) {
   const now = useClock();
   const { contrast } = useTheme();
   const id = useId();
   const main = primaryAction(event.actions);
   const others = secondaryActions(event.actions);
-  const status = cardStatus(event, main);
+  const narrow = cardStatus(event, main);
+  const wide = useWide();
+  const status =
+    wide && narrow.full ? { panel: { ...narrow.panel, text: narrow.full }, full: null } : narrow;
   const fullId = `${id}-full`;
   const panelId = `${id}-panel`;
   const participation = useParticipationAction(event.id);
@@ -301,6 +319,9 @@ function CardBody({ event }: { event: EventCardView }) {
             <Icon name="action-location" />
             <span className="event-card-place-text">{place}</span>
           </p>
+          {/* До 10 кружков ряд помещается на 360 px, больше — полоса с подписью в той же
+              строке: перенос кружков увёл бы подпись под панель действия */}
+          <Seats capacity={event.capacity} taken={event.confirmedCount} maxDots={10} />
           <div className="event-card-action">
             <div id={panelId} aria-describedby={status.full ? fullId : undefined}>
               <StatusBadge view={status.panel} compact />
@@ -369,10 +390,7 @@ function CardBody({ event }: { event: EventCardView }) {
           <h2 id="faq-title">Частые вопросы</h2>
           <p className="event-card-soon">Здесь появятся ответы организатора на частые вопросы.</p>
         </section>
-        <section id="discussion" className="event-card-section" aria-labelledby="discussion-title">
-          <h2 id="discussion-title">Обсуждение</h2>
-          <p className="event-card-soon">Здесь будет обсуждение мероприятия.</p>
-        </section>
+        <Discussion eventId={event.id} post={findAction(event.actions, 'post_message')} />
       </div>
     </article>
   );

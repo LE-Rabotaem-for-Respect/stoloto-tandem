@@ -145,6 +145,7 @@ describe('метки доступа маршрутов приложения', ()
         'AdminController.organizationsList',
         'AdminController.decide',
         'AdminController.eventsList',
+        'AdminController.moderateEvent',
         'AdminController.hiddenMessages',
         'AuthController.register',
         'AuthController.login',

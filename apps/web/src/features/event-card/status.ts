@@ -69,7 +69,9 @@ export function cardStatus(event: EventCardView, main: Action | undefined): Card
       icon: 'action-reject',
       tone: 'off',
     };
-    full = join(eventView.text, main.reason);
+    // «Мест нет — можно встать в лист ожидания» уже объясняет «Мест нет» кнопки
+    const reason = main.reason && !eventView.text.startsWith(main.reason) ? main.reason : null;
+    full = join(eventView.text, reason);
   } else {
     panel = shortView(eventView);
     full = eventView.text;

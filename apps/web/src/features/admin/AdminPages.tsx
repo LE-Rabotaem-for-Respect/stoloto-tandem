@@ -6,7 +6,13 @@ import {
   SPORT_CATEGORY_TITLES,
   SPORT_NAME_MAX_LENGTH,
 } from '@tandem/domain';
-import type { EventStatus, OrganizationStatus, SportCategory, StatusTone } from '@tandem/domain';
+import type {
+  ActionCode,
+  EventStatus,
+  OrganizationStatus,
+  SportCategory,
+  StatusTone,
+} from '@tandem/domain';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -21,6 +27,7 @@ import {
   useAdminOverview,
   useAdminSports,
   useDiscussion,
+  useEventModeration,
   useModerateMessage,
   useOrganizationDecision,
   useSportChange,
@@ -32,6 +39,7 @@ import type {
   AdminOrganization,
   AdminSearch,
   AdminSport,
+  EventModerationBody,
   Page,
   SportChange,
 } from './api';
@@ -619,6 +627,128 @@ function Discussion({ eventId }: { eventId: string }) {
   );
 }
 
+type EventModerationAction = EventModerationBody['action'];
+
+const MODERATION_TEXT: Record<EventModerationAction, { button: string; submit: string }> = {
+  unpublish: { button: 'Снять с публикации', submit: 'Снять с этой причиной' },
+  delete: { button: 'Удалить', submit: 'Удалить с этой причиной' },
+};
+
+// Код в `actions[]` строки → действие запроса модерации
+const MODERATION_CODE: Record<EventModerationAction, ActionCode> = {
+  unpublish: 'unpublish_event',
+  delete: 'delete_event',
+};
+
+/**
+ * «Снять с публикации» и «Удалить» (ТЗ 2.10) — только с причиной: её увидят организатор и
+ * записавшиеся. Кнопки — по `actions[]` строки: интерфейс сам права не проверяет (DECISION-002).
+ */
+function Moderation({ event }: { event: AdminEvent }) {
+  const moderate = useEventModeration();
+  const [action, setAction] = useState<EventModerationAction | null>(null);
+  const [reason, setReason] = useState('');
+  // Кнопка заменяется формой и обратно: фокус — на поле причины, после «Отмены» и решения —
+  // на кнопку действия (или первую оставшуюся), а не на body
+  const [returnTo, setReturnTo] = useState<EventModerationAction | null>(null);
+  const reasonField = useRef<HTMLTextAreaElement>(null);
+  const buttons = useRef<HTMLDivElement>(null);
+  const close = () => {
+    setReturnTo(action);
+    setAction(null);
+  };
+  const id = useId();
+  const available = (['unpublish', 'delete'] as const).filter((code) =>
+    event.actions.some((item) => item.code === MODERATION_CODE[code] && item.enabled),
+  );
+  // После решения строка перезагружается и кнопка может исчезнуть: тогда фокус — на оставшейся
+  const shown = available.join();
+  useEffect(() => {
+    if (action) {
+      reasonField.current?.focus();
+      return;
+    }
+    const lost = document.activeElement === document.body;
+    if (!returnTo || !(lost || buttons.current?.contains(document.activeElement))) return;
+    const own = buttons.current?.querySelector<HTMLButtonElement>(`[data-action="${returnTo}"]`);
+    (own ?? buttons.current?.querySelector('button'))?.focus();
+  }, [action, returnTo, shown]);
+  const fieldError =
+    moderate.error instanceof ApiRequestError ? moderate.error.fields.reason : undefined;
+  const formError = moderate.error && !fieldError ? errorText(moderate.error) : undefined;
+
+  if (available.length === 0) return null;
+  if (action) {
+    return (
+      <form
+        className="admin-decision"
+        onSubmit={(submit) => {
+          submit.preventDefault();
+          moderate.mutate(
+            { id: event.id, action, reason },
+            {
+              onSuccess: () => {
+                close();
+                setReason('');
+              },
+            },
+          );
+        }}
+      >
+        <div className="field">
+          <label htmlFor={`${id}-reason`}>Причина — её увидят организатор и записавшиеся</label>
+          <textarea
+            ref={reasonField}
+            id={`${id}-reason`}
+            value={reason}
+            maxLength={500}
+            required
+            aria-invalid={fieldError ? true : undefined}
+            aria-describedby={fieldError ? `${id}-reason-error` : undefined}
+            onChange={(change) => setReason(change.target.value)}
+          />
+          {fieldError && (
+            <p className="field-error" id={`${id}-reason-error`}>
+              {fieldError}
+            </p>
+          )}
+        </div>
+        {formError && <p className="form-error">{formError}</p>}
+        <div className="admin-actions">
+          <button className="button" type="submit" disabled={moderate.isPending}>
+            {MODERATION_TEXT[action].submit}
+          </button>
+          <button
+            className="button"
+            type="button"
+            onClick={() => {
+              close();
+              moderate.reset();
+            }}
+          >
+            Отмена
+          </button>
+        </div>
+      </form>
+    );
+  }
+  return (
+    <div className="admin-actions" ref={buttons}>
+      {available.map((code) => (
+        <button
+          key={code}
+          className="button"
+          type="button"
+          data-action={code}
+          onClick={() => setAction(code)}
+        >
+          {MODERATION_TEXT[code].button}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function EventRow({ event }: { event: AdminEvent }) {
   const organizer =
     event.organizer.kind === 'organization' ? (
@@ -654,6 +784,7 @@ function EventRow({ event }: { event: AdminEvent }) {
           </>
         )}
       </dl>
+      <Moderation event={event} />
       <Discussion eventId={event.id} />
     </li>
   );
