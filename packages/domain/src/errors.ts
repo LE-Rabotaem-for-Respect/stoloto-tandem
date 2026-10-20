@@ -95,7 +95,7 @@ export const ERROR_SHORT_MESSAGES: Partial<Record<ErrorCode, string>> = {
   organization_not_approved: 'Организация не допущена',
   not_event_organizer: 'Только для организатора',
   participants_only: 'Только для участников',
-  not_organization_owner: 'Только для представителя',
+  not_organization_owner: 'Не ваша организация',
   admins_only: 'Только для администратора',
   not_message_author: 'Только для автора',
   invalid_transition: 'Сейчас недоступно',

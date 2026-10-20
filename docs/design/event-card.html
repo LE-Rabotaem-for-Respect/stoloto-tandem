@@ -1087,14 +1087,14 @@
 
       <template id="gallery">
         <div class="action-bar action-bar--sample">
-          <div class="status status--off">
+          <div class="status status--off sample-reason-status">
             <svg class="icon" aria-hidden="true"><use href="#i-cancelled" /></svg>
-            <span class="status-text">Запись закрыта</span>
+            <span class="status-text">Только для пользователей</span>
           </div>
           <button class="btn-primary sample-disabled" type="button" disabled>Записаться</button>
         </div>
         <p class="record-status record-status--off record-status--sample sample-reason">
-          Отменено организатором. Мероприятие недоступно для записи
+          Набор открыт. Записываться могут только пользователи
         </p>
         <div class="status status--wait">
           <svg class="icon" aria-hidden="true"><use href="#i-pending" /></svg
@@ -1250,10 +1250,11 @@
       const gallery = document.getElementById('gallery');
       document.querySelectorAll('.panel').forEach((panel, i) => {
         const copy = gallery.content.cloneNode(true);
-        // Неактивная кнопка ссылается на строку с причиной
+        // Неактивная кнопка и плашка статуса ссылаются на строку с причиной
         const reason = copy.querySelector('.sample-reason');
         reason.id = 'sample-reason-' + i;
         copy.querySelector('.sample-disabled').setAttribute('aria-describedby', reason.id);
+        copy.querySelector('.sample-reason-status').setAttribute('aria-describedby', reason.id);
         panel.append(copy);
       });
     </script>
