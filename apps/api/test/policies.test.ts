@@ -14,6 +14,7 @@ import {
   canViewEvent,
   canViewParticipants,
   eventActions,
+  organizationActions,
   participationActions,
 } from '../src/core/policies';
 import type { Actor, Decision, PolicyEvent } from '../src/core/policies';
@@ -471,5 +472,63 @@ describe('actions[]: заявка в «Участниках и заявках»'
     );
     expect(finished.map((action) => action.enabled)).toEqual([false, false]);
     expect(finished[0]?.reason).toBe('Мероприятие недоступно для записи');
+  });
+});
+
+describe('actions[]: профиль организации', () => {
+  const own = (status: Parameters<typeof organizationActions>[1]['status']) =>
+    organizationActions({ ...orgPending, organization: { id: 'o-padel', status } } as Actor, {
+      id: 'o-padel',
+      status,
+    });
+
+  it('владелец черновика: правка и отправка; мероприятие — после одобрения', () => {
+    expect(own('draft')).toEqual([
+      { code: 'edit_organization', enabled: true },
+      { code: 'submit_organization', enabled: true },
+      {
+        code: 'create_event',
+        enabled: false,
+        reason: 'Организация ещё не допущена администратором',
+        reasonCode: 'organization_not_approved',
+      },
+    ]);
+  });
+
+  it.each(['rejected', 'needs_changes'] as const)('%s — можно отправить снова', (status) => {
+    expect(own(status)).toContainEqual({ code: 'submit_organization', enabled: true });
+  });
+
+  it('на проверке отправка неактивна с причиной автомата', () => {
+    expect(own('pending')).toContainEqual({
+      code: 'submit_organization',
+      enabled: false,
+      reason: 'Заявка уже на проверке или одобрена',
+      reasonCode: 'invalid_transition',
+    });
+  });
+
+  it('одобренная: отправки нет, создание мероприятия доступно', () => {
+    expect(own('approved')).toEqual([
+      { code: 'edit_organization', enabled: true },
+      { code: 'create_event', enabled: true },
+    ]);
+  });
+
+  it('администратор решает только заявку на проверке; чужим действий нет', () => {
+    expect(organizationActions(admin, { id: 'o-padel', status: 'pending' })).toEqual([
+      { code: 'review_organization', enabled: true },
+    ]);
+    expect(organizationActions(admin, { id: 'o-padel', status: 'approved' })).toEqual([
+      {
+        code: 'review_organization',
+        enabled: false,
+        reason: 'Решение принимается только по заявке на проверке',
+        reasonCode: 'invalid_transition',
+      },
+    ]);
+    expect(organizationActions(orgApproved, { id: 'o-padel', status: 'draft' })).toEqual([]);
+    expect(organizationActions(user, { id: 'o-padel', status: 'pending' })).toEqual([]);
+    expect(organizationActions(guest, { id: 'o-padel', status: 'pending' })).toEqual([]);
   });
 });
