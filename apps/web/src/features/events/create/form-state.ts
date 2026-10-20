@@ -157,11 +157,14 @@ export function stepErrors(step: StepIndex, state: CreateEventState, now: Date):
   if (step === 1) {
     const starts = krasnoyarskTime(state.date, state.startTime);
     const ends = krasnoyarskTime(state.date, state.endTime);
+    // Без даты ошибка одна — у даты: под заполненным временем «укажите время» сбивает
     if (!state.date) errors.date = 'Укажите дату';
-    if (!starts) errors.startTime = 'Укажите время начала';
-    else if (starts <= now) errors.startTime = 'Время начала должно быть в будущем';
-    if (!ends) errors.endTime = 'Укажите время окончания';
-    else if (starts && ends <= starts) errors.endTime = 'Окончание — позже начала';
+    else {
+      if (!starts) errors.startTime = 'Укажите время начала';
+      else if (starts <= now) errors.startTime = 'Время начала должно быть в будущем';
+      if (!ends) errors.endTime = 'Укажите время окончания';
+      else if (starts && ends <= starts) errors.endTime = 'Окончание — позже начала';
+    }
     if (lineLength(state.city) < 2 || lineLength(state.city) > 80) {
       errors.city = 'Город — от 2 до 80 символов';
     }

@@ -292,7 +292,10 @@ describe('создание мероприятия', { timeout: 15_000 }, () => {
     await user.click(await screen.findByRole('radio', { name: /Свободно/ }));
     await user.click(screen.getByRole('button', { name: 'Опубликовать' }));
 
-    expect((await screen.findByRole('alert')).textContent).toBe('Создавать мероприятия нельзя');
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe('Создавать мероприятия нельзя');
+    // Кнопка на время запроса отключалась — фокус на сообщении, а не на body
+    await waitFor(() => expect(alert).toBe(document.activeElement));
     expect(currentStep()?.textContent).toContain('Запись');
   });
 });
@@ -363,5 +366,22 @@ describe('подсказки направлений с клавиатуры', { 
 
     expect(describedBy(combobox())).toBe('Выберите направление из списка или добавьте новое');
     expect(currentStep()?.textContent).toContain('Что');
+  });
+
+  it('сбой подсказок — понятная строка, а не пустой список', async () => {
+    fakeApi();
+    const base = vi.mocked(fetch).getMockImplementation();
+    vi.mocked(fetch).mockImplementation(async (url, init) =>
+      String(url).startsWith('/api/sports')
+        ? json(500, { code: 'internal', message: 'Что-то пошло не так' })
+        : base
+          ? base(url, init)
+          : json(404, {}),
+    );
+    const user = userEvent.setup();
+    renderCreate();
+    await user.type(await screen.findByRole('combobox', { name: 'Направление' }), 'бег');
+    await screen.findByText('Не удалось загрузить подсказки — попробуйте ещё раз');
+    expect(combobox().getAttribute('maxLength')).toBe('50');
   });
 });

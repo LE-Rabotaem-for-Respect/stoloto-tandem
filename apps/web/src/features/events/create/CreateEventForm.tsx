@@ -103,6 +103,10 @@ export function CreateEventForm() {
   const [step, setStep] = useState<StepIndex>(0);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState<string>();
+  // Счётчик «перевести фокус на сообщение»: кнопка на время запроса отключена, и без этого
+  // фокус после отказа без полей (403, нет связи) уходил бы на body
+  const [focusMessage, setFocusMessage] = useState(0);
+  const messageRef = useRef<HTMLParagraphElement>(null);
   // Открытость «Дополнительно» — своим состоянием: исправление поля не сворачивает блок
   const [moreOpen, setMoreOpen] = useState<Record<OptionalField, boolean>>({
     participantInfo: false,
@@ -133,6 +137,10 @@ export function CreateEventForm() {
         : invalid;
     target?.focus();
   }, [focusInvalid]);
+
+  useEffect(() => {
+    if (focusMessage > 0) messageRef.current?.focus();
+  }, [focusMessage]);
 
   const showErrors = (next: FieldErrors) => {
     setErrors(next);
@@ -185,11 +193,13 @@ export function CreateEventForm() {
       onError: (error) => {
         if (!(error instanceof ApiRequestError)) {
           setMessage('Не удалось опубликовать. Проверьте связь и попробуйте ещё раз');
+          setFocusMessage((count) => count + 1);
           return;
         }
         const target = firstStepWithError(error.fields);
         if (target === null) {
           setMessage(error.message);
+          setFocusMessage((count) => count + 1);
           return;
         }
         const fields: FieldErrors = {};
@@ -372,7 +382,7 @@ export function CreateEventForm() {
       )}
 
       {message && (
-        <p className="form-error" role="alert">
+        <p className="form-error" role="alert" tabIndex={-1} ref={messageRef}>
           {message}
         </p>
       )}

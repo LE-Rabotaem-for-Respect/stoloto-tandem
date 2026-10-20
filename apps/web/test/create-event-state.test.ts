@@ -99,10 +99,13 @@ describe('проверки шагов повторяют серверные', ()
       ),
     ).toEqual({
       date: 'Укажите дату',
-      startTime: 'Укажите время начала',
-      endTime: 'Укажите время окончания',
       area: 'Район или ориентир — от 2 до 120 символов',
       placeText: 'Адрес или описание места — от 3 до 300 символов',
+    });
+    // Без даты ошибка одна — у даты, хотя время заполнено
+    expect(stepErrors(1, filled({ date: '' }), now)).toEqual({ date: 'Укажите дату' });
+    expect(stepErrors(1, filled({ startTime: '' }), now)).toEqual({
+      startTime: 'Укажите время начала',
     });
     expect(stepErrors(1, filled({ city: 'К'.repeat(81) }), now).city).toBeDefined();
   });

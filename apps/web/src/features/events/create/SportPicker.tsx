@@ -1,4 +1,4 @@
-import { SPORT_CATEGORIES, SPORT_CATEGORY_TITLES } from '@tandem/domain';
+import { SPORT_CATEGORIES, SPORT_CATEGORY_TITLES, SPORT_NAME_MAX_LENGTH } from '@tandem/domain';
 import type { SportCategory } from '@tandem/domain';
 import { useId, useState } from 'react';
 import type { KeyboardEvent } from 'react';
@@ -93,6 +93,7 @@ export function SportPicker({ value, onChange, error }: SportPickerProps) {
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
         autoComplete="off"
+        maxLength={SPORT_NAME_MAX_LENGTH}
         value={text}
         onChange={(event) => {
           setText(event.target.value);
@@ -122,6 +123,11 @@ export function SportPicker({ value, onChange, error }: SportPickerProps) {
             </li>
           ))}
         </ul>
+      )}
+      {suggestions.isError && open && (
+        <p className="field-error" role="status">
+          Не удалось загрузить подсказки — попробуйте ещё раз
+        </p>
       )}
       {error && (
         <p className="field-error" id={errorId}>

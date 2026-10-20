@@ -1,4 +1,4 @@
-import { coverUrl } from '../../../shared/illustrations';
+import { coverAlt, coverUrl } from '../../../shared/illustrations';
 import { useTheme } from '../../../shared/theme';
 import { EventDate, Icon, LevelScale, ModeBadge } from '../../../shared/ui';
 import { krasnoyarskTime } from './form-state';
@@ -19,10 +19,13 @@ export function EventPreview({ state, now }: { state: CreateEventState; now: Dat
     <article className="event-preview">
       <img
         className="event-preview-cover"
+        // Поля по бокам вписанного рисунка — фон группы; в «Контрасте» фон темы: инверсия
+        // контурной обложки перекрасила бы и фон
+        style={contrast ? undefined : { background: `var(--cover-${category})` }}
         src={coverUrl(category, { contrast })}
-        alt=""
-        width={320}
-        height={180}
+        alt={coverAlt(category)}
+        width={360}
+        height={72}
       />
       <div className="event-preview-body">
         <div className="event-preview-heading">
