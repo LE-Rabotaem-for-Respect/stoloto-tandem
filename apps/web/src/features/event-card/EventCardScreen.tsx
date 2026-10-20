@@ -212,7 +212,9 @@ function CardBody({ event }: { event: EventCardView }) {
             <Icon name="action-location" />
             <span className="event-card-place-text">{place}</span>
           </p>
-          <Seats capacity={event.capacity} taken={event.confirmedCount} />
+          {/* До 10 кружков ряд помещается на 360 px, больше — полоса с подписью в той же
+              строке: перенос кружков увёл бы подпись под панель действия */}
+          <Seats capacity={event.capacity} taken={event.confirmedCount} maxDots={10} />
           <div className="event-card-action">
             <div id={panelId} aria-describedby={status.full ? fullId : undefined}>
               <StatusBadge view={status.panel} compact />

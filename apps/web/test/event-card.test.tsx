@@ -201,6 +201,18 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     expect(full.querySelector('.seats--full')?.textContent).toBe('Мест нет');
   });
 
+  it('больше 10 мест — полоса, а не кружки: ряд кружков на 360 px перенёсся бы', async () => {
+    fakeApi({
+      signedIn: true,
+      cardFor: () => json(200, card({ capacity: 16, confirmedCount: 4 })),
+    });
+    renderCard();
+    const article = await screen.findByRole('article', { name: 'Пробежка 5 км на Татышеве' });
+    within(article).getByText('Осталось 12 из 16');
+    expect(article.querySelector('.seats-dots')).toBeNull();
+    expect(article.querySelector('.seats-bar')).not.toBeNull();
+  });
+
   it('гость: кнопка ведёт на вход, после входа запись выполняется сама', async () => {
     const { calls } = fakeApi();
     const user = userEvent.setup();
