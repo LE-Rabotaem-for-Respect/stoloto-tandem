@@ -309,13 +309,36 @@ describe('actions[]: пример для карточки события', () =>
     ]);
   });
 
-  it('пользователь может записаться; уже записанный — нет, с причиной из автомата', () => {
+  it('пользователь может записаться; после отмены — снова, после отказа — нет, с причиной', () => {
     expect(card(user)[0]).toEqual({ code: 'join', enabled: true });
-    expect(card(user, 'confirmed')[0]).toEqual({
+    expect(card(user, 'cancelled')[0]).toEqual({ code: 'join', enabled: true });
+    expect(card(user, 'rejected')[0]).toEqual({
       code: 'join',
       enabled: false,
-      reason: expect.stringMatching(/[А-Яа-я]/),
+      reason: 'После отказа повторная заявка на это мероприятие недоступна',
     });
+  });
+
+  it.each(['pending', 'confirmed', 'waitlist'] as const)(
+    'запись %s: «Отменить запись» вместо «Записаться»',
+    (status) => {
+      const actions = card(user, status);
+      expect(actions[0]).toEqual({ code: 'leave', enabled: true });
+      expect(actions.map((action) => action.code)).not.toContain('join');
+    },
+  );
+
+  it('после окончания и вне публикации отмена записи неактивна — с причиной', () => {
+    const ended = new Date(userEvent.endsAt.getTime() + 60_000);
+    const event = { ...userEvent, mode: 'free' as const, hasSeats: true };
+    expect(eventActions(user, event, 'confirmed', ended)[0]).toEqual({
+      code: 'leave',
+      enabled: false,
+      reason: 'Мероприятие недоступно для записи',
+    });
+    expect(
+      eventActions(user, { ...event, status: 'cancelled' }, 'confirmed', now)[0],
+    ).toMatchObject({ code: 'leave', enabled: false });
   });
 
   it('организатор получает управление событием, но не запись на своё', () => {
