@@ -40,7 +40,14 @@ git archive --format=tar "$commit" |
     mv \"\$release.tmp\" \"\$release\""
 
 # 2) ссылка current — на этот выпуск, запуск стендов, уборка старых выпусков
-ssh -o BatchMode=yes "$host" sh -s -- "$commit" "$keep" <<'REMOTE'
+# Сбой запуска (например, миграция и нездоровый api) — сразу состояние и журналы стендов
+start_failed() {
+  echo "Запуск стендов на сервере не удался — состояние и журналы:" >&2
+  # shellcheck disable=SC2016 # переменные раскрывает удалённая оболочка
+  ssh -o BatchMode=yes "$host" 'cd "$HOME/tandem/current" && sh scripts/stands.sh ps; for f in stands/*.env; do n=${f#stands/}; sh scripts/stands.sh logs "${n%.env}"; done' >&2 || true
+  exit 1
+}
+ssh -o BatchMode=yes "$host" sh -s -- "$commit" "$keep" <<'REMOTE' || start_failed
 set -eu
 commit=$1
 keep=$2
@@ -83,8 +90,10 @@ for file in $(git ls-tree --name-only "$commit" stands/ | grep '\.env$'); do
     fi
     sleep 5
   done
-  if [ "$ok" = 1 ] && [ "${DEPLOY_RESET:-}" = 1 ]; then
-    curl -fsS --max-time 30 -X POST "$url/api/demo/reset" >/dev/null || ok=0
+  if [ "$ok" = 1 ] && [ "${DEPLOY_RESET:-}" = 1 ] &&
+    ! curl -fsS --max-time 30 -X POST "$url/api/demo/reset" >/dev/null; then
+    echo "$stand — $url — работает, но сброс демо-данных не удался" >&2
+    failed=1
   fi
   if [ "$ok" = 1 ]; then
     echo "$stand — $url — работает"
