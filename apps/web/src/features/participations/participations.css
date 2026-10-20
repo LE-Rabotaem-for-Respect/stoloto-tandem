@@ -1,49 +1,114 @@
 /* «Мои записи» */
 .my-group + .my-group {
-  margin-top: var(--space-5);
+  margin-top: var(--space-6);
+}
+
+/* Заголовок группы — с цветной «пилюлей»-меткой слева: группы видно при беглом взгляде */
+.my-group h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-title);
+}
+
+.my-group h2::before {
+  content: '';
+  flex: none;
+  width: calc(0.75rem * var(--text-scale));
+  height: calc(1.75rem * var(--text-scale));
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+}
+
+.my-group:nth-of-type(2) h2::before {
+  background: var(--color-sky);
+}
+
+.my-group:nth-of-type(3) h2::before {
+  background: var(--color-line-strong);
 }
 
 .my-participations {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+@media (min-width: 1024px) {
+  .my-participations {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.my-participations > li {
+  animation: rise-in var(--motion-enter) var(--ease-out) both;
 }
 
 .my-participation {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--space-3);
+  gap: var(--space-4);
+  height: 100%;
   min-height: var(--tap-min);
-  padding: var(--space-3);
+  padding: var(--space-4);
   border: var(--border-width) solid var(--color-line);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-inner);
   background: var(--color-surface);
+  box-shadow: var(--shadow-card);
   color: var(--color-ink);
   text-decoration: none;
+  transition:
+    transform var(--motion-base) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out);
 }
 
 .my-participation:hover {
-  border-color: var(--color-line-strong);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-lift);
+  transform: translateY(-2px);
 }
 
 .my-participation-text {
   display: grid;
   flex: 1 1 12rem;
-  gap: var(--space-1);
+  gap: var(--space-2);
   min-width: 0;
 }
 
 .my-participation-title {
+  font-family: var(--font-display);
   font-weight: 700;
   font-size: var(--fs-lead);
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
 .my-participation-meta {
-  color: var(--color-ink-muted);
-  font-size: var(--fs-caption);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
   overflow-wrap: anywhere;
+}
+
+.my-participation-sport {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-sky-soft);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+}
+
+[data-theme='contrast'] .my-participation-sport {
+  border: var(--border-width) solid var(--color-line);
+}
+
+.my-participation-place {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-ink-muted);
 }

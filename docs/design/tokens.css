@@ -1,41 +1,79 @@
 /*
- * Токены оформления. Источник правды — docs/design.md.
+ * Токены оформления. Источник правды — docs/design.md (копия docs/design/tokens.css).
  * Тема задаётся атрибутами на корневом элементе (или на любом контейнере):
  *   data-theme="default" | "contrast"   — палитра
  *   data-text="normal"   | "large"      — масштаб текста и графики (+25 %)
+ *   data-scheme="light"  | "dark"       — светлая или тёмная (charcoal) версия обычной палитры
  * Атрибуты независимы: «Крупный текст» и «Высокий контраст» включаются вместе.
+ * «Высокий контраст» важнее тёмной схемы: при нём data-scheme не действует.
  */
 
 :root,
 [data-theme='default'] {
-  /* Основная палитра */
-  --color-paper: #eef3f2;
-  --color-surface: #ffffff;
-  --color-ink: #14212b;
-  --color-ink-muted: #4a5a66;
-  --color-line: #d5dde0;
-  --color-line-strong: #7a8a95;
-  --color-primary: #0b5c6b;
-  --color-primary-hover: #08434f;
-  --color-on-primary: #ffffff;
-  --color-marker: #f2c230;
-  --color-marker-strong: #b07f00;
-  --color-on-marker: #14212b;
-  --color-focus: #1f5fd1;
+  /* Опорные цвета: тёплый Dutch white, «кортовый» зелёный, небесный голубой, лайм-«мяч»
+     и charcoal для тёмной схемы */
+  --dutch: #d7ceaf;
+  --cream: #f6f1e2;
+  --green: #1f6b45;
+  --green-deep: #17573a;
+  --lime: #c6d84a;
+  --sky: #5ba4e6;
+  --blue-deep: #174c85;
+  --charcoal: #323232;
+  --licorice: #1c150f;
+  /* Старые имена — те же роли в новой палитре */
+  --pistachio: var(--lime);
+  --denim: var(--sky);
+
+  /* Основная палитра: фон — Dutch white, карточки и поля — светлый крем того же тона */
+  --color-paper: var(--dutch);
+  --color-surface: var(--cream);
+  --color-surface-2: #ebe3ca;
+  --color-ink: var(--licorice);
+  --color-ink-muted: #4e4636;
+  --color-line: #c9bf9c;
+  --color-line-strong: #7a7058;
+  /* Ссылки и всё «ваше»: глубокий голубой — AA и на креме, и на Dutch white */
+  --color-primary: var(--blue-deep);
+  --color-primary-hover: #0f3966;
+  --color-on-primary: var(--cream);
+  /* Главная кнопка — зелёная «пилюля», текст кремом: 5,7:1 */
+  --color-action: var(--green);
+  --color-action-hover: var(--green-deep);
+  --color-on-action: var(--cream);
+  --color-marker: var(--lime);
+  --color-marker-strong: #4d5a10;
+  --color-on-marker: var(--licorice);
+  --color-sky: var(--sky);
+  --color-sky-soft: #cfe2ef;
+  --color-lime-soft: #e3e8b4;
+  --color-green-soft: #cfe0c4;
+  --color-focus: var(--blue-deep);
+  --color-glass: rgb(246 241 226 / 0.94);
+
+  /* Цветные блоки, как в «теннисном» референсе: глубокий зелёный и текст кремом (7,6:1) */
+  --color-block: var(--green-deep);
+  --color-on-block: var(--cream);
+  --color-block-accent: var(--lime);
+  --color-nav: var(--green-deep);
+
+  --gradient-hero: var(--green-deep);
+  --gradient-cover: linear-gradient(135deg, #d9e6b8 0%, #cfe2ef 55%, #b3d3f0 100%);
+  --gradient-action: var(--green);
 
   /* Статусная палитра: текст/иконка (fg) на подложке (bg) */
   --status-ok-fg: #1d6b35;
-  --status-ok-bg: #e3f4e8;
+  --status-ok-bg: #dcecd2;
   --status-wait-fg: #7a4a00;
-  --status-wait-bg: #fff1d1;
+  --status-wait-bg: #f8e6bb;
   --status-queue-fg: #2a47a3;
-  --status-queue-bg: #e7edff;
+  --status-queue-bg: #dbe3f4;
   --status-bad-fg: #a11d1d;
-  --status-bad-bg: #fce5e3;
+  --status-bad-bg: #f5d9cf;
   --status-warn-fg: #8a3b00;
-  --status-warn-bg: #ffe8d6;
-  --status-off-fg: #4a5a66;
-  --status-off-bg: #ebeef0;
+  --status-warn-bg: #f6dcc0;
+  --status-off-fg: #4e4636;
+  --status-off-bg: #e6dfcb;
 
   /* Группы направлений: фон обложки и цвет линии рисунка (docs/design.md) */
   --cover-team: #ddf0e2;
@@ -55,12 +93,65 @@
   --cover-other: #eceff3;
   --cover-other-tone: #283240;
   --border-width: 1px;
-  --shadow-card: 0 1px 0 var(--color-line);
+  --shadow-card: 0 1px 2px rgb(28 21 15 / 0.08), 0 10px 24px -14px rgb(23 87 58 / 0.35);
+  --shadow-lift: 0 2px 4px rgb(28 21 15 / 0.08), 0 24px 40px -18px rgb(23 87 58 / 0.5);
+  --shadow-nav: 0 -8px 24px -12px rgb(28 21 15 / 0.4);
+}
+
+/* Тёмная схема: charcoal вместо Dutch white, лайм — главное действие, зелёный и голубой —
+   те же цветные блоки */
+:root[data-scheme='dark']:not([data-theme='contrast']) {
+  color-scheme: dark;
+  --color-paper: #262626;
+  --color-surface: #333230;
+  --color-surface-2: #3d3b38;
+  --color-ink: var(--cream);
+  --color-ink-muted: #cfc7b0;
+  --color-line: #4a4741;
+  --color-line-strong: #9a917b;
+  --color-primary: #8cc2f2;
+  --color-primary-hover: #b8d9f7;
+  --color-on-primary: #1c150f;
+  --color-action: var(--lime);
+  --color-action-hover: #d6e46f;
+  --color-on-action: var(--licorice);
+  --color-marker: var(--lime);
+  --color-marker-strong: #d6e46f;
+  --color-on-marker: var(--licorice);
+  --color-sky-soft: #2c4256;
+  --color-lime-soft: #434a24;
+  --color-green-soft: #29402f;
+  --color-focus: #8cc2f2;
+  --color-glass: rgb(38 38 38 / 0.94);
+  --color-block: #17402c;
+  --color-nav: #1a1a1a;
+
+  --gradient-hero: #17402c;
+  --gradient-cover: linear-gradient(135deg, #3e4a2a 0%, #2f4255 100%);
+  --gradient-action: var(--lime);
+
+  --status-ok-fg: #8fe0a4;
+  --status-ok-bg: #263d2d;
+  --status-wait-fg: #ffd27a;
+  --status-wait-bg: #463a20;
+  --status-queue-fg: #aec4ff;
+  --status-queue-bg: #2b3350;
+  --status-bad-fg: #ffaaa2;
+  --status-bad-bg: #4c2a28;
+  --status-warn-fg: #ffbf8a;
+  --status-warn-bg: #4a3222;
+  --status-off-fg: #c3cbd3;
+  --status-off-bg: #424242;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 26px -14px rgb(0 0 0 / 0.7);
+  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.3), 0 24px 40px -18px rgb(0 0 0 / 0.85);
+  --shadow-nav: 0 -8px 24px -12px rgb(0 0 0 / 0.6);
 }
 
 [data-theme='contrast'] {
   --color-paper: #000000;
   --color-surface: #000000;
+  --color-surface-2: #000000;
   --color-ink: #ffffff;
   --color-ink-muted: #d0d0d0;
   --color-line: #ffffff;
@@ -68,10 +159,26 @@
   --color-primary: #ffe600;
   --color-primary-hover: #ffffff;
   --color-on-primary: #000000;
+  --color-action: #ffe600;
+  --color-action-hover: #ffffff;
+  --color-on-action: #000000;
   --color-marker: #ffe600;
   --color-marker-strong: #ffe600;
   --color-on-marker: #000000;
+  --color-sky: #ffffff;
+  --color-sky-soft: #000000;
+  --color-lime-soft: #000000;
+  --color-green-soft: #000000;
+  --color-block: #000000;
+  --color-on-block: #ffffff;
+  --color-block-accent: #ffe600;
+  --color-nav: #000000;
   --color-focus: #ffe600;
+  --color-glass: #000000;
+
+  --gradient-hero: #000000;
+  --gradient-cover: #000000;
+  --gradient-action: #ffe600;
 
   --status-ok-fg: #7dff8f;
   --status-ok-bg: #000000;
@@ -106,6 +213,8 @@
 
   --border-width: 2px;
   --shadow-card: none;
+  --shadow-lift: none;
+  --shadow-nav: none;
 }
 
 :root,
@@ -120,10 +229,12 @@
 :root,
 [data-theme],
 [data-text] {
-  /* Шрифты */
-  --font-text: 'Golos Text Variable', 'Golos Text', 'Segoe UI', Roboto, Arial, sans-serif;
-  --font-display:
-    'Unbounded Variable', 'Unbounded', 'Golos Text Variable', 'Segoe UI', Arial, sans-serif;
+  /* Шрифты: широкий гротеск Unbounded для заголовков, геометрический Jost — для текста,
+     рукописный — для акцентов. Все три раздаются вместе с приложением — на любом устройстве
+     одинаковые */
+  --font-text: 'Jost Variable', 'Jost', 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-display: 'Unbounded Variable', 'Unbounded', 'Jost Variable', 'Segoe UI', Arial, sans-serif;
+  --font-script: 'Caveat Variable', 'Caveat', 'Segoe Script', cursive;
 
   /* Размеры в rem (уважают настройку шрифта браузера), умножены на масштаб темы.
      База 18 px = 1.125rem. Размер шрифта на html не меняется, иначе rem перестанет быть 16 px */
@@ -139,8 +250,10 @@
   --fs-display: calc(
     2rem * var(--text-scale)
   ); /* 32 px — число на листке даты, заголовок на десктопе */
+  --fs-hero: calc(clamp(2.25rem, 1.4rem + 3.6vw, 4.25rem) * var(--text-scale)); /* 36–68 px */
   --lh-text: 1.45;
-  --lh-tight: 1.15;
+  --lh-tight: 1.1;
+  --tracking-display: -0.02em;
 
   /* Отступы: шаг 4 px */
   --space-1: calc(0.25rem * var(--text-scale)); /* 4 */
@@ -149,16 +262,23 @@
   --space-4: calc(1rem * var(--text-scale)); /* 16 */
   --space-5: calc(1.5rem * var(--text-scale)); /* 24 */
   --space-6: calc(2rem * var(--text-scale)); /* 32 */
+  --space-7: calc(3rem * var(--text-scale)); /* 48 */
 
-  --radius-control: calc(0.5rem * var(--text-scale)); /* 8 */
-  --radius-card: calc(1rem * var(--text-scale)); /* 16 */
+  --radius-control: calc(0.75rem * var(--text-scale)); /* 12 */
+  --radius-card: calc(1.75rem * var(--text-scale)); /* 28 — мягкая карточка, как в референсе */
+  --radius-inner: calc(1.25rem * var(--text-scale)); /* 20 — картинка внутри карточки */
+  --radius-pill: 999px;
   --tap-min: calc(3rem * var(--text-scale)); /* 48 px, не меньше 44 по ТЗ */
 
   --focus-ring: 3px solid var(--color-focus);
   --focus-offset: 3px;
 
+  /* Движение: короткие ответы на действия и мягкое появление содержимого */
   --motion-fast: 150ms;
   --motion-base: 250ms;
+  --motion-enter: 450ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 body,
@@ -173,5 +293,6 @@ body,
   [data-text] {
     --motion-fast: 0ms;
     --motion-base: 0ms;
+    --motion-enter: 0ms;
   }
 }

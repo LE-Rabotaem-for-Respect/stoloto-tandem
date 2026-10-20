@@ -42,14 +42,19 @@ export function LoginPage() {
   const registerLink = next === '/' ? '/register' : `/register?next=${encodeURIComponent(next)}`;
   return (
     <div className="page page-narrow">
-      <h1>Вход</h1>
-      <LoginForm onSignedIn={done} />
-      <p>
-        Нет аккаунта?{' '}
-        <Link to={registerLink} state={carry} replace>
-          Зарегистрироваться
-        </Link>
-      </p>
+      <div className="panel auth-panel">
+        <p className="auth-kicker" aria-hidden="true">
+          <span className="script-accent">с возвращением!</span>
+        </p>
+        <h1>Вход</h1>
+        <LoginForm onSignedIn={done} />
+        <p className="auth-switch">
+          Нет аккаунта?{' '}
+          <Link to={registerLink} state={carry} replace>
+            Зарегистрироваться
+          </Link>
+        </p>
+      </div>
       <QuickLogin onSignedIn={done} />
     </div>
   );
@@ -62,14 +67,19 @@ export function RegisterPage() {
   const loginLink = next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`;
   return (
     <div className="page page-narrow">
-      <h1>Регистрация</h1>
-      <RegisterForm onSignedIn={done} />
-      <p>
-        Уже есть аккаунт?{' '}
-        <Link to={loginLink} state={carry} replace>
-          Войти
-        </Link>
-      </p>
+      <div className="panel auth-panel">
+        <p className="auth-kicker" aria-hidden="true">
+          <span className="script-accent">давайте знакомиться!</span>
+        </p>
+        <h1>Регистрация</h1>
+        <RegisterForm onSignedIn={done} />
+        <p className="auth-switch">
+          Уже есть аккаунт?{' '}
+          <Link to={loginLink} state={carry} replace>
+            Войти
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
@@ -95,7 +105,7 @@ export const EditEventPage = () => (
 
 export const CreateEventPage = () => (
   <RequireAuth>
-    <div className="page page-narrow">
+    <div className="page page-narrow panel">
       <h1>Создать мероприятие</h1>
       <CreateEventForm />
     </div>
@@ -117,7 +127,7 @@ function Profile() {
   const me = useMe();
   if (!me.data) return null;
   return (
-    <div className="page">
+    <div className="page page-narrow panel">
       <h1>Профиль</h1>
       <dl className="facts">
         <dt>Имя</dt>
