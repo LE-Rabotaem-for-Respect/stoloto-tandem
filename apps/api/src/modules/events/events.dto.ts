@@ -12,7 +12,7 @@ import type { EventLevel, EventMode, SportCategory } from '@tandem/domain';
 import { Transform, Type } from 'class-transformer';
 import {
   IsDate,
-  IsEmpty,
+  Equals,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -150,8 +150,12 @@ export class CreateEventDto {
 // Поле изменения: не передано — не меняется; передано — проверяется, null не пропускается
 const present = () => ValidateIf((_dto: object, value: unknown) => value !== undefined);
 
-// Дату, время и направление после публикации не меняют (ТЗ 2.2): поле в теле — понятный отказ
-const notEditable = (message: string) => IsEmpty({ message });
+// Дату, время и направление после публикации не меняют (ТЗ 2.2): поле в теле — понятный
+// отказ при любом значении, и null тоже
+const notEditable = (message: string) => (target: object, property: string) => {
+  ValidateIf((_dto: object, value: unknown) => value !== undefined)(target, property);
+  Equals(undefined, { message })(target, property);
+};
 
 /**
  * Изменение мероприятия после публикации (ТЗ 2.2, таблица): название, описание,

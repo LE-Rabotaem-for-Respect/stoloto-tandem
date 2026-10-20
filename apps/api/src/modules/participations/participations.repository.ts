@@ -70,6 +70,13 @@ export class ParticipationsRepository {
     });
   }
 
+  /** Записи, при которых режим записи не меняется (ТЗ 2.2): заявка, участник, лист ожидания. */
+  activeCount(eventId: string, tx: Db): Promise<number> {
+    return tx.participation.count({
+      where: { eventId, status: { in: ['pending', 'confirmed', 'waitlist'] } },
+    });
+  }
+
   confirmedCount(eventId: string, tx: Db): Promise<number> {
     return tx.participation.count({ where: { eventId, status: 'confirmed' } });
   }

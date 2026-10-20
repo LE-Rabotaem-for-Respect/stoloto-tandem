@@ -3,10 +3,11 @@ import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/configure-app';
 import { STAND_CONFIG } from '../src/core/config';
+import { EventBus } from '../src/core/event-bus';
 import { hashPassword } from '../src/modules/auth/password';
 import type { ParticipationStatus } from '../src/generated/prisma/client';
 import { databaseUrl, prisma } from './db';
@@ -190,6 +191,7 @@ describe('PATCH /events/:id — что не меняется', () => {
       'newSport',
       'Направление после публикации не меняется',
     ],
+    ['дата начала null', { startsAt: null }, 'startsAt', 'Дату и время меняют через «Перенести»'],
     ['лишнее поле', { organizerUserId: randomUUID() }, 'organizerUserId', 'Лишнее поле'],
     ['короткое название', { title: 'Бег' }, 'title', 'Название — от 5 до 80 символов'],
   ])('%s — 400 с понятной причиной у поля', async (_, body, field, message) => {
@@ -380,5 +382,40 @@ describe('PATCH /events/:id — одновременно с записью', () 
     expect(response.status).toBe(400);
     expect(response.body.fields).toHaveProperty('mode');
     expect((await prisma.event.findUniqueOrThrow({ where: { id } })).mode).toBe('free');
+  });
+});
+
+describe('PATCH /events/:id — событие EventUpdated', () => {
+  afterEach(() => vi.restoreAllMocks());
+  // Доменное событие плоское: { type, eventId, fields, actorId, occurredAt }
+  const updates = (spy: { mock: { calls: unknown[][] } }) =>
+    spy.mock.calls.flat().filter((event) => (event as { type: string }).type === 'EventUpdated');
+
+  it('после изменения — со списком реально изменённых полей', async () => {
+    const id = await event();
+    const published = vi.spyOn(app.get(EventBus), 'publish');
+    const response = await patch(igor, id, {
+      title: 'Футбол 8×8 по четвергам',
+      level: 'amateur',
+      participantInfo: 'Раздевалка с 18:00',
+    });
+    expect(response.status).toBe(200);
+    const [updated, ...more] = updates(published);
+    expect(more).toEqual([]);
+    expect(updated).toMatchObject({
+      eventId: id,
+      fields: ['title', 'participantInfo'],
+      actorId: igor.id,
+    });
+  });
+
+  it('без изменений и при отказе — события нет', async () => {
+    const id = await event();
+    await participations(id, 'confirmed');
+    const published = vi.spyOn(app.get(EventBus), 'publish');
+    expect((await patch(igor, id, { title: 'Футбол 7×7 по средам' })).status).toBe(200);
+    expect((await patch(igor, id, { mode: 'approval', title: 'Новое название' })).status).toBe(400);
+    expect((await patch(anna, id, { title: 'Чужое название' })).status).toBe(403);
+    expect(updates(published)).toEqual([]);
   });
 });
