@@ -1,20 +1,48 @@
 import { Injectable } from '@nestjs/common';
 import { participationMachine } from '@tandem/domain';
-import type { ParticipationStatus } from '@tandem/domain';
+import type { Action, ParticipationStatus } from '@tandem/domain';
 import { isUUID } from 'class-validator';
 import { Clock } from '../../core/clock';
 import { ApiError } from '../../core/errors';
 import type { ErrorFields } from '../../core/errors';
 import { EventBus, domainEvent } from '../../core/event-bus';
-import { canJoin, canLeave } from '../../core/policies';
+import {
+  canDecideParticipation,
+  canJoin,
+  canLeave,
+  canViewParticipants,
+  participationActions,
+} from '../../core/policies';
 import type { Actor } from '../../core/policies';
 import { ParticipationsRepository } from './participations.repository';
-import type { Db, JoinableEvent } from './participations.repository';
+import type { Db, JoinableEvent, ParticipantRow } from './participations.repository';
 
 export interface ParticipationView {
   id: string;
   eventId: string;
   status: ParticipationStatus;
+}
+
+/** Запись в «Участниках и заявках»: почты участника здесь нет — организатору она не нужна. */
+export interface ParticipantView {
+  id: string;
+  status: ParticipationStatus;
+  user: { id: string; name: string };
+  answer: string | null;
+  decisionReason: string | null;
+  createdAt: Date;
+  decidedAt: Date | null;
+  actions: Action[];
+}
+
+export interface ParticipantsView {
+  eventId: string;
+  capacity: number | null;
+  confirmedCount: number;
+  pending: ParticipantView[];
+  confirmed: ParticipantView[];
+  waitlist: ParticipantView[];
+  archive: ParticipantView[];
 }
 
 // Ответ нужен, только если организатор задал вопрос, и только к нему
@@ -118,6 +146,109 @@ export class ParticipationsService {
           }),
         );
         return { id: active.id, eventId: event.id, status };
+      }),
+    );
+  }
+
+  /**
+   * «Участники и заявки» (ТЗ 2.5): ждут решения, участники, лист ожидания и архив
+   * (отклонённые и отменённые). Организатору — с действиями у заявок, администратору —
+   * только просмотр.
+   */
+  async participants(actor: Actor, eventId: string): Promise<ParticipantsView> {
+    const event = isUUID(eventId) ? await this.participations.findEvent(eventId) : null;
+    if (!event) throw new ApiError('event_not_available');
+    const decision = canViewParticipants(actor, event);
+    if (!decision.allowed) throw new ApiError(decision.code);
+
+    const rows = await this.participations.listByEvent(event.id);
+    const confirmedCount = rows.filter((row) => row.status === 'confirmed').length;
+    const card = {
+      ...event,
+      hasSeats: event.capacity === null || confirmedCount < event.capacity,
+    };
+    const now = this.clock.now();
+    const view = (row: ParticipantRow): ParticipantView => ({
+      id: row.id,
+      status: row.status,
+      user: row.user,
+      answer: row.answer,
+      decisionReason: row.decisionReason,
+      createdAt: row.createdAt,
+      decidedAt: row.decidedAt,
+      actions: participationActions(actor, card, row.status, now),
+    });
+    const group = (...statuses: ParticipationStatus[]) =>
+      rows.filter((row) => statuses.includes(row.status)).map(view);
+    return {
+      eventId: event.id,
+      capacity: event.capacity,
+      confirmedCount,
+      pending: group('pending'),
+      confirmed: group('confirmed'),
+      waitlist: group('waitlist'),
+      archive: group('rejected', 'cancelled'),
+    };
+  }
+
+  /** Принять заявку: под блокировкой события, места считает автомат (ТЗ 2.4). */
+  accept(actor: Actor, participationId: string): Promise<ParticipationView> {
+    return this.decide(actor, participationId, 'accept', null);
+  }
+
+  /** Отклонить заявку, причина необязательна; после отказа повторной заявки нет. */
+  reject(actor: Actor, participationId: string, reason?: string): Promise<ParticipationView> {
+    return this.decide(actor, participationId, 'reject', reason || null);
+  }
+
+  private async decide(
+    actor: Actor,
+    participationId: string,
+    action: 'accept' | 'reject',
+    reason: string | null,
+  ): Promise<ParticipationView> {
+    const eventId = isUUID(participationId)
+      ? await this.participations.eventIdOf(participationId)
+      : null;
+    if (!eventId) throw new ApiError('not_found');
+    return this.bus.afterCommit((emit) =>
+      this.participations.transaction(async (tx) => {
+        const event = await this.lock(eventId, tx);
+        const now = this.clock.now();
+        const decision = canDecideParticipation(actor, event, now);
+        if (!decision.allowed) throw new ApiError(decision.code);
+        // canDecideParticipation пускает только организатора, а он вошёл
+        if (actor.role === 'guest') throw new ApiError('unauthorized');
+
+        // Статус читается под блокировкой: параллельное решение уже применено или ждёт
+        const participation = await this.participations.findById(participationId, tx);
+        if (!participation) throw new ApiError('not_found');
+        const confirmed = await this.participations.confirmedCount(event.id, tx);
+        const status = participationMachine.nextState(participation.status, action, {
+          mode: event.mode,
+          hasSeats: event.capacity === null || confirmed < event.capacity,
+        });
+        const changed = await this.participations.decide(
+          participation.id,
+          participation.status,
+          status,
+          { by: actor.userId, reason, at: now },
+          tx,
+        );
+        if (!changed) throw new ApiError('conflict');
+
+        const ids = {
+          participationId: participation.id,
+          eventId: event.id,
+          userId: participation.userId,
+        };
+        const meta = { actorId: actor.userId, occurredAt: now };
+        emit(
+          action === 'accept'
+            ? domainEvent('ParticipationConfirmed', { ...ids, via: 'accept', ...meta })
+            : domainEvent('ParticipationRejected', { ...ids, reason, ...meta }),
+        );
+        return { id: participation.id, eventId: event.id, status };
       }),
     );
   }
