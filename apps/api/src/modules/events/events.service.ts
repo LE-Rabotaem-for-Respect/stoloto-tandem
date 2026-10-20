@@ -295,6 +295,27 @@ export class EventsService {
     };
   }
 
+  /**
+   * Мероприятие глазами уведомлений (ТЗ 3.3): название и аккаунт организатора —
+   * пользователь или представитель организации. Права не проверяются: вызывают
+   * обработчики доменных событий, а не маршруты.
+   */
+  async notificationTarget(id: string): Promise<{ title: string; organizerUserId: string } | null> {
+    const event = await this.events.findOrganizerOf(id);
+    const organizerUserId = event?.organizerUserId ?? event?.organizerOrg?.ownerUserId;
+    return event && organizerUserId ? { title: event.title, organizerUserId } : null;
+  }
+
+  /** Кто организатор мероприятия — пользователь или организация (для других модулей). */
+  async organizerOf(
+    id: string,
+  ): Promise<{ organizerUserId: string | null; organizerOrgId: string | null } | null> {
+    const event = await this.events.findOrganizerOf(id);
+    return (
+      event && { organizerUserId: event.organizerUserId, organizerOrgId: event.organizerOrgId }
+    );
+  }
+
   private startsRange(query: EventFeedQuery, now: Date): Partial<TimeRange> | undefined {
     const fields: ErrorFields = {};
     if (query.date && (query.from || query.to)) {

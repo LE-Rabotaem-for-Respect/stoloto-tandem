@@ -105,6 +105,14 @@ export class ParticipationsRepository {
     return row?.eventId ?? null;
   }
 
+  async signedUpUserIds(eventId: string): Promise<string[]> {
+    const rows = await this.prisma.participation.findMany({
+      where: { eventId, status: { in: ['pending', 'confirmed', 'waitlist'] } },
+      select: { userId: true },
+    });
+    return rows.map((row) => row.userId);
+  }
+
   findById(id: string, tx: Db): Promise<ParticipationRow | null> {
     return tx.participation.findUnique({ where: { id }, select: rowSelect });
   }
