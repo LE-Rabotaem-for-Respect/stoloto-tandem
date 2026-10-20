@@ -1,8 +1,9 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StrictMode, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router';
+import type { InitialEntry } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppProviders, AppRoutes, createQueryClient } from '../src/App';
 import { useAuthAction } from '../src/features/auth';
@@ -64,13 +65,24 @@ function fakeApi({ demoMode = false, signedIn = null as Me | null, meDown = fals
     }
   });
   vi.stubGlobal('fetch', fetchMock);
-  return { calls };
+  // Сменить пользователя на сервере без входа и выхода — как вход в другой вкладке
+  const setMe = (next: Me | null) => {
+    me = next;
+  };
+  return { calls, setMe };
 }
 
-function renderApp(path: string, routes = <AppRoutes />) {
+function renderApp(
+  path: string | InitialEntry[],
+  routes = <AppRoutes />,
+  client = createQueryClient(),
+) {
+  const entries = typeof path === 'string' ? [path] : path;
   return render(
-    <AppProviders client={createQueryClient()}>
-      <MemoryRouter initialEntries={[path]}>{routes}</MemoryRouter>
+    <AppProviders client={client}>
+      <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
+        {routes}
+      </MemoryRouter>
     </AppProviders>,
   );
 }
@@ -748,5 +760,100 @@ describe('отложенное действие — только ответ на
     } finally {
       now.mockRestore();
     }
+  });
+
+  it('запись истории с действием, которого эта вкладка не выдавала, ничего не запускает', async () => {
+    // Старая запись экрана входа с действием в state — как после «Сменить аккаунт» и «Назад»
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp(
+      [
+        '/events/1',
+        {
+          pathname: '/login',
+          search: '?next=%2Fevents%2F1',
+          state: { pendingAction: { path: '/events/1', intent: 'join', token: 0 } },
+        },
+      ],
+      routes(<JoinButton onJoin={onJoin} />),
+    );
+    await signIn('igor@demo');
+    await screen.findByRole('button', { name: 'Записаться' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).not.toHaveBeenCalled();
+  });
+
+  it('гость ушёл со входа по ссылке и вошёл позже: прежнее действие для другого не выполняется', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp(
+      '/events/1',
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route index element={<BackButton />} />
+          <Route path="events/:id" element={<JoinButton onJoin={onJoin} />} />
+          <Route
+            path="login"
+            element={
+              <>
+                <BackButton />
+                <LoginPage />
+              </>
+            }
+          />
+        </Route>
+      </Routes>,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    await screen.findByLabelText('Почта');
+    // Ушёл по логотипу, позже вошёл через шапку — Анна
+    await userEvent.click(screen.getByRole('link', { name: 'Тандем' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Войти' }));
+    await signIn('anna@demo');
+    await screen.findByRole('button', { name: 'Сменить аккаунт' });
+    // «Сменить аккаунт», затем «Назад», пока не вернётся старый экран входа с действием
+    await userEvent.click(screen.getByRole('button', { name: 'Сменить аккаунт' }));
+    for (let step = 0; step < 3; step += 1) {
+      await userEvent.click(await screen.findByRole('button', { name: 'Назад' }));
+    }
+    await signIn('igor@demo');
+    await screen.findByRole('button', { name: 'Сменить аккаунт' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).not.toHaveBeenCalled();
+  });
+
+  it('сменился пользователь на той же странице — действие прежнего не выполняется', async () => {
+    const { setMe } = fakeApi();
+    const client = createQueryClient();
+    const onJoin = vi.fn();
+    renderApp('/events/1', routes(<RevealLater onJoin={onJoin} />), client);
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    memberAfterSignIn = true;
+    await signIn();
+    await screen.findByText('Вы участник');
+
+    // В другой вкладке вошёл Игорь: без навигации и без нажатий на этой странице
+    setMe(igor);
+    await act(() => client.invalidateQueries({ queryKey: ['me'] }));
+    await screen.findByText('Игорь');
+    act(() => reveal());
+    await screen.findByRole('button', { name: 'Записаться' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).not.toHaveBeenCalled();
+  });
+
+  it('щелчок без нажатия указателя (диктор, голосовое управление) тоже выбрасывает действие', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp('/events/1', routes(<RevealLater onJoin={onJoin} />));
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    memberAfterSignIn = true;
+    await signIn();
+    await screen.findByText('Вы участник');
+    fireEvent.click(document.body);
+    act(() => reveal());
+    await screen.findByRole('button', { name: 'Записаться' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).not.toHaveBeenCalled();
   });
 });

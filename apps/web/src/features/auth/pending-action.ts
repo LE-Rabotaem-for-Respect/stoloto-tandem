@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useMe } from './api';
 import { pendingActionFrom } from './return-path';
@@ -25,7 +25,8 @@ const listeners = new Set<() => void>();
 // Действие — ответ на клик гостя сразу после входа. Если человек начал действовать сам
 // (нажал, коснулся, ввёл), оно больше не нужно: иначе кнопка, которая появилась от его
 // же действия, например «Записаться» после «Отменить запись», сработала бы без клика
-const OWN_ACTIONS = ['pointerdown', 'keydown'] as const;
+// (click — для экранного диктора и голосового управления: они нажимают без указателя)
+const OWN_ACTIONS = ['pointerdown', 'keydown', 'click'] as const;
 const discardOnOwnAction = () => setSlot(null);
 
 function setSlot(next: Slot | null) {
@@ -42,6 +43,21 @@ function setSlot(next: Slot | null) {
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+/**
+ * Номер последнего действия, выданного кликом гостя в этой вкладке. Действие из
+ * `state` навигации принимается, только если несёт этот номер, и один раз: старые
+ * записи истории — вход, брошенный раньше, «Назад» после смены аккаунта — его не
+ * запустят. Номер сбрасывается и при смене пользователя вне того входа, что его несёт.
+ */
+let issuedToken: number | null = null;
+let nextToken = 1;
+
+export function issuePendingAction(path: string, intent: string): PendingAction {
+  issuedToken = nextToken;
+  nextToken += 1;
+  return { path, intent, token: issuedToken };
 }
 
 /** Слот меняется — хуки на странице проверяют, не их ли это действие. */
@@ -74,15 +90,20 @@ export function usePendingActionRelay() {
   const me = useMe();
   const userId = me.data?.id ?? null;
   const { pathname, search, hash, key, state } = location;
+  const previousUserId = useRef(userId);
 
   useEffect(() => {
     const pending = pendingActionFrom(state);
+    const carried = pending !== null && pending.token === issuedToken;
+    // Вошёл или вышел кто-то не тем входом, что несёт выданное действие, — оно не нужно
+    if (previousUserId.current !== userId && !carried) issuedToken = null;
+    previousUserId.current = userId;
     // На экранах входа и регистрации действие ещё в пути — его несёт их state
     if (pending && pending.path === pathname) {
+      const fresh = userId !== null && carried;
+      if (fresh) issuedToken = null;
       setSlot(
-        userId
-          ? { ...pending, userId, expiresAt: performance.now() + PENDING_ACTION_TTL_MS }
-          : null,
+        fresh ? { ...pending, userId, expiresAt: performance.now() + PENDING_ACTION_TTL_MS } : null,
       );
       void navigate(pathname + search + hash, { replace: true, state: null });
       return;
@@ -91,5 +112,11 @@ export function usePendingActionRelay() {
   }, [pathname, search, hash, key, state, userId, navigate]);
 
   // Каркас размонтирован — оставленное действие никому не принадлежит
-  useEffect(() => () => setSlot(null), []);
+  useEffect(
+    () => () => {
+      issuedToken = null;
+      setSlot(null);
+    },
+    [],
+  );
 }
