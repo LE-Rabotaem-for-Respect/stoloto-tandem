@@ -1,5 +1,5 @@
 import { TIME_ZONE } from '@tandem/domain';
-import type { Action } from '@tandem/domain';
+import type { Action, ActionCode } from '@tandem/domain';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useLocation } from 'react-router';
@@ -20,44 +20,69 @@ const when = new Intl.DateTimeFormat('ru-RU', {
   minute: '2-digit',
 });
 
-const fieldError = (error: unknown) =>
-  error instanceof ApiRequestError ? (error.fields.text ?? error.fields.parentId) : undefined;
-const formError = (error: unknown) => {
-  if (!error || fieldError(error)) return undefined;
-  return error instanceof ApiRequestError ? error.message : 'Не получилось. Попробуйте ещё раз';
-};
+/** Текст ошибки api для формы: ошибка поля важнее общей. */
+function errorText(error: unknown): string | undefined {
+  if (!error) return undefined;
+  if (!(error instanceof ApiRequestError)) return 'Не получилось. Попробуйте ещё раз';
+  return error.fields.text ?? error.fields.parentId ?? error.message;
+}
 
-const can = (message: MessageView, code: Action['code']) =>
+const allowed = (message: MessageView, code: ActionCode) =>
   message.actions.some((action) => action.code === code && action.enabled);
+
+/** Какая форма открыта: ошибка api показывается только у неё. */
+type Open =
+  | { kind: 'ask' }
+  | { kind: 'reply'; threadId: string }
+  | { kind: 'edit'; messageId: string }
+  | { kind: 'delete'; messageId: string };
+
+interface Controls {
+  open: Open | null;
+  setOpen: (open: Open | null) => void;
+  send: (change: MessageChange) => void;
+  error: string | undefined;
+  pending: boolean;
+}
 
 /** Поле сообщения: вопрос, ответ или правка — с ошибкой api у поля. */
 function MessageForm({
   label,
   submitText,
   initial = '',
+  controls,
   onSubmit,
-  onCancel,
+  cancellable = true,
 }: {
   label: string;
   submitText: string;
   initial?: string;
-  onSubmit: (text: string, done: () => void) => void;
-  onCancel?: () => void;
+  controls: Controls;
+  onSubmit: (text: string) => void;
+  cancellable?: boolean;
 }) {
   const [text, setText] = useState(initial);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    onSubmit(text, () => setText(''));
+    onSubmit(text);
   };
   return (
     <form className="discussion-form" onSubmit={submit}>
-      <MessageFormBody label={label} text={text} onText={setText} />
+      <TextAreaField
+        label={label}
+        value={text}
+        rows={3}
+        maxLength={MESSAGE_MAX_LENGTH}
+        required
+        error={controls.error}
+        onChange={(event) => setText(event.target.value)}
+      />
       <div className="discussion-actions">
-        <button className="button" type="submit">
+        <button className="button" type="submit" disabled={controls.pending}>
           {submitText}
         </button>
-        {onCancel && (
-          <button className="button" type="button" onClick={onCancel}>
+        {cancellable && (
+          <button className="button" type="button" onClick={() => controls.setOpen(null)}>
             Отмена
           </button>
         )}
@@ -66,109 +91,78 @@ function MessageForm({
   );
 }
 
-function MessageFormBody({
-  label,
-  text,
-  onText,
-}: {
-  label: string;
-  text: string;
-  onText: (text: string) => void;
-}) {
-  return (
-    <TextAreaField
-      label={label}
-      value={text}
-      rows={3}
-      maxLength={MESSAGE_MAX_LENGTH}
-      required
-      onChange={(event) => onText(event.target.value)}
-    />
-  );
-}
-
 /**
  * Сообщение: автор (организация — своим названием), метка «Организатор», время и
  * «изменено»; у скрытого и удалённого — заглушка, автор скрытого видит причину.
  */
-function Message({
-  message,
-  send,
-  error,
-  pending,
-}: {
-  message: MessageView;
-  send: (change: MessageChange, done?: () => void) => void;
-  error: unknown;
-  pending: boolean;
-}) {
-  const [mode, setMode] = useState<'view' | 'edit' | 'delete'>('view');
-  const errorHere = mode !== 'view' ? error : undefined;
+function Message({ message, controls }: { message: MessageView; controls: Controls }) {
+  const { open, setOpen } = controls;
+  const editing = open?.kind === 'edit' && open.messageId === message.id;
+  const deleting = open?.kind === 'delete' && open.messageId === message.id;
   return (
     <article className="message" aria-label={`Сообщение: ${message.author.name}`}>
       <p className="message-meta">
         <span className="message-author">{message.author.name}</span>
         {message.isOrganizer && <span className="message-organizer">Организатор</span>}
         <time dateTime={message.createdAt}>{when.format(new Date(message.createdAt))}</time>
-        {message.edited && <span className="message-edited">изменено</span>}
+        {message.edited && <span>изменено</span>}
       </p>
-      {message.text !== null ? (
-        mode === 'edit' ? (
-          <MessageForm
-            label="Изменить сообщение"
-            submitText="Сохранить"
-            initial={message.text}
-            onSubmit={(text) =>
-              send({ kind: 'edit', id: message.id, text }, () => setMode('view'))
-            }
-            onCancel={() => setMode('view')}
-          />
-        ) : (
-          <p className="message-text">{message.text}</p>
-        )
-      ) : (
+      {message.text === null ? (
         <p className="message-placeholder">
           {message.placeholder}
           {message.moderationReason && `. Причина: ${message.moderationReason}`}
         </p>
+      ) : editing ? (
+        <MessageForm
+          label="Изменить сообщение"
+          submitText="Сохранить"
+          initial={message.text}
+          controls={controls}
+          onSubmit={(text) => controls.send({ kind: 'edit', id: message.id, text })}
+        />
+      ) : (
+        <p className="message-text">{message.text}</p>
       )}
-      {mode === 'delete' && (
+      {deleting && (
         <div className="discussion-confirm">
           <p>Удалить сообщение? Вместо него останется «Сообщение удалено автором».</p>
+          {controls.error && (
+            <p className="form-error" role="alert">
+              {controls.error}
+            </p>
+          )}
           <div className="discussion-actions">
             <button
               className="button"
               type="button"
-              disabled={pending}
-              onClick={() => send({ kind: 'remove', id: message.id }, () => setMode('view'))}
+              disabled={controls.pending}
+              onClick={() => controls.send({ kind: 'remove', id: message.id })}
             >
               Удалить
             </button>
-            <button className="button" type="button" onClick={() => setMode('view')}>
+            <button className="button" type="button" onClick={() => setOpen(null)}>
               Отмена
             </button>
           </div>
         </div>
       )}
-      {errorHere !== undefined && fieldError(errorHere) && (
-        <p className="field-error" role="alert">
-          {fieldError(errorHere)}
-        </p>
-      )}
-      {errorHere !== undefined && formError(errorHere) && (
-        <p className="form-error" role="alert">
-          {formError(errorHere)}
-        </p>
-      )}
-      {mode === 'view' && (can(message, 'edit_message') || can(message, 'delete_message')) && (
+      {!editing && !deleting && (
         <div className="discussion-actions">
-          {can(message, 'edit_message') && (
-            <button className="button" type="button" onClick={() => setMode('edit')}>
+          {allowed(message, 'edit_message') && (
+            <button
+              className="button"
+              type="button"
+              onClick={() => setOpen({ kind: 'edit', messageId: message.id })}
+            >
               Изменить
             </button>
           )}
-          {can(message, 'delete_message') && (
-            <button className="button" type="button" onClick={() => setMode('delete')}>
+          {allowed(message, 'delete_message') && (
+            <button
+              className="button"
+              type="button"
+              onClick={() => setOpen({ kind: 'delete', messageId: message.id })}
+            >
               Удалить
             </button>
           )}
@@ -182,90 +176,93 @@ function Message({
 function Thread({
   thread,
   canPost,
-  send,
-  error,
-  pending,
-  active,
-  setActive,
+  controls,
 }: {
   thread: ThreadView;
   canPost: boolean;
-  send: (change: MessageChange, done?: () => void) => void;
-  error: unknown;
-  pending: boolean;
-  active: string | null;
-  setActive: (key: string | null) => void;
+  controls: Controls;
 }) {
-  const replying = active === `reply:${thread.id}`;
+  const replying = controls.open?.kind === 'reply' && controls.open.threadId === thread.id;
   return (
     <li className="thread">
-      <Message message={thread} send={send} error={error} pending={pending} />
+      <Message message={thread} controls={controls} />
       {thread.replies.length > 0 && (
-        <ul className="thread-replies" aria-label="Ответы">
+        <ul className="thread-replies" aria-label={`Ответы: ${thread.author.name}`}>
           {thread.replies.map((reply) => (
             <li key={reply.id}>
-              <Message message={reply} send={send} error={error} pending={pending} />
+              <Message message={reply} controls={controls} />
             </li>
           ))}
         </ul>
       )}
-      {canPost && thread.status === 'visible' && (
-        <div className="thread-reply">
-          {replying ? (
-            <>
-              <MessageForm
-                label={`Ответ: ${thread.author.name}`}
-                submitText="Ответить"
-                onSubmit={(text) =>
-                  send({ kind: 'post', text, parentId: thread.id }, () => setActive(null))
-                }
-                onCancel={() => setActive(null)}
-              />
-              {fieldError(error) && (
-                <p className="field-error" role="alert">
-                  {fieldError(error)}
-                </p>
-              )}
-            </>
-          ) : (
-            <button className="button" type="button" onClick={() => setActive(`reply:${thread.id}`)}>
+      {canPost &&
+        thread.status === 'visible' &&
+        (replying ? (
+          <MessageForm
+            label={`Ответ: ${thread.author.name}`}
+            submitText="Ответить"
+            controls={controls}
+            onSubmit={(text) => controls.send({ kind: 'post', text, parentId: thread.id })}
+          />
+        ) : (
+          <div className="discussion-actions">
+            <button
+              className="button"
+              type="button"
+              onClick={() => controls.setOpen({ kind: 'reply', threadId: thread.id })}
+            >
               Ответить
             </button>
-          )}
-        </div>
-      )}
+          </div>
+        ))}
     </li>
   );
 }
 
 /**
  * Обсуждение мероприятия (ТЗ 2.7): читают все, кому видна карточка, в том числе гость;
- * писать — по `post_message` из `actions[]` карточки. Гостю — вход с возвратом к карточке.
- * Новые сообщения подгружаются при открытии карточки и каждые 30 секунд.
+ * писать — по `post_message` из `actions[]` карточки, гостю — вход с возвратом к карточке.
+ * Сообщения загружаются при открытии карточки и подгружаются каждые 30 секунд.
  */
 export function Discussion({ eventId, post }: { eventId: string; post: Action | undefined }) {
   const discussion = useDiscussion(eventId);
   const change = useMessageChange(eventId);
   const location = useLocation();
-  // Какая форма открыта: ошибка api показывается только у неё
-  const [active, setActive] = useState<string | null>(null);
-  const canPost = post?.enabled === true;
+  const [open, setOpenState] = useState<Open | null>(null);
+  // Форма вопроса после отправки очищается: новый ключ — новое пустое поле
+  const [askKey, setAskKey] = useState(0);
 
-  const send = (body: MessageChange, done?: () => void) => {
-    change.mutate(body, { onSuccess: () => done?.() });
+  const controls: Controls = {
+    open,
+    setOpen: (next) => {
+      change.reset();
+      setOpenState(next);
+    },
+    send: (body) =>
+      change.mutate(body, {
+        onSuccess: () => {
+          setOpenState(null);
+          if (body.kind === 'post' && !body.parentId) setAskKey((key) => key + 1);
+        },
+      }),
+    error: errorText(change.error),
+    pending: change.isPending,
   };
-  const askError = active === 'ask' ? change.error : undefined;
+  const askControls: Controls = {
+    ...controls,
+    error: open?.kind === 'ask' ? controls.error : undefined,
+  };
+  const canPost = post?.enabled === true;
 
   return (
     <section id="discussion" className="event-card-section" aria-labelledby="discussion-title">
       <h2 id="discussion-title">Обсуждение</h2>
       {discussion.isPending && <p role="status">Загрузка…</p>}
+      {/* Обсуждение — второстепенный блок: его сбой не объявляется поверх статуса карточки */}
       {discussion.error && (
-        <p role="alert">Не удалось загрузить обсуждение. Попробуйте обновить страницу</p>
+        <p className="event-card-soon">Не удалось загрузить обсуждение. Обновите страницу</p>
       )}
-      {discussion.data?.length === 0 && (
-        <p className="event-card-soon">Вопросов пока нет — задайте первый.</p>
-      )}
+      {discussion.data?.length === 0 && <p className="event-card-soon">Вопросов пока нет.</p>}
       {discussion.data && discussion.data.length > 0 && (
         <ul className="discussion">
           {discussion.data.map((thread) => (
@@ -273,45 +270,41 @@ export function Discussion({ eventId, post }: { eventId: string; post: Action | 
               key={thread.id}
               thread={thread}
               canPost={canPost}
-              send={(body, done) => {
-                setActive((current) => current ?? `message:${thread.id}`);
-                send(body, done);
-              }}
-              error={active?.endsWith(thread.id) ? change.error : undefined}
-              pending={change.isPending}
-              active={active}
-              setActive={(key) => {
-                change.reset();
-                setActive(key);
-              }}
+              controls={open?.kind === 'ask' ? { ...controls, error: undefined } : controls}
             />
           ))}
         </ul>
       )}
-      {post?.requiresAuth ? (
+      {post?.requiresAuth && (
         <p>
           <Link className="button" to={loginPath(location.pathname + location.search)}>
             Войти, чтобы задать вопрос
           </Link>
         </p>
-      ) : canPost ? (
-        <div onFocus={() => active !== 'ask' && (change.reset(), setActive('ask'))}>
-          <MessageForm
-            label="Ваш вопрос организатору и участникам"
-            submitText="Отправить"
-            onSubmit={(text, done) => {
-              setActive('ask');
-              send({ kind: 'post', text }, done);
-            }}
-          />
-          {askError !== undefined && (fieldError(askError) ?? formError(askError)) && (
-            <p className="field-error" role="alert">
-              {fieldError(askError) ?? formError(askError)}
-            </p>
-          )}
-        </div>
-      ) : (
-        post && <p className="event-card-soon">Написать нельзя: {post.reason}</p>
+      )}
+      {canPost && (
+        <MessageForm
+          key={askKey}
+          label="Ваш вопрос организатору и участникам"
+          submitText="Отправить"
+          controls={askControls}
+          cancellable={false}
+          onSubmit={(text) => {
+            setOpenState({ kind: 'ask' });
+            change.mutate(
+              { kind: 'post', text },
+              {
+                onSuccess: () => {
+                  setOpenState(null);
+                  setAskKey((key) => key + 1);
+                },
+              },
+            );
+          }}
+        />
+      )}
+      {post && !canPost && !post.requiresAuth && (
+        <p className="event-card-soon">Написать нельзя: {post.reason}</p>
       )}
     </section>
   );

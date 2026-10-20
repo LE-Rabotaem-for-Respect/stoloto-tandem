@@ -16,6 +16,7 @@ import {
   StatusBadge,
 } from '../../shared/ui';
 import { loginPath, useAuthAction } from '../auth';
+import { Discussion } from '../discussion';
 import { useEventCard, useParticipationAction } from './api';
 import type { EventCardView } from './api';
 import { actionLabel, actionTarget, findAction, primaryAction, secondaryActions } from './actions';
@@ -252,10 +253,7 @@ function CardBody({ event }: { event: EventCardView }) {
           <h2 id="faq-title">Частые вопросы</h2>
           <p className="event-card-soon">Здесь появятся ответы организатора на частые вопросы.</p>
         </section>
-        <section id="discussion" className="event-card-section" aria-labelledby="discussion-title">
-          <h2 id="discussion-title">Обсуждение</h2>
-          <p className="event-card-soon">Здесь будет обсуждение мероприятия.</p>
-        </section>
+        <Discussion eventId={event.id} post={findAction(event.actions, 'post_message')} />
       </div>
     </article>
   );
