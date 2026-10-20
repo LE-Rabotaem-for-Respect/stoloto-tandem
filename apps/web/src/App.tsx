@@ -12,6 +12,7 @@ import { AppLayout } from './features/navigation/AppLayout';
 import { OrganizationPage, PublicOrganizationPage } from './features/organizations';
 import {
   CreateEventPage,
+  EditEventPage,
   EventPage,
   FeedPage,
   LoginPage,
@@ -36,6 +37,7 @@ export function AppRoutes() {
       <Route element={<AppLayout />}>
         <Route index element={<FeedPage />} />
         <Route path="events/:id" element={<EventPage />} />
+        <Route path="events/:id/edit" element={<EditEventPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
         <Route path="my" element={<MyParticipationsPage />} />

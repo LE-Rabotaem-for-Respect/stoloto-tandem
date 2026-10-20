@@ -149,3 +149,14 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* Поле, которое после публикации не меняется: значение и причина */
+.create-event-locked {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.create-event-locked-reason {
+  margin: 0;
+  color: var(--color-ink-muted);
+}

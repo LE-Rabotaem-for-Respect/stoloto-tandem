@@ -6,7 +6,7 @@ import { ApiRequestError } from '../../../shared/api';
 import { useClock } from '../../../shared/clock';
 import { Field, PrimaryButton, Stepper } from '../../../shared/ui';
 import type { Step } from '../../../shared/ui';
-import { useCreateEvent } from '../api';
+import { useCreateEvent, useUpdateEvent } from '../api';
 import { EventPreview } from './EventPreview';
 import {
   STEPS,
@@ -16,6 +16,7 @@ import {
   stepErrors,
   stepOfField,
   toRequestBody,
+  toUpdateBody,
 } from './form-state';
 import type { CreateEventState, FieldErrors, StepIndex } from './form-state';
 import { SportPicker } from './SportPicker';
@@ -87,6 +88,22 @@ const replaceStepErrors = (errors: FieldErrors, step: StepIndex, found: FieldErr
   ...found,
 });
 
+/**
+ * Поле, которое после публикации не меняется (ТЗ 2.2): значение видно, рядом — почему
+ * его нельзя изменить и что делать вместо этого.
+ */
+function Locked({ label, value, reason }: { label: string; value: string; reason: string }) {
+  const id = useId();
+  return (
+    <div className="create-event-locked">
+      <Field label={label} value={value} readOnly aria-describedby={id} />
+      <p className="create-event-locked-reason" id={id}>
+        {reason}
+      </p>
+    </div>
+  );
+}
+
 // Необязательные поля в «Дополнительно»
 type OptionalField = 'participantInfo' | 'applyQuestion';
 
@@ -95,11 +112,19 @@ type OptionalField = 'participantInfo' | 'applyQuestion';
  * необязательное — в «Дополнительно», на последнем шаге — предпросмотр карточки.
  * Проверки шагов повторяют серверные; окончательно решает api.
  */
-export function CreateEventForm() {
+export function CreateEventForm({
+  edit,
+}: {
+  /** Изменение опубликованного (ТЗ 2.2): те же шаги, направление, дата и время — только видны. */
+  edit?: { eventId: string; initial: CreateEventState };
+} = {}) {
   const now = useClock();
   const navigate = useNavigate();
   const create = useCreateEvent();
-  const [state, setState] = useState<CreateEventState>(emptyState);
+  const update = useUpdateEvent(edit?.eventId ?? '');
+  const saving = edit ? update : create;
+  const checks = { schedule: !edit };
+  const [state, setState] = useState<CreateEventState>(() => edit?.initial ?? emptyState());
   const [step, setStep] = useState<StepIndex>(0);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState<string>();
@@ -168,7 +193,7 @@ export function CreateEventForm() {
   };
 
   const next = () => {
-    const found = stepErrors(step, state, now);
+    const found = stepErrors(step, state, now, checks);
     if (Object.keys(found).length > 0) {
       showErrors(replaceStepErrors(errors, step, found));
       return;
@@ -180,7 +205,7 @@ export function CreateEventForm() {
   const publish = () => {
     // Все шаги — заново: пока человек заполнял форму, время начала могло пройти
     for (const index of [0, 1, 2, 3] as StepIndex[]) {
-      const found = stepErrors(index, state, now);
+      const found = stepErrors(index, state, now, checks);
       if (Object.keys(found).length > 0) {
         showErrors(replaceStepErrors(errors, index, found));
         goTo(index);
@@ -188,11 +213,13 @@ export function CreateEventForm() {
       }
     }
     setMessage(undefined);
-    create.mutate(toRequestBody(state), {
-      onSuccess: (event) => void navigate(`/events/${event.id}`),
+    saving.mutate(edit ? toUpdateBody(state) : toRequestBody(state), {
+      onSuccess: (event) => void navigate(`/events/${edit?.eventId ?? event.id}`),
       onError: (error) => {
         if (!(error instanceof ApiRequestError)) {
-          setMessage('Не удалось опубликовать. Проверьте связь и попробуйте ещё раз');
+          setMessage(
+            `Не удалось ${edit ? 'сохранить' : 'опубликовать'}. Проверьте связь и попробуйте ещё раз`,
+          );
           setFocusMessage((count) => count + 1);
           return;
         }
@@ -226,7 +253,10 @@ export function CreateEventForm() {
 
   return (
     <form ref={form} className="form create-event" onSubmit={submit} noValidate>
-      <Stepper steps={steps} label="Шаги создания мероприятия" />
+      <Stepper
+        steps={steps}
+        label={edit ? 'Шаги изменения мероприятия' : 'Шаги создания мероприятия'}
+      />
       <h2 ref={heading} tabIndex={-1} className="create-event-step">
         Шаг {step + 1} из {STEPS.length}: {STEPS[step]}
       </h2>
@@ -239,11 +269,19 @@ export function CreateEventForm() {
             onChange={(event) => set({ title: event.target.value })}
             error={errors.title}
           />
-          <SportPicker
-            value={state.sport}
-            onChange={(sport) => set({ sport })}
-            error={errors.sport}
-          />
+          {edit ? (
+            <Locked
+              label="Направление"
+              value={state.sport?.name ?? ''}
+              reason="Направление после публикации не меняется"
+            />
+          ) : (
+            <SportPicker
+              value={state.sport}
+              onChange={(sport) => set({ sport })}
+              error={errors.sport}
+            />
+          )}
           <TextArea
             label="Описание"
             value={state.description}
@@ -255,29 +293,39 @@ export function CreateEventForm() {
 
       {step === 1 && (
         <>
-          <Field
-            label="Дата"
-            type="date"
-            value={state.date}
-            onChange={(event) => set({ date: event.target.value })}
-            error={errors.date}
-          />
-          <div className="create-event-times">
-            <Field
-              label="Начало"
-              type="time"
-              value={state.startTime}
-              onChange={(event) => set({ startTime: event.target.value })}
-              error={errors.startTime}
+          {edit ? (
+            <Locked
+              label="Дата и время"
+              value={`${state.date.split('-').reverse().join('.')}, ${state.startTime}–${state.endTime}`}
+              reason="Дату и время меняют через «Перенести»"
             />
-            <Field
-              label="Окончание"
-              type="time"
-              value={state.endTime}
-              onChange={(event) => set({ endTime: event.target.value })}
-              error={errors.endTime}
-            />
-          </div>
+          ) : (
+            <>
+              <Field
+                label="Дата"
+                type="date"
+                value={state.date}
+                onChange={(event) => set({ date: event.target.value })}
+                error={errors.date}
+              />
+              <div className="create-event-times">
+                <Field
+                  label="Начало"
+                  type="time"
+                  value={state.startTime}
+                  onChange={(event) => set({ startTime: event.target.value })}
+                  error={errors.startTime}
+                />
+                <Field
+                  label="Окончание"
+                  type="time"
+                  value={state.endTime}
+                  onChange={(event) => set({ endTime: event.target.value })}
+                  error={errors.endTime}
+                />
+              </div>
+            </>
+          )}
           <Field
             label="Город"
             value={state.city}
@@ -398,8 +446,14 @@ export function CreateEventForm() {
             Далее
           </button>
         ) : (
-          <PrimaryButton type="submit" disabled={create.isPending}>
-            {create.isPending ? 'Публикуем…' : 'Опубликовать'}
+          <PrimaryButton type="submit" disabled={saving.isPending}>
+            {edit
+              ? saving.isPending
+                ? 'Сохраняем…'
+                : 'Сохранить'
+              : saving.isPending
+                ? 'Публикуем…'
+                : 'Опубликовать'}
           </PrimaryButton>
         )}
       </div>
