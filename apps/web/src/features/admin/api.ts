@@ -35,6 +35,27 @@ export interface AdminEvent {
   createdAt: string;
 }
 
+export interface AdminHiddenMessage {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  author: { kind: 'user' | 'organization'; id: string; name: string };
+  text: string;
+  moderationReason: string | null;
+  createdAt: string;
+}
+
+/** Сообщение обсуждения так, как его отдаёт `GET /events/:id/messages`. */
+export interface ThreadMessage {
+  id: string;
+  author: { name: string };
+  isOrganizer: boolean;
+  text: string | null;
+  placeholder: string | null;
+  createdAt: string;
+  replies: Omit<ThreadMessage, 'replies'>[];
+}
+
 export interface Page<T> {
   items: T[];
   total: number;
@@ -46,6 +67,8 @@ export interface AdminSearch {
   q?: string;
   status?: string;
   organizationId?: string;
+  period?: string;
+  offset?: string;
 }
 
 // Пустые значения в адрес не попадают: api отклоняет пустой статус
@@ -76,6 +99,23 @@ export function useAdminEvents(search: AdminSearch) {
   return useQuery({
     queryKey: [...ADMIN_KEY, 'events', search],
     queryFn: () => apiRequest<Page<AdminEvent>>(`/admin/events${query(search)}`),
+  });
+}
+
+export function useAdminHiddenMessages(search: AdminSearch) {
+  return useQuery({
+    queryKey: [...ADMIN_KEY, 'messages', search],
+    queryFn: () =>
+      apiRequest<Page<AdminHiddenMessage>>(`/admin/messages${query({ offset: search.offset })}`),
+  });
+}
+
+/** Обсуждение мероприятия — только когда его открыли. */
+export function useDiscussion(eventId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...ADMIN_KEY, 'discussion', eventId],
+    queryFn: () => apiRequest<ThreadMessage[]>(`/events/${eventId}/messages`),
+    enabled,
   });
 }
 
