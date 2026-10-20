@@ -235,6 +235,7 @@ describe('POST /events/:id/leave', () => {
           type: 'ParticipationCancelled',
           participationId: row.id,
           userId: anna.id,
+          previousStatus: from,
         }),
       );
       published.mockRestore();
