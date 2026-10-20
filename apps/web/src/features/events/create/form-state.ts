@@ -1,0 +1,226 @@
+import {
+  MULTI_LINE_TEXT,
+  SINGLE_LINE_TEXT,
+  SPORT_NAME_MAX_LENGTH,
+  VISIBLE_TEXT,
+  cleanSingleLine,
+  isValidSportName,
+  normalizeLineBreaks,
+} from '@tandem/domain';
+import type { EventLevel, SportCategory } from '@tandem/domain';
+
+/** Шаги формы (ТЗ 2.11, «Бюджет экранов»): короткие экраны вместо одной длинной формы. */
+export const STEPS = ['Что', 'Когда и где', 'Условия', 'Запись'] as const;
+export type StepIndex = 0 | 1 | 2 | 3;
+
+/** Направление: выбранное из подсказок или новое («Добавить «…» как новое»). */
+export type SportChoice =
+  | { kind: 'existing'; id: string; name: string; category: SportCategory }
+  | { kind: 'new'; name: string; category?: SportCategory };
+
+export interface CreateEventState {
+  title: string;
+  description: string;
+  sport: SportChoice | null;
+  /** Календарная дата «ГГГГ-ММ-ДД» и время «ЧЧ:ММ» — по Красноярску. */
+  date: string;
+  startTime: string;
+  endTime: string;
+  city: string;
+  area: string;
+  placeText: string;
+  participantInfo: string;
+  level: EventLevel | null;
+  mode: 'free' | 'approval' | null;
+  applyQuestion: string;
+}
+
+export const emptyState = (): CreateEventState => ({
+  title: '',
+  description: '',
+  sport: null,
+  date: '',
+  startTime: '',
+  endTime: '',
+  city: 'Красноярск',
+  area: '',
+  placeText: '',
+  participantInfo: '',
+  level: null,
+  mode: null,
+  applyQuestion: '',
+});
+
+export type FieldErrors = Record<string, string>;
+
+/** На каком шаге поле формы: там его ошибка видна и там её отмечает степпер. */
+const FIELD_STEPS: Record<string, StepIndex> = {
+  title: 0,
+  sport: 0,
+  description: 0,
+  date: 1,
+  startTime: 1,
+  endTime: 1,
+  city: 1,
+  area: 1,
+  placeText: 1,
+  level: 2,
+  participantInfo: 2,
+  mode: 3,
+  applyQuestion: 3,
+};
+
+/** Шаг поля формы; `undefined` — поля в форме нет. */
+export const stepOfField = (field: string): StepIndex | undefined => FIELD_STEPS[field];
+
+/** Поле ответа api → поле формы (у нового направления ошибка имени — у поля направления). */
+export function formField(apiField: string): string {
+  if (apiField === 'sportId' || apiField.startsWith('newSport')) return 'sport';
+  if (apiField === 'startsAt') return 'startTime';
+  if (apiField === 'endsAt') return 'endTime';
+  return apiField;
+}
+
+/** Первый шаг, на котором есть ошибка; `null` — ошибок полей нет. */
+export function firstStepWithError(apiFields: FieldErrors): StepIndex | null {
+  const steps = Object.keys(apiFields)
+    .map((field) => stepOfField(formField(field)))
+    .filter((step): step is StepIndex => step !== undefined);
+  return steps.length > 0 ? (Math.min(...steps) as StepIndex) : null;
+}
+
+// Красноярск — UTC+7 круглый год (без перехода на летнее время с 2014 года)
+const KRASNOYARSK_OFFSET = '+07:00';
+
+/** Дата и время по Красноярску → момент времени; неполный ввод — `null`. */
+export function krasnoyarskTime(date: string, time: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null;
+  const moment = new Date(`${date}T${time}:00${KRASNOYARSK_OFFSET}`);
+  return Number.isNaN(moment.getTime()) ? null : moment;
+}
+
+// Длина в символах, как считает сервер: эмодзи из двух половинок UTF-16 — один символ
+const length = (value: string) => Array.from(value.trim()).length;
+// Однострочное поле сервер сначала чистит (пробелы по краям, мягкие переносы), потом мерит
+const lineLength = (value: string) => Array.from(cleanSingleLine(value)).length;
+
+// Невидимые символы и «пустой» на вид текст — то же правило, что у api (@tandem/domain)
+const HIDDEN_CHARS = 'В тексте есть недопустимые символы';
+function lineError(value: string): string | undefined {
+  const clean = cleanSingleLine(value);
+  if (!SINGLE_LINE_TEXT.test(clean)) return HIDDEN_CHARS;
+  if (!VISIBLE_TEXT.test(clean)) return 'Нужна хотя бы одна буква или цифра';
+  return undefined;
+}
+const blockError = (value: string) =>
+  MULTI_LINE_TEXT.test(normalizeLineBreaks(value).trim()) ? undefined : HIDDEN_CHARS;
+
+type LineField = 'title' | 'city' | 'area' | 'placeText';
+type BlockField = 'description' | 'participantInfo' | 'applyQuestion';
+const LINE_FIELDS: Record<StepIndex, LineField[]> = {
+  0: ['title'],
+  1: ['city', 'area', 'placeText'],
+  2: [],
+  3: [],
+};
+const BLOCK_FIELDS: Record<StepIndex, BlockField[]> = {
+  0: ['description'],
+  1: [],
+  2: ['participantInfo'],
+  3: ['applyQuestion'],
+};
+
+const SPORT_NAME_RULE = `Название направления — от 2 до ${SPORT_NAME_MAX_LENGTH} символов: буквы, цифры, пробелы и знаки . , ' ( ) × / + -; над буквой — не больше одного значка; в одном слове — буквы одного алфавита`;
+
+/**
+ * Проверки шага до отправки — те же правила, что у api (ТЗ 2.2), чтобы человек
+ * увидел ошибку сразу у поля. Окончательно решает сервер.
+ */
+export function stepErrors(step: StepIndex, state: CreateEventState, now: Date): FieldErrors {
+  const errors: FieldErrors = {};
+  if (step === 0) {
+    if (lineLength(state.title) < 5 || lineLength(state.title) > 80) {
+      errors.title = 'Название — от 5 до 80 символов';
+    }
+    if (!state.sport) errors.sport = 'Выберите направление из списка или добавьте новое';
+    else if (
+      state.sport.kind === 'new' &&
+      (length(state.sport.name) < 2 || !isValidSportName(state.sport.name))
+    ) {
+      errors.sport = SPORT_NAME_RULE;
+    }
+    if (length(state.description) === 0) errors.description = 'Добавьте описание';
+    else if (length(state.description) > 2000) {
+      errors.description = 'Описание — не длиннее 2000 символов';
+    }
+  }
+  if (step === 1) {
+    const starts = krasnoyarskTime(state.date, state.startTime);
+    const ends = krasnoyarskTime(state.date, state.endTime);
+    // Без даты ошибка одна — у даты: под заполненным временем «укажите время» сбивает
+    if (!state.date) errors.date = 'Укажите дату';
+    else {
+      if (!starts) errors.startTime = 'Укажите время начала';
+      else if (starts <= now) errors.startTime = 'Время начала должно быть в будущем';
+      if (!ends) errors.endTime = 'Укажите время окончания';
+      else if (starts && ends <= starts) errors.endTime = 'Окончание — позже начала';
+    }
+    if (lineLength(state.city) < 2 || lineLength(state.city) > 80) {
+      errors.city = 'Город — от 2 до 80 символов';
+    }
+    if (lineLength(state.area) < 2 || lineLength(state.area) > 120) {
+      errors.area = 'Район или ориентир — от 2 до 120 символов';
+    }
+    if (lineLength(state.placeText) < 3 || lineLength(state.placeText) > 300) {
+      errors.placeText = 'Адрес или описание места — от 3 до 300 символов';
+    }
+  }
+  if (step === 2) {
+    if (!state.level) errors.level = 'Выберите уровень';
+    if (length(state.participantInfo) > 2000) {
+      errors.participantInfo = 'Информация для участников — не длиннее 2000 символов';
+    }
+  }
+  if (step === 3) {
+    if (!state.mode) errors.mode = 'Выберите режим записи';
+    if (state.mode === 'approval' && length(state.applyQuestion) > 300) {
+      errors.applyQuestion = 'Вопрос к заявке — не длиннее 300 символов';
+    }
+  }
+  // Символы — после длины: у поля одна ошибка, сначала понятная
+  for (const field of LINE_FIELDS[step]) {
+    const error = errors[field] ? undefined : lineError(state[field]);
+    if (error) errors[field] = error;
+  }
+  for (const field of BLOCK_FIELDS[step]) {
+    if (field === 'applyQuestion' && state.mode !== 'approval') continue;
+    const error = errors[field] ? undefined : blockError(state[field]);
+    if (error) errors[field] = error;
+  }
+  return errors;
+}
+
+/** Тело `POST /events`: вопрос к заявке — только для режима «По заявке». */
+export function toRequestBody(state: CreateEventState) {
+  const starts = krasnoyarskTime(state.date, state.startTime);
+  const ends = krasnoyarskTime(state.date, state.endTime);
+  const sport = state.sport;
+  return {
+    title: state.title.trim(),
+    description: state.description.trim(),
+    ...(sport?.kind === 'existing' && { sportId: sport.id }),
+    ...(sport?.kind === 'new' && {
+      newSport: { name: sport.name.trim(), ...(sport.category && { category: sport.category }) },
+    }),
+    startsAt: starts?.toISOString(),
+    endsAt: ends?.toISOString(),
+    city: state.city.trim(),
+    area: state.area.trim(),
+    placeText: state.placeText.trim(),
+    ...(state.participantInfo.trim() && { participantInfo: state.participantInfo.trim() }),
+    mode: state.mode,
+    ...(state.mode === 'approval' &&
+      state.applyQuestion.trim() && { applyQuestion: state.applyQuestion.trim() }),
+    level: state.level,
+  };
+}

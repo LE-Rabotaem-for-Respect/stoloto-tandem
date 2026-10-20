@@ -8,6 +8,7 @@ const dayOfMonth = format({ day: 'numeric' });
 const weekdayShort = format({ weekday: 'short' });
 const fullDate = format({ weekday: 'long', day: 'numeric', month: 'long' });
 const clock = format({ hour: '2-digit', minute: '2-digit' });
+const numericDayMonth = format({ day: '2-digit', month: '2-digit' });
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -19,6 +20,11 @@ export function leafParts(date: Date) {
     weekday: weekdayShort.format(date).replace('.', ''),
     spoken: capitalize(fullDate.format(date)),
   };
+}
+
+/** «21.10» по Красноярску — для метки переноса «Перенесено с 21.10 на 22.10». */
+export function dayMonth(date: Date): string {
+  return numericDayMonth.format(date);
 }
 
 /** «07:30–08:30» или «07:30». */

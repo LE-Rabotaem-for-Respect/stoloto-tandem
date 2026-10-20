@@ -141,11 +141,17 @@ describe('метки доступа маршрутов приложения', ()
   it('найдены все маршруты всех контроллеров', () => {
     expect(routes.map((route) => route.name)).toEqual(
       expect.arrayContaining([
+        'AdminController.overview',
+        'AdminController.organizationsList',
+        'AdminController.decide',
+        'AdminController.eventsList',
+        'AdminController.hiddenMessages',
         'AuthController.register',
         'AuthController.login',
         'AuthController.demoLogin',
         'AuthController.logout',
         'AuthController.me',
+        'AuthController.updateSettings',
         'ClockController.get',
         'EventsController.create',
         'EventsController.feed',

@@ -7,6 +7,7 @@ export type EventStatus = (typeof EVENT_STATUSES)[number];
 
 export const EVENT_ACTIONS = [
   'publish',
+  'edit',
   'reschedule',
   'cancel',
   'unpublish',
@@ -41,6 +42,7 @@ const newStartInFuture = (ctx: EventContext): Denial | undefined =>
 
 const deniedMessages: Record<EventAction, string> = {
   publish: 'Мероприятие уже опубликовано',
+  edit: 'Изменить можно только опубликованное мероприятие',
   reschedule: 'Перенести можно только опубликованное мероприятие',
   cancel: 'Отменить можно только опубликованное мероприятие',
   unpublish: 'Снять с публикации можно только опубликованное мероприятие',
@@ -53,6 +55,8 @@ export const eventMachine = defineMachine<EventStatus, EventAction, EventContext
   name: 'event',
   rules: [
     { action: 'publish', from: [null], to: 'published', guards: [startInFuture] },
+    // Изменение после публикации (ТЗ 2.2): поля — без смены статуса, только до начала
+    { action: 'edit', from: ['published'], to: 'published', guards: [notStarted] },
     {
       action: 'reschedule',
       from: ['published'],

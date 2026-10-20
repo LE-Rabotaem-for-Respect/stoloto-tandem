@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import type { Actor } from '../../core/policies';
 import { CurrentActor, Public, SignedIn } from '../auth';
-import { CreateEventDto, EventFeedQuery } from './events.dto';
+import { CreateEventDto, EventFeedQuery, UpdateEventDto } from './events.dto';
 import { EventsService } from './events.service';
 import type { EventCard, EventFeed } from './events.service';
 
@@ -32,5 +32,16 @@ export class EventsController {
   @Get(':id')
   card(@CurrentActor() actor: Actor, @Param('id') id: string): Promise<EventCard> {
     return this.events.card(actor, id);
+  }
+
+  // Изменить может только организатор — решают политика и автомат в сервисе
+  @SignedIn()
+  @Patch(':id')
+  update(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Body() dto: UpdateEventDto,
+  ): Promise<EventCard> {
+    return this.events.update(actor, id, dto);
   }
 }

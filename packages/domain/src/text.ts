@@ -17,6 +17,14 @@ const ZWJ = String.raw`(?<=\p{Extended_Pictographic}(?:\u{FE0F}|[\u{1F3FB}-\u{1F
 const SELECTOR = String.raw`(?<=\p{Emoji})(?<![#*0-9])[\u{FE0E}\u{FE0F}]|(?<=[#*0-9])\u{FE0F}(?=\u{20E3})`;
 const SOFT_HYPHEN = String.raw`(?<=\p{L}\p{M}*)\u{AD}(?=\p{L})`;
 const ALLOWED = `${ZWJ}|${SELECTOR}|${SOFT_HYPHEN}`;
+// Комбинирующие знаки (\p{M}) в однострочном тексте — как в названии направления: не
+// больше одного и только сразу после буквы («й», «ё» в разложенном виде, ударение).
+// Цепочки знаков («залго») налезают на соседние строки, а знак внутри слова
+// («Ку⃣бок») прячет слово от поиска. Исключение — рамка клавиши U+20E3 в keycap («1️⃣»).
+// Невидимые знаки (U+034F, селекторы начертания) и рамка клавиши сюда не входят:
+// у них свои правила выше и ниже
+const MARK = String.raw`(?<=\p{L})(?![${HIDDEN}])(?!\u{20E3})\p{M}(?!\p{M})`;
+const KEYCAP = String.raw`(?<=[0-9#*]\u{FE0F}?)\u{20E3}`;
 // В многострочном тексте — ещё перевод строки и табуляция
 const LINE_BREAKS = String.raw`[\n\t]`;
 
@@ -25,7 +33,10 @@ const LINE_BREAKS = String.raw`[\n\t]`;
  * без невидимых символов, кроме разрешённых. Общее для api и web, чтобы проверки
  * формы совпадали с серверными.
  */
-export const SINGLE_LINE_TEXT = new RegExp(`^(?:[^${HIDDEN}]|${ALLOWED})*$`, 'u');
+export const SINGLE_LINE_TEXT = new RegExp(
+  String.raw`^(?:[^${HIDDEN}\p{M}]|${ALLOWED}|${MARK}|${KEYCAP})*$`,
+  'u',
+);
 
 /** Многострочный текст (описание, вопрос к заявке). */
 export const MULTI_LINE_TEXT = new RegExp(`^(?:[^${HIDDEN}]|${ALLOWED}|${LINE_BREAKS})*$`, 'u');
@@ -43,11 +54,13 @@ export const PLAIN_TEXT = new RegExp(`^[^${HIDDEN}]*$`, 'u');
 export const VISIBLE_TEXT = /[\p{L}\p{N}]/u;
 
 /**
- * Однострочный текст перед проверкой: без пробелов по краям и без мягких переносов —
- * в коротком поле они не нужны, а слово с ними не находится поиском.
+ * Однострочный текст перед проверкой: в форме NFC (буква со знаком — одним символом,
+ * как её набирают на Windows и Android; macOS и iOS присылают разложенную), без
+ * пробелов по краям и без мягких переносов — в коротком поле они не нужны, а слово с
+ * ними не находится поиском.
  */
 export function cleanSingleLine(text: string): string {
-  return text.replaceAll(String.fromCodePoint(0xad), '').trim();
+  return text.normalize('NFC').replaceAll(String.fromCodePoint(0xad), '').trim();
 }
 
 /** Переводы строк Windows и старых Mac (`\r\n`, `\r`) — к одному `\n`. */
