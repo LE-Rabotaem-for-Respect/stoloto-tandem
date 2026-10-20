@@ -170,6 +170,18 @@ describe('POST /events', () => {
     expect(response.body).toMatchObject({ title, description });
   });
 
+  it('мягкий перенос в названии убирается: мероприятие находится поиском', async () => {
+    const response = await post(igor, {
+      ...validEvent(),
+      title: `Кёр${String.fromCodePoint(0xad)}линг для новичков`,
+      city: `Крас${String.fromCodePoint(0xad)}ноярск`,
+    });
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({ title: 'Кёрлинг для новичков', city: 'Красноярск' });
+    const stored = await prisma.event.findUniqueOrThrow({ where: { id: response.body.id } });
+    expect(stored.title).toBe('Кёрлинг для новичков');
+  });
+
   it('в описании и «Информации для участников» допустимы переводы строк', async () => {
     const newline = String.fromCharCode(10);
     const description = `Играем 7 на 7${newline}Команды делим на месте`;
@@ -305,6 +317,37 @@ describe('POST /events', () => {
     ['неверный sportId, новое — null', { sportId: 'not-a-uuid', newSport: null }, 'sportId'],
     ['переворот текста в названии', { title: 'Футбол 7×7 \u202e' }, 'title'],
     ['управляющий символ в месте', { placeText: 'Поле \u0007 у школы' }, 'placeText'],
+    // Разрешённые невидимые — только на своём месте; пустое на вид поле не проходит
+    [
+      'пять соединителей вместо названия',
+      { title: String.fromCodePoint(0x200d).repeat(5) },
+      'title',
+    ],
+    [
+      'соединитель внутри слова в названии',
+      { title: `Фут${String.fromCodePoint(0x200d)}бол 7×7` },
+      'title',
+    ],
+    [
+      'селектор начертания после буквы в названии',
+      { title: `Фут${String.fromCodePoint(0xfe0f)}бол 7×7` },
+      'title',
+    ],
+    [
+      'пустые символы Брайля вместо названия',
+      { title: String.fromCodePoint(0x2800).repeat(5) },
+      'title',
+    ],
+    ['мягкие переносы вместо названия', { title: String.fromCodePoint(0xad).repeat(5) }, 'title'],
+    ['название из одних точек', { title: '.....' }, 'title'],
+    ['город из тире', { city: '— —' }, 'city'],
+    ['район из одних эмодзи', { area: String.fromCodePoint(0x1f3c3, 0x1f3c3) }, 'area'],
+    ['место из знаков', { placeText: '--- ...' }, 'placeText'],
+    [
+      'частный символ в описании',
+      { description: `Играем ${String.fromCodePoint(0xe000)}` },
+      'description',
+    ],
     ['лишнее поле', { organizerOrgId: randomUUID() }, 'organizerOrgId'],
   ])('%s — 400 с полем', async (_, change, field) => {
     const response = await post(anna, { ...validEvent(), ...change });

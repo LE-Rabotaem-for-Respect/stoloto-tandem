@@ -3,6 +3,7 @@ import {
   SPORT_CATEGORIES,
   SPORT_NAME_MAX_LENGTH,
   SPORT_NAME_PATTERN,
+  cleanSingleLine,
   cleanSportName,
 } from '@tandem/domain';
 import type { SportCategory } from '@tandem/domain';
@@ -23,6 +24,10 @@ export const SPORT_NAME_RULE = `Название направления — от
 
 export class SearchSportsQuery {
   @IsOptional()
+  // Мягкий перенос внутри слова — прочь, как в названии мероприятия: иначе ничего не находится
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? cleanSingleLine(value) : value,
+  )
   @IsString({ message: 'Запрос — строка' })
   @MaxLength(SPORT_NAME_MAX_LENGTH, { message: `Не длиннее ${SPORT_NAME_MAX_LENGTH} символов` })
   @Matches(SINGLE_LINE_TEXT, { message: 'В запросе есть недопустимые символы' })
