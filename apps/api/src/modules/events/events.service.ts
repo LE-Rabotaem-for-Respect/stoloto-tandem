@@ -26,13 +26,14 @@ import type { ErrorFields } from '../../core/errors';
 import { EventBus, domainEvent } from '../../core/event-bus';
 import {
   canCreateEvent,
+  canManageEvent,
   canSeeParticipantInfo,
   canViewEvent,
   eventActions,
 } from '../../core/policies';
 import type { Actor } from '../../core/policies';
 import { SportsService } from '../sports/sports.service';
-import type { CreateEventDto, EventFeedQuery, FeedDate } from './events.dto';
+import type { CreateEventDto, EventFeedQuery, FeedDate, UpdateEventDto } from './events.dto';
 import { EventsRepository } from './events.repository';
 import type { EventWithCard } from './events.repository';
 
@@ -206,6 +207,72 @@ export class EventsService {
     const view = canViewEvent(actor, event, participation);
     if (!view.allowed) throw new ApiError(view.code);
     return { event, participation };
+  }
+
+  /**
+   * Изменение после публикации (ТЗ 2.2): только организатор, только опубликованное и
+   * до начала. Режим записи — пока нет заявок, участников и листа ожидания; лимит мест —
+   * не ниже числа подтверждённых. Строка мероприятия заблокирована до конца транзакции:
+   * запись, которая идёт в это же время, дождётся изменения или пройдёт до него.
+   * Уведомления участникам об изменении — P1 (3.3).
+   */
+  async update(actor: Actor, id: string, dto: UpdateEventDto): Promise<EventCard> {
+    await this.events.transaction(async (tx) => {
+      const event = isUUID(id) ? await this.events.lockForEdit(id, tx) : null;
+      if (!event) throw new ApiError('event_not_available');
+      // Кому мероприятие не видно, тот не узнаёт и о нём: тот же ответ, что у карточки
+      const view = canViewEvent(actor, event, null);
+      if (!view.allowed) throw new ApiError(view.code);
+      const manage = canManageEvent(actor, event);
+      if (!manage.allowed) throw new ApiError(manage.code);
+      eventMachine.nextState(event.status, 'edit', {
+        now: this.clock.now(),
+        startsAt: event.startsAt,
+      });
+
+      const fields: ErrorFields = {};
+      const mode = dto.mode ?? event.mode;
+      if (dto.mode !== undefined && dto.mode !== event.mode) {
+        const active = await this.events.activeParticipationCount(event.id, tx);
+        if (active > 0) {
+          fields.mode = 'Режим записи не меняется, пока есть заявки, участники или лист ожидания';
+        }
+      }
+      if (typeof dto.capacity === 'number') {
+        const confirmed = await this.events.confirmedCountIn(event.id, tx);
+        if (dto.capacity < confirmed) {
+          fields.capacity = `Лимит мест — не ниже числа подтверждённых участников: ${confirmed}`;
+        }
+      }
+      // Вопрос к заявке остаётся только у режима «По заявке» (как при создании)
+      if (mode === 'free' && dto.applyQuestion) {
+        fields.applyQuestion = 'Вопрос к заявке — только для режима «По заявке»';
+      }
+      if (Object.keys(fields).length > 0) throw new ApiError('validation_failed', fields);
+
+      await this.events.update(
+        event.id,
+        {
+          title: dto.title,
+          description: dto.description,
+          city: dto.city,
+          area: dto.area,
+          placeText: dto.placeText,
+          participantInfo: dto.participantInfo,
+          level: dto.level,
+          mode: dto.mode,
+          capacity: dto.capacity,
+          applyQuestion:
+            mode === 'free'
+              ? null
+              : dto.applyQuestion === undefined
+                ? undefined
+                : dto.applyQuestion || null,
+        },
+        tx,
+      );
+    });
+    return this.card(actor, id);
   }
 
   /**

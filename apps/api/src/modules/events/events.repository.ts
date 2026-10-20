@@ -14,6 +14,21 @@ const cardInclude = {
 
 export type EventWithCard = Prisma.EventGetPayload<{ include: typeof cardInclude }>;
 
+// Для изменения нужны поля политик и правил таблицы 2.2
+const editSelect = {
+  id: true,
+  organizerUserId: true,
+  organizerOrgId: true,
+  status: true,
+  startsAt: true,
+  endsAt: true,
+  mode: true,
+  applyQuestion: true,
+  capacity: true,
+} satisfies Prisma.EventSelect;
+
+export type EditableEvent = Prisma.EventGetPayload<{ select: typeof editSelect }>;
+
 /** Фильтры ленты уже в терминах модели; что они значат для человека — решает сервис. */
 export interface FeedFilter {
   /** Не завершённые к этому моменту. */
@@ -86,6 +101,32 @@ export class EventsRepository {
 
   create(data: Prisma.EventUncheckedCreateInput, tx: Db): Promise<{ id: string }> {
     return tx.event.create({ data, select: { id: true } });
+  }
+
+  /**
+   * Блокирует строку мероприятия до конца транзакции, как запись на него: смена режима
+   * и лимита не разойдётся с записью, которая идёт в это же время (DECISION-002).
+   */
+  async lockForEdit(id: string, tx: Db): Promise<EditableEvent | null> {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "events" WHERE "id" = ${id}::uuid FOR UPDATE`;
+    if (locked.length === 0) return null;
+    return tx.event.findUnique({ where: { id }, select: editSelect });
+  }
+
+  /** Записи, при которых режим записи менять нельзя (ТЗ 2.2): заявка, участник, лист ожидания. */
+  activeParticipationCount(eventId: string, tx: Db): Promise<number> {
+    return tx.participation.count({
+      where: { eventId, status: { in: ['pending', 'confirmed', 'waitlist'] } },
+    });
+  }
+
+  confirmedCountIn(eventId: string, tx: Db): Promise<number> {
+    return tx.participation.count({ where: { eventId, status: 'confirmed' } });
+  }
+
+  update(id: string, data: Prisma.EventUncheckedUpdateInput, tx: Db): Promise<{ id: string }> {
+    return tx.event.update({ where: { id }, data, select: { id: true } });
   }
 
   findCard(id: string): Promise<EventWithCard | null> {

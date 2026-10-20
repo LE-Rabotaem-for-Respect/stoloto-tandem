@@ -320,7 +320,13 @@ describe('actions[]: пример для карточки события', () =>
 
   it('организатор получает управление событием, но не запись на своё', () => {
     const codes = card(author).map((action) => action.code);
-    expect(codes).toEqual(['join', 'post_message', 'reschedule_event', 'cancel_event']);
+    expect(codes).toEqual([
+      'join',
+      'post_message',
+      'edit_event',
+      'reschedule_event',
+      'cancel_event',
+    ]);
     expect(card(author)[0]).toEqual({
       code: 'join',
       enabled: false,
