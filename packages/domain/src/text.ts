@@ -39,7 +39,7 @@ export const VISIBLE_TEXT = /[\p{L}\p{N}]/u;
  * в коротком поле они не нужны, а слово с ними не находится поиском.
  */
 export function cleanSingleLine(text: string): string {
-  return text.replaceAll('­', '').trim();
+  return text.replaceAll(String.fromCodePoint(0xad), '').trim();
 }
 
 /** Переводы строк Windows и старых Mac (`\r\n`, `\r`) — к одному `\n`. */

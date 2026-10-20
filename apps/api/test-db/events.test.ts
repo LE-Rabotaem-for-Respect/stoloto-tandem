@@ -173,8 +173,8 @@ describe('POST /events', () => {
   it('мягкий перенос в названии убирается: мероприятие находится поиском', async () => {
     const response = await post(igor, {
       ...validEvent(),
-      title: `Кёр­линг для новичков`,
-      city: 'Крас­ноярск',
+      title: `Кёр${String.fromCodePoint(0xad)}линг для новичков`,
+      city: `Крас${String.fromCodePoint(0xad)}ноярск`,
     });
     expect(response.status).toBe(201);
     expect(response.body).toMatchObject({ title: 'Кёрлинг для новичков', city: 'Красноярск' });
@@ -333,13 +333,21 @@ describe('POST /events', () => {
       { title: `Фут${String.fromCodePoint(0xfe0f)}бол 7×7` },
       'title',
     ],
-    ['пустые символы Брайля вместо названия', { title: '⠀'.repeat(5) }, 'title'],
-    ['мягкие переносы вместо названия', { title: '­'.repeat(5) }, 'title'],
+    [
+      'пустые символы Брайля вместо названия',
+      { title: String.fromCodePoint(0x2800).repeat(5) },
+      'title',
+    ],
+    ['мягкие переносы вместо названия', { title: String.fromCodePoint(0xad).repeat(5) }, 'title'],
     ['название из одних точек', { title: '.....' }, 'title'],
     ['город из тире', { city: '— —' }, 'city'],
     ['район из одних эмодзи', { area: String.fromCodePoint(0x1f3c3, 0x1f3c3) }, 'area'],
     ['место из знаков', { placeText: '--- ...' }, 'placeText'],
-    ['частный символ в описании', { description: `Играем ${''}` }, 'description'],
+    [
+      'частный символ в описании',
+      { description: `Играем ${String.fromCodePoint(0xe000)}` },
+      'description',
+    ],
     ['лишнее поле', { organizerOrgId: randomUUID() }, 'organizerOrgId'],
   ])('%s — 400 с полем', async (_, change, field) => {
     const response = await post(anna, { ...validEvent(), ...change });

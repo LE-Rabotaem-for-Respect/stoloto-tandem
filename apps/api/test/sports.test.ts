@@ -261,6 +261,14 @@ describe('GET /sports', () => {
     expect(repository.searches).toEqual([{ query: q.toLowerCase(), limit: 10 }]);
   });
 
+  it('мягкий перенос в запросе убирается — ищется слово целиком', async () => {
+    repository.searches = [];
+    const q = `скало${String.fromCodePoint(0xad)}лазание`;
+    const response = await request(app.getHttpServer()).get('/sports').query({ q });
+    expect(response.status).toBe(200);
+    expect(repository.searches).toEqual([{ query: 'скалолазание', limit: 10 }]);
+  });
+
   it('отклоняет неверный лимит понятной ошибкой', async () => {
     const response = await request(app.getHttpServer()).get('/sports').query({ limit: '0' });
     expect(response.status).toBe(400);
