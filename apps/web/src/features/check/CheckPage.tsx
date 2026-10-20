@@ -1,6 +1,7 @@
 import { DEMO_ACCOUNTS, demoAccountEmail } from '@tandem/domain';
 import { Link, useNavigate } from 'react-router';
-import { useDemoLogin, useStandInfo } from '../auth';
+import { useStandInfo } from '../../shared/clock';
+import { useDemoLogin } from '../auth';
 import { Markdown } from './markdown';
 import {
   BACKGROUND_PEOPLE,
