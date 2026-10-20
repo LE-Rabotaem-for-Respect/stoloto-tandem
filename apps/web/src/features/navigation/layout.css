@@ -1,14 +1,16 @@
 /* Шапка и нижняя панель — бюджет первого экрана в docs/design.md («Первый экран карточки события»). */
 
 .app {
-  --nav-height: 64px;
-  /* Подписи нижней панели: пятая часть ширины 360 px */
-  --nav-label-size: 0.8125rem;
   min-height: 100vh;
 }
 
-/* Фокус при обходе Tab не прячется под нижней панелью */
+/* Переменные — на html: scroll-padding ниже читает их там, а не на .app */
 html {
+  --nav-height: 64px;
+  /* Подписи нижней панели: пятая часть ширины 360 px */
+  --nav-label-size: 0.8125rem;
+  /* Фокус при обходе Tab не прячется ни под шапкой, ни под нижней панелью */
+  scroll-padding-top: calc(var(--app-top-height, 0px) + var(--space-2));
   scroll-padding-bottom: calc(var(--nav-height) + var(--space-2));
 }
 
