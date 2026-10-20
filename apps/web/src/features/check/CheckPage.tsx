@@ -124,7 +124,12 @@ export function CheckPage() {
         <p>Сценарии проходят на демо-стенде: там есть демо-аккаунты и сброс данных.</p>
       )}
       <p>
-        Подробные шаги и демо-данные — <Link to="/check/scenarios">docs/scenarios.md</Link>.
+        Подробные шаги и демо-данные —{' '}
+        {/* Ссылка — блок inline-flex (область нажатия), после него браузер переносит строку:
+            точка вместе со ссылкой, иначе на узком экране она уходит одна на строку */}
+        <span className="check-nowrap">
+          <Link to="/check/scenarios">docs/scenarios.md</Link>.
+        </span>
       </p>
       <Stands current={stand.data?.standId ?? null} />
       {CHECK_ROUTES.map((route) => (

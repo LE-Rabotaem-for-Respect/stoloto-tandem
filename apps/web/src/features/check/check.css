@@ -78,3 +78,8 @@
   align-items: center;
   min-height: var(--tap-min);
 }
+
+/* Ссылка и знак препинания после неё — на одной строке */
+.check-nowrap {
+  white-space: nowrap;
+}

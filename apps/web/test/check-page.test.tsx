@@ -201,6 +201,19 @@ describe('маршруты /check — проверки ТЗ 4.7 не теряю�
     expect(steps.map((item) => item.path)).toEqual(['/organization', '/create', '/organization']);
   });
 
+  it('«Открыть экран» ведёт туда, где есть мероприятие шага', () => {
+    // Игорь — организатор «Футбола»: в его «Моих записях» события нет, а в ленте есть
+    const reschedule = route('3.3')?.steps.find(
+      (item) => 'account' in item.who && item.who.account === 'igor',
+    );
+    expect(reschedule?.path).toBe('/');
+    // Снятого «Блица» в ленте нет — «Ладья» находит его через уведомление
+    const ladya = route('6')?.steps.find(
+      (item) => 'account' in item.who && item.who.account === 'ladya',
+    );
+    expect(ladya?.path).toBe('/notifications');
+  });
+
   it('сценарий 6: «Ладья» видит баннер, а запись по прямой ссылке API отклоняет', () => {
     const steps = route('6')?.steps ?? [];
     expect(
