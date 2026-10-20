@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useMutationState, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { apiRequest } from '../../shared/api';
 import { useTheme } from '../../shared/theme';
@@ -18,13 +18,30 @@ export function savedTheme(settings: unknown): Partial<ThemeSettings> {
   };
 }
 
+const SAVE_THEME_KEY = ['save-theme'] as const;
+
+export const THEME_NOT_SAVED = 'Не сохранилось в аккаунте — выбор остался в этом браузере';
+
 function useSaveTheme() {
   const client = useQueryClient();
   return useMutation({
+    mutationKey: SAVE_THEME_KEY,
     mutationFn: (patch: Partial<ThemeSettings>) =>
       apiRequest<Me>('/me/settings', { method: 'PATCH', body: patch }),
     onSuccess: (me) => client.setQueryData(ME_KEY, me),
   });
+}
+
+/**
+ * Последнее сохранение оформления в аккаунт не удалось — общее для шапки и профиля:
+ * переключатели в них разные, а сообщение о сбое должно быть видно у любого.
+ */
+export function useThemeSaveFailed(): boolean {
+  const statuses = useMutationState({
+    filters: { mutationKey: SAVE_THEME_KEY },
+    select: (mutation) => mutation.state.status,
+  });
+  return statuses.at(-1) === 'error';
 }
 
 /**

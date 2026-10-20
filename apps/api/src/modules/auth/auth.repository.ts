@@ -67,10 +67,22 @@ export class AuthRepository {
     return session?.user ?? null;
   }
 
-  updateSettings(userId: string, settings: Prisma.InputJsonValue): Promise<UserWithOrganization> {
-    return this.prisma.user.update({
+  /**
+   * Сливает изменение в `settings.theme` одним UPDATE: два одновременных запроса
+   * («Крупный текст» и «Контраст») не затирают друг друга, остальные ключи `settings`
+   * не трогаются. Не объект в `settings` или `theme` считается пустым.
+   */
+  async mergeTheme(userId: string, theme: Record<string, boolean>): Promise<UserWithOrganization> {
+    await this.prisma.$executeRaw`
+      UPDATE "users" SET "settings" = jsonb_set(
+        CASE WHEN jsonb_typeof("settings") = 'object' THEN "settings" ELSE '{}'::jsonb END,
+        '{theme}',
+        CASE WHEN jsonb_typeof("settings" -> 'theme') = 'object'
+          THEN "settings" -> 'theme' ELSE '{}'::jsonb END || ${JSON.stringify(theme)}::jsonb
+      )
+      WHERE "id" = ${userId}::uuid`;
+    return this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      data: { settings },
       include: withOrganization,
     });
   }

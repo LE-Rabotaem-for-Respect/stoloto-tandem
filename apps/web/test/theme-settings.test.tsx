@@ -26,6 +26,7 @@ const anna = (settings: unknown = {}) => ({
 function fakeApi({ signedIn = false, settings = {} as unknown, saveFails = false } = {}) {
   let me = signedIn ? anna(settings) : null;
   const saved: unknown[] = [];
+  const failures = { saveFails };
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
@@ -46,7 +47,7 @@ function fakeApi({ signedIn = false, settings = {} as unknown, saveFails = false
         case 'PATCH /api/me/settings': {
           const patch = JSON.parse(String(init?.body)) as object;
           saved.push(patch);
-          if (saveFails) return json(500, { code: 'internal', message: 'Ошибка' });
+          if (failures.saveFails) return json(500, { code: 'internal', message: 'Ошибка' });
           return json(200, anna({ theme: patch }));
         }
         case 'GET /api/events':
@@ -56,7 +57,7 @@ function fakeApi({ signedIn = false, settings = {} as unknown, saveFails = false
       }
     }),
   );
-  return { saved };
+  return { saved, failures };
 }
 
 function renderApp(path: string) {
@@ -188,5 +189,28 @@ describe('переключатели «Крупный текст» и «Высо
     expect(JSON.parse(localStorage.getItem('tandem-theme') ?? '{}')).toMatchObject({
       largeText: false,
     });
+    // Но человек знает, что в аккаунт не сохранилось
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Не сохранилось в аккаунте — выбор остался в этом браузере',
+    );
+  });
+
+  it('в профиле сбой — у «Оформления», один раз; удачное сохранение убирает сообщение', async () => {
+    const { failures } = fakeApi({ signedIn: true, saveFails: true });
+    const user = userEvent.setup();
+    renderApp('/profile');
+
+    const section = await screen.findByRole('region', { name: 'Оформление' });
+    const contrast = section.querySelector('button:nth-of-type(2)') as HTMLButtonElement;
+    await user.click(contrast);
+    const alert = await screen.findByRole('alert');
+    expect(section.contains(alert)).toBe(true);
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(section.textContent).not.toContain('работает на любом устройстве');
+
+    failures.saveFails = false;
+    await user.click(contrast);
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    expect(section.textContent).toContain('Выбор запоминается в аккаунте');
   });
 });
