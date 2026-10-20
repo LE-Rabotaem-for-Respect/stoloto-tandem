@@ -99,6 +99,7 @@ describe('«Что взять с собой»', () => {
     expect(bringItem('Сменная обувь')).toBe('action-shoes');
     expect(bringItem('кроссовки')).toBe('action-shoes');
     expect(bringItem('Хорошее настроение')).toBeNull();
+    expect(bringItem('Тёплая водолазка')).toBeNull();
   });
 
   it('частые — пиктограммой с подписью, остальные — текстом', () => {
@@ -134,6 +135,18 @@ describe('«Как всё пройдёт»', () => {
     expect(howItGoesSteps('а\nб\nв\nг\nд\nе')).toEqual(['а', 'б', 'в', 'г д е']);
   });
 
+  it('одной строкой — время с точкой и сокращения вроде «ул.» шаг не режут', () => {
+    expect(howItGoesSteps('Сбор в 18.50 у входа. Разминка. Игра.')).toEqual([
+      'Сбор в 18.50 у входа.',
+      'Разминка.',
+      'Игра.',
+    ]);
+    expect(howItGoesSteps('Встречаемся на ул. Ленина, д. 5. Разминка на месте.')).toEqual([
+      'Встречаемся на ул. Ленина, д. 5.',
+      'Разминка на месте.',
+    ]);
+  });
+
   it('таймлайн — нумерованный список шагов', () => {
     render(<HowItGoes text={'Сбор\nРазминка\nЗанятие\nПосле — чай'} />);
     const list = screen.getByRole('list', { name: 'Как всё пройдёт' });
@@ -163,6 +176,8 @@ describe('листок переноса', () => {
     expect(leaves).toHaveLength(2);
     expect(leaves[0]?.classList.contains('date-leaf-off')).toBe(true);
     expect(leaves[1]?.classList.contains('date-leaf-off')).toBe(false);
+    // Чтец не читает две даты подряд как равноправные: смысл несёт подпись
+    expect(container.querySelector('.reschedule-leaves')?.getAttribute('aria-hidden')).toBe('true');
     expect(container.querySelector('.reschedule-arrow')?.getAttribute('aria-hidden')).toBe('true');
     expect(screen.getByText('Перенесено с 21.10 на 22.10')).toBeTruthy();
   });

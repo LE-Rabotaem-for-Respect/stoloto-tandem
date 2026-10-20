@@ -118,7 +118,8 @@ export function PriceBadge({ price }: { price: number }) {
 // Основы слов: «форма» и «форму», «вода» и «воды», «кроссовки»
 const BRING_ITEMS: readonly { icon: IconName; stems: readonly string[] }[] = [
   { icon: 'action-uniform', stems: ['форм', 'футболк'] },
-  { icon: 'action-water', stems: ['вод', 'бутыл'] },
+  // Не «вод»: с него начинается и «водолазка»
+  { icon: 'action-water', stems: ['вода', 'воды', 'воду', 'водой', 'водичк', 'бутыл'] },
   { icon: 'action-mat', stems: ['коврик'] },
   { icon: 'action-racket', stems: ['ракетк'] },
   { icon: 'action-shoes', stems: ['обув', 'кроссовк', 'кеды', 'бутс'] },
@@ -155,6 +156,10 @@ export function BringList({ items }: { items: readonly string[] }) {
 }
 
 const MAX_STEPS = 4;
+// Конец предложения — точка, «!» или «?», пробел и заглавная буква или цифра, но не
+// после сокращения адреса («ул. Ленина, д. 5»); «18.50» без пробела не режется
+const SENTENCE_END =
+  /(?<=[.!?])(?<!(?:^|[^\p{L}])(?:ул|пр|пер|пл|наб|бул|ш|д|корп|стр|г|им|см|т\.\s?е|т\.\s?к)\.)\s+(?=[\p{Lu}\d«"])/u;
 const LIST_MARKER = /^\s*(?:[-*•–—]|\d+[.)])\s*/;
 
 /**
@@ -168,7 +173,10 @@ export function howItGoesSteps(text: string): string[] {
     .filter(Boolean);
   const steps =
     lines.length === 1
-      ? (lines[0]?.match(/[^.!?]+[.!?]*/g) ?? []).map((part) => part.trim()).filter(Boolean)
+      ? (lines[0] ?? '')
+          .split(SENTENCE_END)
+          .map((part) => part.trim())
+          .filter(Boolean)
       : lines;
   if (steps.length <= MAX_STEPS) return steps;
   return [...steps.slice(0, MAX_STEPS - 1), steps.slice(MAX_STEPS - 1).join(' ')];
@@ -193,11 +201,14 @@ export function HowItGoes({ text }: { text: string }) {
 export function RescheduleLeaf({ from, to }: { from: Date; to: Date }) {
   return (
     <div className="reschedule">
-      <DateLeaf date={from} compact off />
-      <span className="reschedule-arrow" aria-hidden="true">
-        →
+      {/* Две даты подряд чтец прочёл бы как равноправные — смысл несёт подпись */}
+      <span className="reschedule-leaves" aria-hidden="true">
+        <DateLeaf date={from} compact off />
+        <span className="reschedule-arrow" aria-hidden="true">
+          →
+        </span>
+        <DateLeaf date={to} compact />
       </span>
-      <DateLeaf date={to} compact />
       <span className="reschedule-label">{`Перенесено с ${dayMonth(from)} на ${dayMonth(to)}`}</span>
     </div>
   );
