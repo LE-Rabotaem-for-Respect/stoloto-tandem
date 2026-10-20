@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/com
 import { ApiError } from '../../core/errors';
 import type { Actor } from '../../core/policies';
 import { CurrentActor, Roles } from '../auth';
-import type { AdminEventList } from '../events/events.service';
+import type { AdminEventItem, AdminEventList } from '../events/events.service';
 import { EventsService } from '../events/events.service';
 import type { OwnOrganizationView } from '../organizations/organization-view';
 import { MessagesService } from '../messages/messages.service';
@@ -11,6 +11,7 @@ import {
   AdminEventsQuery,
   AdminMessagesQuery,
   AdminOrganizationsQuery,
+  EventModerationDto,
   OrganizationDecisionDto,
 } from './admin.dto';
 import { AdminService } from './admin.service';
@@ -77,6 +78,18 @@ export class AdminController {
       },
       page(query),
     );
+  }
+
+  @Post('events/:id/moderation')
+  @Roles('admin')
+  @HttpCode(200)
+  moderateEvent(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Body() dto: EventModerationDto,
+  ): Promise<AdminEventItem> {
+    if (!UUID.test(id)) throw new ApiError('not_found', undefined, 'Мероприятие не найдено');
+    return this.events.moderate(actor, id, dto.action, dto.reason);
   }
 
   @Get('messages')
