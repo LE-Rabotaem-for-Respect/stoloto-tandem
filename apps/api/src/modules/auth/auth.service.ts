@@ -13,10 +13,6 @@ import type { AuthLimits } from './attempt-limiter';
 import { PasswordHasher } from './password-hasher';
 import { SessionService } from './session.service';
 
-type JsonObject = Record<string, unknown>;
-const isPlainObject = (value: unknown): value is JsonObject =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
 export interface SignedIn {
   user: UserWithOrganization;
   token: string;
@@ -96,23 +92,17 @@ export class AuthService {
 
   /**
    * Настройки оформления вошедшего (ТЗ 2.8): «Крупный текст» и «Высокий контраст» —
-   * в `settings.theme`, остальные настройки аккаунта не трогаются.
+   * в `settings.theme`, остальные настройки аккаунта не трогаются. Слияние — в базе,
+   * а не по снимку пользователя из сессии: иначе быстрые переключения теряют одно из них.
    */
-  async updateSettings(
+  updateSettings(
     user: UserWithOrganization,
     dto: UpdateSettingsDto,
   ): Promise<UserWithOrganization> {
-    const current = isPlainObject(user.settings) ? user.settings : {};
-    const theme = isPlainObject(current.theme) ? current.theme : {};
-    const next = {
-      ...current,
-      theme: {
-        ...theme,
-        ...(dto.largeText !== undefined && { largeText: dto.largeText }),
-        ...(dto.contrast !== undefined && { contrast: dto.contrast }),
-      },
-    };
-    return this.repository.updateSettings(user.id, next);
+    return this.repository.mergeTheme(user.id, {
+      ...(dto.largeText !== undefined && { largeText: dto.largeText }),
+      ...(dto.contrast !== undefined && { contrast: dto.contrast }),
+    });
   }
 
   async logout(token?: string) {

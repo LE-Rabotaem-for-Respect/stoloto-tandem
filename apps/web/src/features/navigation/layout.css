@@ -7,8 +7,6 @@
 /* Переменные — на html: scroll-padding ниже читает их там, а не на .app */
 html {
   --nav-height: 64px;
-  /* Подписи нижней панели: пятая часть ширины 360 px */
-  --nav-label-size: 0.8125rem;
   /* Фокус при обходе Tab не прячется ни под шапкой, ни под нижней панелью */
   scroll-padding-top: calc(var(--app-top-height, 0px) + var(--space-2));
   scroll-padding-bottom: calc(var(--nav-height) + var(--space-2));
@@ -33,6 +31,13 @@ html {
 
 .skip-link:focus {
   top: var(--space-2);
+}
+
+/* Сбой сохранения оформления — строкой под шапкой, с теми же отступами */
+.theme-save-error {
+  border-radius: 0;
+  padding-inline: var(--space-4);
+  overflow-wrap: anywhere;
 }
 
 .app-header {
@@ -208,7 +213,7 @@ html {
    высоты из docs/design.md. Верхнее меню — размером основного текста */
 @media (max-width: 767px) {
   .main-nav-link {
-    font-size: calc(var(--nav-label-size) * var(--text-scale));
+    font-size: var(--fs-nav);
   }
 
   .main-nav-link .icon {

@@ -3,12 +3,14 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { IconName } from '../../shared/illustrations';
 import { Icon } from '../../shared/ui/Icon';
 import {
+  THEME_NOT_SAVED,
   loginPath,
   returnPath,
   useLogout,
   useMe,
   usePendingActionRelay,
   useThemeFromAccount,
+  useThemeSaveFailed,
   useThemeSettings,
 } from '../auth';
 import { DemoPanel } from '../demo';
@@ -60,6 +62,21 @@ function ThemeSwitches() {
         <span className="header-button-label">Контраст</span>
       </button>
     </div>
+  );
+}
+
+/**
+ * Сбой сохранения оформления в аккаунт — под шапкой, где переключатели. В профиле то же
+ * сообщение стоит у «Оформления», второй раз его не повторяем.
+ */
+function ThemeSaveError() {
+  const failed = useThemeSaveFailed();
+  const { pathname } = useLocation();
+  if (!failed || pathname === '/profile') return null;
+  return (
+    <p className="form-error theme-save-error" role="alert">
+      {THEME_NOT_SAVED}
+    </p>
   );
 }
 
@@ -152,6 +169,7 @@ export function AppLayout() {
           <ThemeSwitches />
           <Account />
         </header>
+        <ThemeSaveError />
         <nav className="main-nav" aria-label="Основные разделы">
           <ul>
             {NAV_ITEMS.map((item) => (

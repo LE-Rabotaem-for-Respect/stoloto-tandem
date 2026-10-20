@@ -78,6 +78,30 @@ describe('PATCH /me/settings — оформление в аккаунте', () =
     });
   });
 
+  it('одновременные изменения не теряются: в аккаунте остаются оба', async () => {
+    for (let round = 0; round < 5; round++) {
+      const anna = await account({ notifications: { email: false } });
+      const responses = await Promise.all([
+        save(anna.cookie, { largeText: true }),
+        save(anna.cookie, { contrast: true }),
+      ]);
+      expect(responses.map((response) => response.status)).toEqual([200, 200]);
+      const stored = await prisma.user.findUniqueOrThrow({ where: { id: anna.id } });
+      expect(stored.settings).toEqual({
+        notifications: { email: false },
+        theme: { largeText: true, contrast: true },
+      });
+    }
+  });
+
+  it('не объект в settings или theme — считается пустым', async () => {
+    for (const settings of [[], { theme: 'крупно' }]) {
+      const anna = await account(settings);
+      const response = await save(anna.cookie, { contrast: true });
+      expect(response.body.settings.theme).toEqual({ contrast: true });
+    }
+  });
+
   it.each([
     ['не да/нет', { largeText: 'да' }, 'largeText', '«Крупный текст» — да или нет'],
     ['null', { contrast: null }, 'contrast', '«Высокий контраст» — да или нет'],
