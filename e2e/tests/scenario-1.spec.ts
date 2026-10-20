@@ -2,7 +2,7 @@ import { expect, test } from '../support/fixtures';
 import { fillEventForm, navLink, standDate, switchAccount } from '../support/scenario';
 
 // ТЗ 4.7, сценарий 1 (docs/scenarios.md): событие с новым направлением находят другие
-test('сценарий 1: Анна создаёт событие с новым направлением, Игорь находит его поиском', async ({
+test('сценарий 1: Анна создаёт событие с новым направлением, Игорь находит его поиском и фильтром', async ({
   page,
   loginAs,
 }) => {
@@ -67,5 +67,19 @@ test('сценарий 1: Анна создаёт событие с новым �
   await page.getByRole('button', { name: 'Найти', exact: true }).click();
   await expect(page).toHaveURL(/[?&]q=/);
   const results = page.locator('.feed-list');
+  await expect(results.getByRole('link', { name: /Кёрлинг для новичков/ })).toBeVisible();
+
+  // 7. Без поиска — фильтр по новому направлению: в выдаче только это событие
+  await navLink(page, 'Найти').click();
+  await expect(page).not.toHaveURL(/[?&]q=/);
+  await page.locator('summary', { hasText: 'Фильтры' }).click();
+  await page.getByRole('combobox', { name: 'Направление' }).fill('Кёрлинг на льду');
+  await page
+    .getByRole('listbox', { name: 'Подсказки' })
+    .getByRole('option', { name: 'Кёрлинг на льду', exact: true })
+    .click();
+  await expect(page).toHaveURL(/[?&]sport=[0-9a-f-]{36}/);
+  await expect(page.locator('summary', { hasText: 'Фильтры · 1' })).toBeVisible();
+  await expect(results.locator(':scope > li')).toHaveCount(1);
   await expect(results.getByRole('link', { name: /Кёрлинг для новичков/ })).toBeVisible();
 });
