@@ -50,7 +50,8 @@ export class UpdateOrganizationDto {
   @trimLine()
   @ValidateIf((dto: UpdateOrganizationDto) => dto.website !== '')
   @IsUrl(
-    { require_protocol: true, protocols: ['http', 'https'] },
+    // Без данных входа: в https://vk.com@evil.com человек видит «vk.com», а попадает на evil.com
+    { require_protocol: true, protocols: ['http', 'https'], disallow_auth: true },
     { message: 'Ссылка на сайт или соцсеть, например https://vk.com/club' },
   )
   @MaxLength(300, { message: 'Ссылка — не длиннее 300 символов' })

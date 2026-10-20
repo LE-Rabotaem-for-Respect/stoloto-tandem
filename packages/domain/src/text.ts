@@ -15,6 +15,12 @@ const ZWJ = String.raw`(?<=\p{Extended_Pictographic}(?:\u{FE0F}|[\u{1F3FB}-\u{1F
 const SELECTOR = String.raw`(?<=\p{Emoji})[\u{FE00}-\u{FE0F}]`;
 const SOFT_HYPHEN = String.raw`(?<=\p{L}\p{M}*)\u{AD}(?=\p{L})`;
 const ALLOWED = `${ZWJ}|${SELECTOR}|${SOFT_HYPHEN}`;
+// Комбинирующие знаки (\p{M}) в однострочном тексте — как в названии направления: не
+// больше одного и только сразу после буквы («й», «ё» в разложенном виде, ударение).
+// Цепочки знаков («залго») налезают на соседние строки, а знак внутри слова
+// («Ку⃣бок») прячет слово от поиска. Исключение — рамка клавиши U+20E3 в keycap («1️⃣»).
+const MARK = String.raw`(?<=\p{L})\p{M}(?!\p{M})`;
+const KEYCAP = String.raw`(?<=[0-9#*]\u{FE0F}?)\u{20E3}`;
 // В многострочном тексте — ещё перевод строки и табуляция
 const LINE_BREAKS = String.raw`[\n\t]`;
 
@@ -23,7 +29,10 @@ const LINE_BREAKS = String.raw`[\n\t]`;
  * без невидимых символов, кроме разрешённых. Общее для api и web, чтобы проверки
  * формы совпадали с серверными.
  */
-export const SINGLE_LINE_TEXT = new RegExp(`^(?:[^${HIDDEN}]|${ALLOWED})*$`, 'u');
+export const SINGLE_LINE_TEXT = new RegExp(
+  String.raw`^(?:[^${HIDDEN}\p{M}]|${ALLOWED}|${MARK}|${KEYCAP})*$`,
+  'u',
+);
 
 /** Многострочный текст (описание, вопрос к заявке). */
 export const MULTI_LINE_TEXT = new RegExp(`^(?:[^${HIDDEN}]|${ALLOWED}|${LINE_BREAKS})*$`, 'u');

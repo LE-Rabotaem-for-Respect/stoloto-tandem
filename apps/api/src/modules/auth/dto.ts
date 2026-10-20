@@ -7,6 +7,7 @@ import {
   IsNotEmpty,
   IsString,
   Length,
+  Matches,
   MaxLength,
   ValidateIf,
 } from 'class-validator';
@@ -14,6 +15,9 @@ import { singleLine } from '../../core/validation';
 
 const trim = () =>
   Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
+
+// Печатные символы ASCII без пробела
+const EMAIL_ASCII = /^[!-~]+$/;
 
 const email = () =>
   Transform(({ value }: { value: unknown }) =>
@@ -37,6 +41,9 @@ export class RegisterDto {
   @email()
   @MaxLength(254, { message: 'Слишком длинная почта' })
   @IsEmail({}, { message: 'Укажите почту, например anna@mail.ru' })
+  // Только латиница: «аnna@mail.ru» с кириллической «а», «ａnna» или «anná» — на вид та же
+  // почта, а аккаунт другой. Домен на кириллице — в punycode (xn--…), как его отдаёт почта
+  @Matches(EMAIL_ASCII, { message: 'Почта — латиницей, например anna@mail.ru' })
   email!: string;
 
   @IsString({ message: 'Придумайте пароль' })
