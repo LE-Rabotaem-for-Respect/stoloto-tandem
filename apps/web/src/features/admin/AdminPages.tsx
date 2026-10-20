@@ -1,4 +1,9 @@
-import { EVENT_STATUSES, ORGANIZATION_STATUSES, ORGANIZATION_STATUS_VIEW } from '@tandem/domain';
+import {
+  EVENT_STATUSES,
+  ORGANIZATION_STATUSES,
+  ORGANIZATION_STATUS_VIEW,
+  eventMachine,
+} from '@tandem/domain';
 import type { EventStatus, OrganizationStatus, StatusTone } from '@tandem/domain';
 import { useId, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
@@ -13,9 +18,17 @@ import {
   useAdminOrganizations,
   useAdminOverview,
   useDiscussion,
+  useEventModeration,
   useOrganizationDecision,
 } from './api';
-import type { AdminEvent, AdminHiddenMessage, AdminOrganization, AdminSearch, Page } from './api';
+import type {
+  AdminEvent,
+  AdminHiddenMessage,
+  AdminOrganization,
+  AdminSearch,
+  EventModerationBody,
+  Page,
+} from './api';
 import './admin.css';
 
 interface StatusLook {
@@ -459,6 +472,96 @@ function Discussion({ eventId }: { eventId: string }) {
   );
 }
 
+type ModerationAction = EventModerationBody['action'];
+
+const MODERATION_TEXT: Record<ModerationAction, { button: string; submit: string }> = {
+  unpublish: { button: 'Снять с публикации', submit: 'Снять с этой причиной' },
+  delete: { button: 'Удалить', submit: 'Удалить с этой причиной' },
+};
+
+/**
+ * «Снять с публикации» и «Удалить» (ТЗ 2.10) — только с причиной: её увидят организатор и
+ * записавшиеся. Какие действия доступны в статусе, решает тот же автомат, что и api.
+ */
+function Moderation({ event }: { event: AdminEvent }) {
+  const moderate = useEventModeration();
+  const [action, setAction] = useState<ModerationAction | null>(null);
+  const [reason, setReason] = useState('');
+  const id = useId();
+  // Доступность кнопки до ввода: причину администратор укажет в форме
+  const startsAt = new Date(event.startsAt);
+  const available = (['unpublish', 'delete'] as const).filter((code) =>
+    eventMachine.canTransition(event.status, code, { now: startsAt, startsAt, reason: 'в форме' }),
+  );
+  const fieldError =
+    moderate.error instanceof ApiRequestError ? moderate.error.fields.reason : undefined;
+  const formError = moderate.error && !fieldError ? errorText(moderate.error) : undefined;
+
+  if (available.length === 0) return null;
+  if (action) {
+    return (
+      <form
+        className="admin-decision"
+        onSubmit={(submit) => {
+          submit.preventDefault();
+          moderate.mutate(
+            { id: event.id, action, reason },
+            {
+              onSuccess: () => {
+                setAction(null);
+                setReason('');
+              },
+            },
+          );
+        }}
+      >
+        <div className="field">
+          <label htmlFor={`${id}-reason`}>Причина — её увидят организатор и записавшиеся</label>
+          <textarea
+            id={`${id}-reason`}
+            value={reason}
+            maxLength={500}
+            required
+            aria-invalid={fieldError ? true : undefined}
+            aria-describedby={fieldError ? `${id}-reason-error` : undefined}
+            onChange={(change) => setReason(change.target.value)}
+          />
+          {fieldError && (
+            <p className="field-error" id={`${id}-reason-error`}>
+              {fieldError}
+            </p>
+          )}
+        </div>
+        {formError && <p className="form-error">{formError}</p>}
+        <div className="admin-actions">
+          <button className="button" type="submit" disabled={moderate.isPending}>
+            {MODERATION_TEXT[action].submit}
+          </button>
+          <button
+            className="button"
+            type="button"
+            onClick={() => {
+              setAction(null);
+              moderate.reset();
+            }}
+          >
+            Отмена
+          </button>
+        </div>
+      </form>
+    );
+  }
+  return (
+    <div className="admin-actions">
+      {available.map((code) => (
+        <button key={code} className="button" type="button" onClick={() => setAction(code)}>
+          {MODERATION_TEXT[code].button}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function EventRow({ event }: { event: AdminEvent }) {
   const organizer =
     event.organizer.kind === 'organization' ? (
@@ -494,6 +597,7 @@ function EventRow({ event }: { event: AdminEvent }) {
           </>
         )}
       </dl>
+      <Moderation event={event} />
       <Discussion eventId={event.id} />
     </li>
   );

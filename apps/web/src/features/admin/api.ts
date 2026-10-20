@@ -138,3 +138,22 @@ export function useOrganizationDecision() {
     onSuccess: () => client.invalidateQueries({ queryKey: ADMIN_KEY }),
   });
 }
+
+export interface EventModerationBody {
+  id: string;
+  action: 'unpublish' | 'delete';
+  reason: string;
+}
+
+/**
+ * «Снять с публикации» или «Удалить» мероприятие. Обновляется всё: мероприятие пропадает
+ * из ленты и поиска, у карточки меняется статус — не только списки админки.
+ */
+export function useEventModeration() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: EventModerationBody) =>
+      apiRequest<AdminEvent>(`/admin/events/${id}/moderation`, { method: 'POST', body }),
+    onSuccess: () => client.invalidateQueries(),
+  });
+}

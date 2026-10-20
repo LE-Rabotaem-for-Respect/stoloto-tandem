@@ -408,7 +408,12 @@ export class EventsService {
           { actorUserId: actor.userId, action, eventId: id, reason: statusReason, at: now },
           tx,
         );
-        const payload = { eventId: id, reason: statusReason, actorId: actor.userId, occurredAt: now };
+        const payload = {
+          eventId: id,
+          reason: statusReason,
+          actorId: actor.userId,
+          occurredAt: now,
+        };
         emit(
           action === 'unpublish'
             ? domainEvent('EventUnpublished', payload)

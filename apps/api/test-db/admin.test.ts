@@ -591,9 +591,7 @@ describe('модерация мероприятий (ТЗ 2.10, сценарий
       const notified = await prisma.notification.findMany({
         where: { type: 'event_unpublished', link: `/events/${event.id}` },
       });
-      expect(notified.map((n) => n.userId).sort()).toEqual(
-        [organizer.id, member.body.id].sort(),
-      );
+      expect(notified.map((n) => n.userId).sort()).toEqual([organizer.id, member.body.id].sort());
     });
   });
 

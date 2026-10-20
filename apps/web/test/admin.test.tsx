@@ -46,9 +46,12 @@ const event = {
   createdAt: '2026-10-19T05:00:00Z',
 };
 
-/** api админки в памяти: решения меняют статус заявки, запросы записываются. */
-function fakeAdminApi(me: typeof adminMe = adminMe) {
+type EventRow = Omit<typeof event, 'statusReason'> & { statusReason: string | null };
+
+/** api админки в памяти: решения меняют статусы, запросы записываются. */
+function fakeAdminApi(me: typeof adminMe = adminMe, eventRows: EventRow[] = [event]) {
   const organizations = [{ ...pending }];
+  const events = eventRows.map((row) => ({ ...row }));
   const calls: { call: string; body?: unknown }[] = [];
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     const call = `${init?.method ?? 'GET'} ${url}`;
@@ -86,7 +89,24 @@ function fakeAdminApi(me: typeof adminMe = adminMe) {
     if (call.startsWith('GET /api/admin/events')) {
       // 45 строк — чтобы было куда листать
       const offset = Number(new URL(url, 'http://x').searchParams.get('offset') ?? 0);
-      return json(200, { items: [event], total: 45, limit: 20, offset });
+      return json(200, { items: events, total: 45, limit: 20, offset });
+    }
+    const moderation = /^POST \/api\/admin\/events\/(\w+)\/moderation$/.exec(call);
+    if (moderation) {
+      const { action, reason } = body as { action: string; reason: string };
+      if (!reason.trim()) {
+        return json(400, {
+          code: 'validation_failed',
+          message: 'Проверьте поля',
+          fields: { reason: 'Укажите причину' },
+        });
+      }
+      const row = events.find(({ id }) => id === moderation[1]);
+      Object.assign(row ?? {}, {
+        status: action === 'unpublish' ? 'unpublished' : 'deleted',
+        statusReason: reason.trim(),
+      });
+      return json(200, row);
     }
     if (call.startsWith('GET /api/admin/messages')) {
       return json(200, {
@@ -254,6 +274,48 @@ describe('админка', () => {
     await waitFor(() =>
       expect(calls.map(({ call }) => call)).toContain('GET /api/admin/events?offset=20'),
     );
+  });
+
+  it('«Снять с публикации» — только с причиной; после решения строка показывает статус и причину', async () => {
+    const calls = fakeAdminApi(adminMe, [{ ...event, status: 'published', statusReason: null }]);
+    renderAt('/admin/events');
+    await userEvent.click(await screen.findByRole('button', { name: 'Снять с публикации' }));
+    const reason = screen.getByLabelText('Причина — её увидят организатор и записавшиеся');
+    await userEvent.type(reason, '   ');
+    await userEvent.click(screen.getByRole('button', { name: 'Снять с этой причиной' }));
+    expect(await screen.findByText('Укажите причину')).toBeTruthy();
+    expect(reason.getAttribute('aria-invalid')).toBe('true');
+
+    await userEvent.clear(reason);
+    await userEvent.type(reason, 'Сведения устарели');
+    await userEvent.click(screen.getByRole('button', { name: 'Снять с этой причиной' }));
+    expect(
+      await screen.findByText('Снято с публикации', { selector: '.admin-status' }),
+    ).toBeTruthy();
+    expect(screen.getByText('Сведения устарели')).toBeTruthy();
+    expect(calls.filter(({ call }) => call.startsWith('POST')).at(-1)).toEqual({
+      call: 'POST /api/admin/events/e1/moderation',
+      body: { action: 'unpublish', reason: 'Сведения устарели' },
+    });
+    // Снятое можно только удалить
+    expect(screen.queryByRole('button', { name: 'Снять с публикации' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Удалить' })).toBeTruthy();
+  });
+
+  it('удалённому — ни снятия, ни удаления; «Отмена» закрывает форму без запроса', async () => {
+    const calls = fakeAdminApi(adminMe, [
+      { ...event, id: 'e2', status: 'deleted', statusReason: 'Мошенничество' },
+      event,
+    ]);
+    renderAt('/admin/events');
+    expect(await screen.findByText('Удалено', { selector: '.admin-status' })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Удалить' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Снять с публикации' })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Удалить' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+    expect(screen.getByRole('button', { name: 'Удалить' })).toBeTruthy();
+    expect(calls.some(({ call }) => call.startsWith('POST'))).toBe(false);
   });
 
   it('скрытые сообщения: текст, причина, автор и мероприятие', async () => {
