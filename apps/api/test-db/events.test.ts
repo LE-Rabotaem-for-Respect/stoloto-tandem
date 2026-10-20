@@ -484,7 +484,12 @@ describe('GET /events/:id', () => {
       confirmed: { code: 'leave', enabled: true },
       waitlist: { code: 'leave', enabled: true },
       cancelled: { code: 'join', enabled: true },
-      rejected: { code: 'join', enabled: false, reason: expect.stringMatching(/После отказа/) },
+      rejected: {
+        code: 'join',
+        enabled: false,
+        reason: expect.stringMatching(/После отказа/),
+        reasonCode: 'rejected_final',
+      },
     } as const;
     for (const [status, action] of Object.entries(expected)) {
       const viewer = await account('user');

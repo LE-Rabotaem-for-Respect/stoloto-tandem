@@ -2,6 +2,7 @@ import { errorMessage, eventMachine, participationMachine } from '@tandem/domain
 import type {
   Action,
   ActionCode,
+  ErrorCode,
   EventAction,
   EventMode,
   ParticipationStatus,
@@ -22,10 +23,17 @@ export function toAction(code: ActionCode, decision: Decision): Action {
   const action: Action = { code, enabled: false };
   if (decision.requiresAuth) action.requiresAuth = true;
   action.reason = errorMessage(decision.code);
+  action.reasonCode = decision.code;
   return action;
 }
 
-const disabled = (code: ActionCode, reason: string): Action => ({ code, enabled: false, reason });
+// Отказ автомата: его текст точнее общего текста кода
+const disabled = (code: ActionCode, error: { code: ErrorCode; message: string }): Action => ({
+  code,
+  enabled: false,
+  reason: error.message,
+  reasonCode: error.code,
+});
 
 export interface CardEvent extends PolicyEvent {
   mode: EventMode;
@@ -40,7 +48,7 @@ function eventAction(code: ActionCode, action: EventAction, event: CardEvent, no
     newStartsAt: new Date(now.getTime() + 86_400_000),
     reason: 'указана в форме',
   });
-  return result.ok ? { code, enabled: true } : disabled(code, result.error.message);
+  return result.ok ? { code, enabled: true } : disabled(code, result.error);
 }
 
 /**
@@ -62,7 +70,7 @@ export function eventActions(
     actions.push(toAction('leave', canLeave(actor, event, now)));
   } else if (join.allowed) {
     const check = participationMachine.check(participation, 'join', event);
-    actions.push(check.ok ? toAction('join', join) : disabled('join', check.error.message));
+    actions.push(check.ok ? toAction('join', join) : disabled('join', check.error));
   } else {
     actions.push(toAction('join', join));
   }
@@ -101,7 +109,7 @@ export function participationActions(
   return [
     accept.ok
       ? { code: 'accept_participation', enabled: true }
-      : disabled('accept_participation', accept.error.message),
+      : disabled('accept_participation', accept.error),
     { code: 'reject_participation', enabled: true },
   ];
 }

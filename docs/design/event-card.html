@@ -868,6 +868,9 @@
           d="M3 17c0-2 1.5-3 3-3s3 1 3 3M9 17c0-2 1.5-3 3-3s3 1 3 3M15 17c0-2 1.5-3 3-3s3 1 3 3"
         />
       </symbol>
+      <symbol id="i-reject" viewBox="0 0 24 24">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </symbol>
       <symbol id="i-rejected" viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="9" />
         <path d="M9 9l6 6M15 9l-6 6" />
@@ -1087,14 +1090,14 @@
 
       <template id="gallery">
         <div class="action-bar action-bar--sample">
-          <div class="status status--off">
-            <svg class="icon" aria-hidden="true"><use href="#i-cancelled" /></svg>
-            <span class="status-text">Запись закрыта</span>
+          <div class="status status--off sample-reason-status">
+            <svg class="icon" aria-hidden="true"><use href="#i-reject" /></svg>
+            <span class="status-text">Только для пользователей</span>
           </div>
           <button class="btn-primary sample-disabled" type="button" disabled>Записаться</button>
         </div>
         <p class="record-status record-status--off record-status--sample sample-reason">
-          Запись закрыта: мероприятие уже началось
+          Набор открыт. Записываться могут только пользователи
         </p>
         <div class="status status--wait">
           <svg class="icon" aria-hidden="true"><use href="#i-pending" /></svg
@@ -1250,10 +1253,11 @@
       const gallery = document.getElementById('gallery');
       document.querySelectorAll('.panel').forEach((panel, i) => {
         const copy = gallery.content.cloneNode(true);
-        // Неактивная кнопка ссылается на строку с причиной
+        // Неактивная кнопка и плашка статуса ссылаются на строку с причиной
         const reason = copy.querySelector('.sample-reason');
         reason.id = 'sample-reason-' + i;
         copy.querySelector('.sample-disabled').setAttribute('aria-describedby', reason.id);
+        copy.querySelector('.sample-reason-status').setAttribute('aria-describedby', reason.id);
         panel.append(copy);
       });
     </script>

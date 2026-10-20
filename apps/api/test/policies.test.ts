@@ -299,12 +299,19 @@ describe('actions[]: пример для карточки события', () =>
 
   it('гость видит запись и обсуждение с requiresAuth', () => {
     expect(card(guest)).toEqual([
-      { code: 'join', enabled: false, requiresAuth: true, reason: 'Войдите, чтобы продолжить' },
+      {
+        code: 'join',
+        enabled: false,
+        requiresAuth: true,
+        reason: 'Войдите, чтобы продолжить',
+        reasonCode: 'unauthorized',
+      },
       {
         code: 'post_message',
         enabled: false,
         requiresAuth: true,
         reason: 'Войдите, чтобы продолжить',
+        reasonCode: 'unauthorized',
       },
     ]);
   });
@@ -316,6 +323,7 @@ describe('actions[]: пример для карточки события', () =>
       code: 'join',
       enabled: false,
       reason: 'После отказа повторная заявка на это мероприятие недоступна',
+      reasonCode: 'rejected_final',
     });
   });
 
@@ -335,6 +343,7 @@ describe('actions[]: пример для карточки события', () =>
       code: 'leave',
       enabled: false,
       reason: 'Мероприятие недоступно для записи',
+      reasonCode: 'event_not_joinable',
     });
     expect(
       eventActions(user, { ...event, status: 'cancelled' }, 'confirmed', now)[0],
@@ -348,6 +357,7 @@ describe('actions[]: пример для карточки события', () =>
       code: 'join',
       enabled: false,
       reason: 'Нельзя записаться на своё мероприятие',
+      reasonCode: 'own_event',
     });
   });
 
@@ -357,7 +367,12 @@ describe('actions[]: пример для карточки события', () =>
   });
 
   it('у снятого и удалённого мероприятия обсуждение неактивно для всех ролей (ТЗ 2.10)', () => {
-    const unavailable = { code: 'post_message', enabled: false, reason: 'Мероприятие недоступно' };
+    const unavailable = {
+      code: 'post_message',
+      enabled: false,
+      reason: 'Мероприятие недоступно',
+      reasonCode: 'event_not_available',
+    };
     const actors = { guest, user, author, orgApproved, orgPending, admin };
     for (const status of ['unpublished', 'deleted'] as const) {
       for (const base of [userEvent, orgEvent]) {
@@ -395,6 +410,7 @@ describe('actions[]: заявка в «Участниках и заявках»'
       code: 'accept_participation',
       enabled: false,
       reason: 'Мест нет: увеличьте лимит или дождитесь отмены',
+      reasonCode: 'no_seats',
     });
   });
 

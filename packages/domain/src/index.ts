@@ -1,7 +1,15 @@
 export * from './state-machines';
 export { ACTION_CODES } from './actions';
 export type { Action, ActionCode } from './actions';
-export { ERROR_CODES, ERROR_HTTP_STATUS, ERROR_MESSAGES, errorMessage } from './errors';
+export {
+  ERROR_CODES,
+  ERROR_HTTP_STATUS,
+  ERROR_MESSAGES,
+  ERROR_SHORT_MESSAGES,
+  SHORT_MESSAGE_MAX_LENGTH,
+  errorMessage,
+  shortErrorMessage,
+} from './errors';
 export type { ErrorCode } from './errors';
 export { EVENT_DISPLAY_STATUSES, displayStatus } from './display-status';
 export {
