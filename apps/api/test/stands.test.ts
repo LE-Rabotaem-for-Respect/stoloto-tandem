@@ -72,21 +72,31 @@ describe('стенды stand-1…3 (stands/*.env)', () => {
   });
 });
 
+// Все переменные, которые подставляет docker-compose.yml, и служебные переменные Compose,
+// которые меняют файлы, профили и проект
+const composeVariables = [
+  ...new Set(
+    [
+      ...readFileSync(resolve(standsDir, '../docker-compose.yml'), 'utf8').matchAll(
+        /\$\{([A-Z_]+)/g,
+      ),
+    ].map((match) => match[1] ?? ''),
+  ),
+].sort();
+const composeSettings = [
+  'COMPOSE_FILE',
+  'COMPOSE_PROFILES',
+  'COMPOSE_ENV_FILES',
+  'COMPOSE_PROJECT_NAME',
+];
+
 describe('scripts/stands.sh', () => {
-  // Вместо docker — скрипт, который печатает аргументы и переменные стенда из окружения
+  // Вместо docker — скрипт, который печатает аргументы и всё окружение
   function run(env: Record<string, string>): string {
     const bin = mkdtempSync(join(tmpdir(), 'stands-'));
     try {
       const docker = join(bin, 'docker');
-      writeFileSync(
-        docker,
-        [
-          '#!/bin/sh',
-          'printf "arg %s\\n" "$@"',
-          'env | grep -E "^(STAND_ID|DEMO_)" || true',
-          '',
-        ].join('\n'),
-      );
+      writeFileSync(docker, ['#!/bin/sh', 'printf "arg %s\\n" "$@"', 'env', ''].join('\n'));
       chmodSync(docker, 0o755);
       return execFileSync('sh', [resolve(standsDir, '../scripts/stands.sh'), 'ps', 'stand-1'], {
         env: { ...process.env, ...env, PATH: `${bin}${delimiter}${process.env.PATH ?? ''}` },
@@ -97,11 +107,31 @@ describe('scripts/stands.sh', () => {
     }
   }
 
-  it('переменные стенда из shell не доходят до compose: значения — из stands/<стенд>.env', () => {
-    const output = run({ DEMO_RESET_INTERVAL_SECONDS: '0', STAND_ID: 'чужой', DEMO_MODE: 'false' });
-    expect(output.split(/\r?\n/)).toEqual(
+  it('docker-compose.yml читает переменные стенда — список для проверки не пустой', () => {
+    expect(composeVariables).toEqual(
+      expect.arrayContaining(['DEMO_MODE', 'DEMO_RESET_INTERVAL_SECONDS', 'STAND_ID', 'WEB_BIND']),
+    );
+  });
+
+  it('ни одна переменная compose из shell не доходит до стенда: значения — из stands/<стенд>.env', () => {
+    const fromShell = Object.fromEntries(
+      [...composeVariables, ...composeSettings].map((name) => [name, `shell-${name}`]),
+    );
+    const output = run({ ...fromShell, DEMO_RESET_INTERVAL_SECONDS: '0', DEMO_MODE: 'false' });
+    const lines = output.split(/\r?\n/);
+    expect(lines).toEqual(
       expect.arrayContaining(['arg --env-file', 'arg stands/stand-1.env', 'arg ps']),
     );
-    expect(output).not.toMatch(/^(STAND_ID|DEMO_MODE|DEMO_RESET_INTERVAL_SECONDS)=/m);
+    const leaked = lines
+      .map((line) => line.split('=')[0] ?? '')
+      .filter((name) => composeVariables.includes(name) || composeSettings.includes(name));
+    expect(leaked).toEqual([]);
+  });
+
+  it('файл compose задан явно: COMPOSE_FILE и docker-compose.override.yml не действуют', () => {
+    const lines = run({ COMPOSE_FILE: 'docker-compose.yml;evil.yml' }).split(/\r?\n/);
+    const file = lines.indexOf('arg -f');
+    expect(file).toBeGreaterThanOrEqual(0);
+    expect(lines[file + 1]).toBe('arg docker-compose.yml');
   });
 });
