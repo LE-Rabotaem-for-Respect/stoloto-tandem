@@ -145,6 +145,7 @@ describe('метки доступа маршрутов приложения', ()
         'AdminController.organizationsList',
         'AdminController.decide',
         'AdminController.eventsList',
+        'AdminController.moderateEvent',
         'AdminController.hiddenMessages',
         'AuthController.register',
         'AuthController.login',
@@ -163,6 +164,7 @@ describe('метки доступа маршрутов приложения', ()
         'OrganizationsController.update',
         'OrganizationsController.submit',
         'SportsController.search',
+        'MessagesController.moderate',
       ]),
     );
   });

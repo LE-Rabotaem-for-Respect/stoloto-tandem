@@ -216,6 +216,52 @@ export class EventsRepository {
     return new Map(rows.map((row) => [row.id, row.title]));
   }
 
+  /**
+   * Новый статус, если он не сменился с момента чтения: два решения модераторов не
+   * перетрут друг друга. `false` — статус уже другой.
+   */
+  async changeStatus(
+    id: string,
+    from: EventStatus,
+    data: { status: EventStatus; statusReason: string | null; statusChangedAt: Date },
+    tx: Db,
+  ): Promise<boolean> {
+    const { count } = await tx.event.updateMany({ where: { id, status: from }, data });
+    return count > 0;
+  }
+
+  /** Запись в журнал модерации о решении по мероприятию. */
+  async logModeration(
+    entry: { actorUserId: string; action: string; eventId: string; reason: string; at: Date },
+    tx: Db,
+  ): Promise<void> {
+    await tx.moderationLog.create({
+      data: {
+        actorUserId: entry.actorUserId,
+        action: entry.action,
+        objectType: 'event',
+        objectId: entry.eventId,
+        reason: entry.reason,
+        createdAt: entry.at,
+      },
+    });
+  }
+
+  /** Объединение направлений: мероприятия переходят на целевое (ТЗ 2.3). */
+  async moveSport(fromId: string, toId: string, tx: Db): Promise<void> {
+    await tx.event.updateMany({ where: { sportId: fromId }, data: { sportId: toId } });
+  }
+
+  /** Мероприятия по направлениям, в любом статусе; направлений без мероприятий в ответе нет. */
+  async countBySports(sportIds: readonly string[]): Promise<Map<string, number>> {
+    const rows = await this.prisma.event.groupBy({
+      by: ['sportId'],
+      where: { sportId: { in: [...sportIds] } },
+      _count: { _all: true },
+    });
+    return new Map(rows.map((row) => [row.sportId, row._count._all]));
+  }
+
   /** Сколько мероприятий перешло в этот статус начиная с момента `since`. */
   countStatusSince(status: EventStatus, since: Date): Promise<number> {
     return this.prisma.event.count({ where: { status, statusChangedAt: { gte: since } } });

@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/com
 import { ApiError } from '../../core/errors';
 import type { Actor } from '../../core/policies';
 import { CurrentActor, Roles } from '../auth';
-import type { AdminEventList } from '../events/events.service';
+import type { AdminEventItem, AdminEventList } from '../events/events.service';
 import { EventsService } from '../events/events.service';
 import type { OwnOrganizationView } from '../organizations/organization-view';
 import { MessagesService } from '../messages/messages.service';
@@ -11,16 +11,26 @@ import {
   AdminEventsQuery,
   AdminMessagesQuery,
   AdminOrganizationsQuery,
+  AdminSportsQuery,
+  EventModerationDto,
+  MergeSportDto,
+  PromoteSportDto,
+  RenameSportDto,
   OrganizationDecisionDto,
 } from './admin.dto';
 import { AdminService } from './admin.service';
-import type { AdminOverview } from './admin.service';
+import type { AdminOverview, AdminSportItem, AdminSportList } from './admin.service';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DEFAULT_LIMIT = 20;
 
 function page(query: { limit?: number; offset?: number }) {
   return { limit: query.limit ?? DEFAULT_LIMIT, offset: query.offset ?? 0 };
+}
+
+function sportId(id: string): string {
+  if (!UUID.test(id)) throw new ApiError('not_found', undefined, 'Направление не найдено');
+  return id;
 }
 
 /** Админка (ТЗ 2.10, 4.5): только администратору — и меткой маршрута, и политикой в сервисе. */
@@ -77,6 +87,67 @@ export class AdminController {
       },
       page(query),
     );
+  }
+
+  @Post('events/:id/moderation')
+  @Roles('admin')
+  @HttpCode(200)
+  moderateEvent(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Body() dto: EventModerationDto,
+  ): Promise<AdminEventItem> {
+    if (!UUID.test(id)) throw new ApiError('not_found', undefined, 'Мероприятие не найдено');
+    return this.events.moderate(actor, id, dto.action, dto.reason);
+  }
+
+  @Get('sports')
+  @Roles('admin')
+  sportsList(
+    @CurrentActor() actor: Actor,
+    @Query() query: AdminSportsQuery,
+  ): Promise<AdminSportList> {
+    return this.admin.sportsList(actor, query, page(query));
+  }
+
+  @Post('sports/:id/rename')
+  @Roles('admin')
+  @HttpCode(200)
+  renameSport(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Body() dto: RenameSportDto,
+  ): Promise<AdminSportItem> {
+    return this.admin.renameSport(actor, sportId(id), dto.name);
+  }
+
+  @Post('sports/:id/merge')
+  @Roles('admin')
+  @HttpCode(200)
+  mergeSport(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Body() dto: MergeSportDto,
+  ): Promise<AdminSportItem> {
+    return this.admin.mergeSport(actor, sportId(id), dto.targetId);
+  }
+
+  @Post('sports/:id/promote')
+  @Roles('admin')
+  @HttpCode(200)
+  promoteSport(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Body() dto: PromoteSportDto,
+  ): Promise<AdminSportItem> {
+    return this.admin.promoteSport(actor, sportId(id), dto.category);
+  }
+
+  @Post('sports/:id/hide')
+  @Roles('admin')
+  @HttpCode(200)
+  hideSport(@CurrentActor() actor: Actor, @Param('id') id: string): Promise<AdminSportItem> {
+    return this.admin.hideSport(actor, sportId(id));
   }
 
   @Get('messages')

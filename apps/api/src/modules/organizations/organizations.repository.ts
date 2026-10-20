@@ -87,6 +87,21 @@ export class OrganizationsRepository {
     });
   }
 
+  /**
+   * Объединение направлений (DECISION-003): у организации, где есть оба, остаётся
+   * целевое, у остальных старое заменяется целевым.
+   */
+  async moveSport(fromId: string, toId: string, tx: Prisma.TransactionClient): Promise<void> {
+    const both = await tx.organizationSport.findMany({
+      where: { sportId: toId },
+      select: { organizationId: true },
+    });
+    await tx.organizationSport.deleteMany({
+      where: { sportId: fromId, organizationId: { in: both.map((row) => row.organizationId) } },
+    });
+    await tx.organizationSport.updateMany({ where: { sportId: fromId }, data: { sportId: toId } });
+  }
+
   /** Меняет статус, только если он всё ещё прежний: два одновременных решения не пройдут оба. */
   async changeStatus(id: string, from: OrganizationStatus, change: StatusChange): Promise<boolean> {
     const { count } = await this.prisma.organization.updateMany({

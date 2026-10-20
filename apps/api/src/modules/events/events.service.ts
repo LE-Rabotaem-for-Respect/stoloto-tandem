@@ -31,6 +31,7 @@ import {
   canSeeParticipantInfo,
   canViewEvent,
   eventActions,
+  moderationActions,
 } from '../../core/policies';
 import type { Actor } from '../../core/policies';
 import { EventTermsService } from '../participations/event-terms.service';
@@ -38,6 +39,7 @@ import { SportsService } from '../sports/sports.service';
 import type { CreateEventDto, EventFeedQuery, FeedDate, UpdateEventDto } from './events.dto';
 import { EventsRepository } from './events.repository';
 import type { EditableFields, EventWithCard } from './events.repository';
+import type { Prisma } from '../../generated/prisma/client';
 
 export interface EventCard {
   id: string;
@@ -63,6 +65,10 @@ export interface EventCard {
   participationReason: string | null;
   /** Только подтверждённым участникам, организатору и администратору; остальным — `null`. */
   participantInfo: string | null;
+  /** Лимит мест; `null` — без ограничения. */
+  capacity: number | null;
+  /** Подтверждённые участники — для блока мест «Осталось N из M» (ТЗ 2.11). */
+  confirmedCount: number;
   actions: Action[];
 }
 
@@ -77,6 +83,8 @@ export interface AdminEventItem {
   status: EventStatus;
   statusReason: string | null;
   createdAt: Date;
+  /** «Снять с публикации», «Вернуть», «Удалить» — по политике и автомату Event (DECISION-002). */
+  actions: Action[];
 }
 
 export interface AdminEventList {
@@ -118,6 +126,11 @@ const QUICK_DATES: Record<FeedDate, (now: Date) => TimeRange> = {
 };
 
 const SPORT_REQUIRED = 'Выберите направление из списка или добавьте новое';
+const EVENT_NOT_FOUND = 'Мероприятие не найдено';
+
+/** Решения администратора по мероприятию (ТЗ 2.10); восстановление публикации — P3. */
+export const EVENT_MODERATIONS = ['unpublish', 'delete'] as const;
+export type EventModeration = (typeof EVENT_MODERATIONS)[number];
 
 // Мероприятие со скрытым направлением показывается в группе «Другое» (ТЗ 2.3),
 // а скрытое некорректное название не показывается ни в карточке, ни в ленте
@@ -152,6 +165,22 @@ function feedItem(event: EventWithCard, now: Date, confirmed: number): EventFeed
     mode: event.mode,
     level: event.level,
     displayStatus: displayStatus(event, now, confirmed),
+  };
+}
+
+// Админка видит настоящее название направления, даже скрытого
+function adminItem(event: EventWithCard, actor: Actor, now: Date): AdminEventItem {
+  return {
+    id: event.id,
+    title: event.title,
+    sport: { id: event.sport.id, name: event.sport.name, category: event.sport.category },
+    organizer: organizerOf(event),
+    startsAt: event.startsAt,
+    city: event.city,
+    status: event.status,
+    statusReason: event.statusReason,
+    createdAt: event.createdAt,
+    actions: moderationActions(actor, event, now),
   };
 }
 
@@ -361,6 +390,8 @@ export class EventsService {
       participation,
       participationReason,
       participantInfo: seesInfo ? event.participantInfo : null,
+      capacity: event.capacity,
+      confirmedCount,
       actions: eventActions(actor, { ...event, hasSeats }, participation, now),
     };
   }
@@ -421,26 +452,78 @@ export class EventsService {
       },
       page,
     );
-    return {
-      items: events.map((event) => ({
-        id: event.id,
-        title: event.title,
-        sport: { id: event.sport.id, name: event.sport.name, category: event.sport.category },
-        organizer: organizerOf(event),
-        startsAt: event.startsAt,
-        city: event.city,
-        status: event.status,
-        statusReason: event.statusReason,
-        createdAt: event.createdAt,
-      })),
-      total,
-      ...page,
-    };
+    const now = this.clock.now();
+    return { items: events.map((event) => adminItem(event, actor, now)), total, ...page };
+  }
+
+  /**
+   * «Снять с публикации» и «Удалить» (ТЗ 2.10): только администратор и только с причиной.
+   * Удаление мягкое — статус `deleted`. Записи остаются как были, новые действия с ними
+   * закрывают политики. Решение — в журнал модерации, уведомления шлют обработчики событий.
+   */
+  async moderate(
+    actor: Actor,
+    id: string,
+    action: EventModeration,
+    reason: string,
+  ): Promise<AdminEventItem> {
+    const decision = canModerate(actor);
+    if (!decision.allowed) throw new ApiError(decision.code);
+    if (actor.role !== 'admin') throw new ApiError('admins_only');
+    const event = isUUID(id) ? await this.events.findCard(id) : null;
+    if (!event) throw new ApiError('not_found', undefined, EVENT_NOT_FOUND);
+
+    const now = this.clock.now();
+    const status = eventMachine.nextState(event.status, action, {
+      now,
+      startsAt: event.startsAt,
+      reason,
+    });
+    const statusReason = reason.trim();
+    await this.bus.afterCommit((emit) =>
+      this.events.transaction(async (tx) => {
+        const changed = await this.events.changeStatus(
+          id,
+          event.status,
+          { status, statusReason, statusChangedAt: now },
+          tx,
+        );
+        if (!changed) throw new ApiError('conflict', undefined, 'Статус мероприятия уже изменился');
+        await this.events.logModeration(
+          { actorUserId: actor.userId, action, eventId: id, reason: statusReason, at: now },
+          tx,
+        );
+        const payload = {
+          eventId: id,
+          reason: statusReason,
+          actorId: actor.userId,
+          occurredAt: now,
+        };
+        emit(
+          action === 'unpublish'
+            ? domainEvent('EventUnpublished', payload)
+            : domainEvent('EventDeleted', payload),
+        );
+      }),
+    );
+    const changed = await this.events.findCard(id);
+    if (!changed) throw new ApiError('not_found', undefined, EVENT_NOT_FOUND);
+    return adminItem(changed, actor, now);
   }
 
   /** Сколько мероприятий снято с публикации за последние 7 дней (обзор админки). */
   countUnpublishedLastWeek(): Promise<number> {
     return this.events.countStatusSince('unpublished', this.weekAgo());
+  }
+
+  /** Мероприятия переходят на целевое направление — в транзакции объединения дублей. */
+  moveSport(fromId: string, toId: string, tx: Prisma.TransactionClient): Promise<void> {
+    return this.events.moveSport(fromId, toId, tx);
+  }
+
+  /** Сколько мероприятий у каждого направления — для каталога в админке. */
+  countBySports(sportIds: readonly string[]): Promise<Map<string, number>> {
+    return this.events.countBySports(sportIds);
   }
 
   /** Названия мероприятий по id — для списков других модулей (сообщения в админке). */

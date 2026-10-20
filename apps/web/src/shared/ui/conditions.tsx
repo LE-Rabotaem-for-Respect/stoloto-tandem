@@ -13,10 +13,12 @@ interface SeatsProps {
   capacity: number | null;
   /** Сколько мест занято подтверждёнными участниками. */
   taken: number;
+  /** Больше мест — полоса: в карточке ряд кружков не должен переноситься на 360 px. */
+  maxDots?: number;
 }
 
 /** Места (docs/design.md, «Места»): кружки или полоса и подпись «Осталось 3 из 10». */
-export function Seats({ capacity, taken }: SeatsProps) {
+export function Seats({ capacity, taken, maxDots = MAX_DOTS }: SeatsProps) {
   if (capacity === null) {
     return (
       <div className="seats">
@@ -28,7 +30,7 @@ export function Seats({ capacity, taken }: SeatsProps) {
   const left = capacity - occupied;
   return (
     <div className={left === 0 ? 'seats seats--full' : 'seats'}>
-      {capacity <= MAX_DOTS ? (
+      {capacity <= maxDots ? (
         <span className="seats-dots" aria-hidden="true">
           {Array.from({ length: capacity }, (_, index) => (
             <i key={index} data-taken={index < occupied ? '' : undefined} />

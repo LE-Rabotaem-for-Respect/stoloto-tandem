@@ -81,3 +81,4 @@ export {
   notificationText,
 } from './notifications';
 export type { NotificationPayload, NotificationType } from './notifications';
+export { isUuid } from './ids';

@@ -54,11 +54,39 @@ const event = {
   createdAt: '2026-10-19T05:00:00Z',
 };
 
-/** api админки в памяти: решения меняют статус заявки, запросы записываются. */
+type EventRow = Omit<typeof event, 'statusReason'> & {
+  statusReason: string | null;
+  /** Без них — как посчитал бы api по статусу. */
+  actions?: { code: string; enabled: boolean; reason?: string }[];
+};
+
+// Как api (moderationActions): у снятого — «Вернуть», удалённое не снять и не удалить
+const moderationActions = (status: string) => {
+  const done = 'Мероприятие удалено';
+  if (status === 'deleted') {
+    return [
+      { code: 'unpublish_event', enabled: false, reason: done },
+      { code: 'delete_event', enabled: false, reason: done },
+    ];
+  }
+  return [
+    { code: status === 'unpublished' ? 'restore_event' : 'unpublish_event', enabled: true },
+    { code: 'delete_event', enabled: true },
+  ];
+};
+
+/** api админки в памяти: решения меняют статусы, запросы записываются. */
 function fakeAdminApi(
   me: typeof adminMe = adminMe,
-  { organizations = [{ ...pending }] }: { organizations?: (typeof pending)[] } = {},
+  {
+    organizations = [{ ...pending }],
+    events: eventRows = [event],
+  }: { organizations?: (typeof pending)[]; events?: EventRow[] } = {},
 ) {
+  const events = eventRows.map((row) => ({
+    ...row,
+    actions: row.actions ?? moderationActions(row.status),
+  }));
   const calls: { call: string; body?: unknown }[] = [];
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     const call = `${init?.method ?? 'GET'} ${url}`;
@@ -97,7 +125,26 @@ function fakeAdminApi(
     if (call.startsWith('GET /api/admin/events')) {
       // 45 строк — чтобы было куда листать
       const offset = Number(new URL(url, 'http://x').searchParams.get('offset') ?? 0);
-      return json(200, { items: [event], total: 45, limit: 20, offset });
+      return json(200, { items: events, total: 45, limit: 20, offset });
+    }
+    const moderation = /^POST \/api\/admin\/events\/(\w+)\/moderation$/.exec(call);
+    if (moderation) {
+      const { action, reason } = body as { action: string; reason: string };
+      if (!reason.trim()) {
+        return json(400, {
+          code: 'validation_failed',
+          message: 'Проверьте поля',
+          fields: { reason: 'Укажите причину' },
+        });
+      }
+      const row = events.find(({ id }) => id === moderation[1]);
+      const status = action === 'unpublish' ? 'unpublished' : 'deleted';
+      Object.assign(row ?? {}, {
+        status,
+        statusReason: reason.trim(),
+        actions: moderationActions(status),
+      });
+      return json(200, row);
     }
     if (call.startsWith('GET /api/admin/messages')) {
       return json(200, {
@@ -110,6 +157,7 @@ function fakeAdminApi(
             text: 'Купите абонемент со скидкой',
             moderationReason: 'Реклама',
             createdAt: '2026-10-19T05:00:00Z',
+            actions: [{ code: 'moderate_delete_message', enabled: true }],
           },
         ],
         total: 1,
@@ -126,6 +174,10 @@ function fakeAdminApi(
           text: 'Нужна своя ракетка?',
           placeholder: null,
           createdAt: '2026-10-19T05:00:00Z',
+          actions: [
+            { code: 'hide_message', enabled: true },
+            { code: 'moderate_delete_message', enabled: true },
+          ],
           replies: [
             {
               id: 't2',
@@ -134,10 +186,21 @@ function fakeAdminApi(
               text: 'Дадим на месте',
               placeholder: null,
               createdAt: '2026-10-19T06:00:00Z',
+              actions: [],
             },
           ],
         },
       ]);
+    }
+    if (call.endsWith('/moderation')) {
+      const { reason } = body as { reason: string };
+      return reason.trim()
+        ? json(200, {})
+        : json(400, {
+            code: 'validation_failed',
+            message: 'Проверьте поля формы',
+            fields: { reason: 'Укажите причину' },
+          });
     }
     return json(404, { code: 'not_found', message: 'Не найдено' });
   });
@@ -275,6 +338,72 @@ describe('админка', () => {
     );
   });
 
+  it('«Снять с публикации» — только с причиной; после решения строка показывает статус и причину', async () => {
+    const calls = fakeAdminApi(adminMe, {
+      events: [{ ...event, status: 'published', statusReason: null }],
+    });
+    renderAt('/admin/events');
+    await userEvent.click(await screen.findByRole('button', { name: 'Снять с публикации' }));
+    const reason = screen.getByLabelText('Причина — её увидят организатор и записавшиеся');
+    // Кнопка заменилась формой: фокус — на поле причины, а не на body
+    expect(reason).toBe(document.activeElement);
+    await userEvent.type(reason, '   ');
+    await userEvent.click(screen.getByRole('button', { name: 'Снять с этой причиной' }));
+    expect(await screen.findByText('Укажите причину')).toBeTruthy();
+    expect(reason.getAttribute('aria-invalid')).toBe('true');
+
+    await userEvent.clear(reason);
+    await userEvent.type(reason, 'Сведения устарели');
+    await userEvent.click(screen.getByRole('button', { name: 'Снять с этой причиной' }));
+    expect(
+      await screen.findByText('Снято с публикации', { selector: '.admin-status' }),
+    ).toBeTruthy();
+    expect(screen.getByText('Сведения устарели')).toBeTruthy();
+    expect(calls.filter(({ call }) => call.startsWith('POST')).at(-1)).toEqual({
+      call: 'POST /api/admin/events/e1/moderation',
+      body: { action: 'unpublish', reason: 'Сведения устарели' },
+    });
+    // Снятое можно только удалить; фокус — на оставшейся кнопке
+    expect(screen.queryByRole('button', { name: 'Снять с публикации' })).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Удалить' })).toBe(document.activeElement),
+    );
+  });
+
+  it('кнопки — по actions[] строки, а не по статусу: недоступное действие не показывается', async () => {
+    fakeAdminApi(adminMe, {
+      events: [
+        {
+          ...event,
+          status: 'published',
+          statusReason: null,
+          actions: [
+            { code: 'unpublish_event', enabled: false, reason: 'Нельзя' },
+            { code: 'delete_event', enabled: true },
+          ],
+        },
+      ],
+    });
+    renderAt('/admin/events');
+    expect(await screen.findByRole('button', { name: 'Удалить' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Снять с публикации' })).toBeNull();
+  });
+
+  it('удалённому — ни снятия, ни удаления; «Отмена» закрывает форму без запроса', async () => {
+    const calls = fakeAdminApi(adminMe, {
+      events: [{ ...event, id: 'e2', status: 'deleted', statusReason: 'Мошенничество' }, event],
+    });
+    renderAt('/admin/events');
+    expect(await screen.findByText('Удалено', { selector: '.admin-status' })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Удалить' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Снять с публикации' })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Удалить' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+    expect(screen.getByRole('button', { name: 'Удалить' })).toBe(document.activeElement);
+    expect(calls.some(({ call }) => call.startsWith('POST'))).toBe(false);
+  });
+
   it('скрытые сообщения: текст, причина, автор и мероприятие', async () => {
     fakeAdminApi();
     renderAt('/admin/messages');
@@ -282,6 +411,57 @@ describe('админка', () => {
     expect(screen.getByText('Реклама')).toBeTruthy();
     expect(screen.getByText('Пётр')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Турнир по паделу' })).toBeTruthy();
+  });
+
+  it('модерация в обсуждении: кнопки по actions[], причина обязательна', async () => {
+    const calls = fakeAdminApi();
+    const user = userEvent.setup();
+    renderAt('/admin/events');
+    await user.click(await screen.findByRole('button', { name: 'Обсуждение' }));
+    await screen.findByText(/Нужна своя ракетка?/);
+    // У ответа организатора действий нет — кнопок одна пара, у вопроса
+    expect(screen.getAllByRole('button', { name: 'Скрыть' })).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'Скрыть' }));
+    // Фокус — в поле причины; «Отмена» возвращает его на кнопку
+    expect(screen.getByLabelText('Причина — её увидит автор')).toBe(document.activeElement);
+    await user.click(screen.getByRole('button', { name: 'Отмена' }));
+    expect(screen.getByRole('button', { name: 'Скрыть' })).toBe(document.activeElement);
+
+    await user.click(screen.getByRole('button', { name: 'Скрыть' }));
+    await user.click(screen.getByRole('button', { name: 'Скрыть' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Укажите причину');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Причина — её увидит автор')).toBe(document.activeElement),
+    );
+
+    await user.type(screen.getByLabelText('Причина — её увидит автор'), 'Оскорбление');
+    await user.click(screen.getByRole('button', { name: 'Скрыть' }));
+    await waitFor(() =>
+      expect(calls).toContainEqual({
+        call: 'POST /api/events/e1/messages/t1/moderation',
+        body: { action: 'hide', reason: 'Оскорбление' },
+      }),
+    );
+    // Итог — объявлен и получает фокус
+    const done = await screen.findByText('Сообщение скрыто');
+    expect(done.getAttribute('role')).toBe('status');
+    expect(done).toBe(document.activeElement);
+  });
+
+  it('скрытое сообщение в админке можно удалить с причиной', async () => {
+    const calls = fakeAdminApi();
+    const user = userEvent.setup();
+    renderAt('/admin/messages');
+    await user.click(await screen.findByRole('button', { name: 'Удалить' }));
+    await user.type(screen.getByLabelText('Причина — удаление не отменить'), 'Спам');
+    await user.click(screen.getByRole('button', { name: 'Удалить' }));
+    await waitFor(() =>
+      expect(calls).toContainEqual({
+        call: 'POST /api/events/e1/messages/m1/moderation',
+        body: { action: 'delete', reason: 'Спам' },
+      }),
+    );
   });
 
   it('в профиле администратора — ссылка на админку', async () => {

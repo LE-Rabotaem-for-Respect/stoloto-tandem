@@ -210,6 +210,29 @@ describe('создание мероприятия', { timeout: 15_000 }, () => {
     expect(created).toEqual([]);
   });
 
+  it('прошедшее время начала — ошибка у поля сразу, без запроса к api', async () => {
+    const { created } = fakeApi();
+    const user = userEvent.setup();
+    renderCreate();
+    await user.type(await screen.findByLabelText('Название'), 'Пробежка по набережной');
+    await user.type(screen.getByRole('combobox', { name: 'Направление' }), 'бег');
+    await screen.findByRole('option', { name: 'Бег' });
+    await user.keyboard('{Enter}');
+    await user.type(screen.getByLabelText('Описание'), 'Пять километров');
+    await user.click(screen.getByRole('button', { name: 'Далее' }));
+
+    // Сейчас по часам сервера — 19:00 19 октября в Красноярске
+    await user.type(await screen.findByLabelText('Дата'), '2026-10-19');
+    await user.type(screen.getByLabelText('Начало'), '10:00');
+    await user.type(screen.getByLabelText('Окончание'), '11:00');
+    await user.type(screen.getByLabelText('Район или ориентир'), 'Центральный');
+    await user.type(screen.getByLabelText('Адрес или как найти место'), 'Набережная{Enter}');
+
+    expect(describedBy(screen.getByLabelText('Начало'))).toBe('Время начала должно быть в будущем');
+    screen.getByRole('heading', { name: /Шаг 2 из 4/ });
+    expect(created).toEqual([]);
+  });
+
   it('ошибки шага — простыми словами у полей, дальше не пускает', async () => {
     fakeApi();
     const user = userEvent.setup();

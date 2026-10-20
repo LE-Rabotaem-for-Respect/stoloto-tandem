@@ -516,6 +516,19 @@ describe('GET /events/:id', () => {
     expect(join.body.code).toBe('no_seats');
   });
 
+  it('места в карточке: лимит и подтверждённые — для «Осталось N из M»; без лимита — null', async () => {
+    const id = (await post(igor, validEvent())).body.id as string;
+    const unlimited = await get(null, id);
+    expect(unlimited.body).toMatchObject({ capacity: null, confirmedCount: 0 });
+
+    await prisma.event.update({ where: { id }, data: { capacity: 10 } });
+    for (const status of ['confirmed', 'confirmed', 'confirmed', 'pending', 'cancelled'] as const) {
+      await participation(id, (await account('user')).id, status);
+    }
+    // Считаются только подтверждённые: заявка и отменённая запись мест не занимают
+    expect((await get(null, id)).body).toMatchObject({ capacity: 10, confirmedCount: 3 });
+  });
+
   it('«Участники и заявки» в actions[] — организатору и администратору, другим — нет', async () => {
     const codes = async (who: Account | null) =>
       ((await get(who, eventId)).body.actions as { code: string }[]).map((action) => action.code);

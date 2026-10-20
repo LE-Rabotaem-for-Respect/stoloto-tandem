@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { SportCategory } from '@tandem/domain';
 import { apiRequest } from '../../shared/api';
 
@@ -34,5 +34,18 @@ export interface CreatedEvent {
 export function useCreateEvent() {
   return useMutation({
     mutationFn: (body: object) => apiRequest<CreatedEvent>('/events', { method: 'POST', body }),
+  });
+}
+
+/** Изменение после публикации (`PATCH /events/:id`); карточка после ответа перечитывается. */
+export function useUpdateEvent(eventId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: object) =>
+      apiRequest<CreatedEvent>(`/events/${encodeURIComponent(eventId)}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['event', eventId] }),
   });
 }
