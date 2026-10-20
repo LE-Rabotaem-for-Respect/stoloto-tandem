@@ -463,6 +463,39 @@ describe('GET /events/:id', () => {
     expect(response.body.participantInfo).toBe('Раздевалка открыта с 18:30');
   });
 
+  it('причина отказа — только тому, кому отказали; без причины и у других статусов — null', async () => {
+    const id = (await post(igor, validEvent())).body.id as string;
+    const [refused, refusedSilently, other] = await Promise.all([
+      account('user'),
+      account('user'),
+      account('user'),
+    ]);
+    const decided = (userId: string, status: 'rejected' | 'confirmed', reason: string | null) =>
+      prisma.participation.create({
+        data: {
+          eventId: id,
+          userId,
+          status,
+          decisionReason: reason,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+    await decided(refused.id, 'rejected', 'Группа уже набрана');
+    await decided(refusedSilently.id, 'rejected', null);
+    // Причина у принятой записи не показывается, даже если в базе она есть
+    await decided(other.id, 'confirmed', 'Ждём в 18:30');
+
+    const reason = async (who: Account | null) => (await get(who, id)).body.participationReason;
+    expect(await reason(refused)).toBe('Группа уже набрана');
+    expect(await reason(refusedSilently)).toBeNull();
+    expect(await reason(other)).toBeNull();
+    // Чужая отклонённая заявка: ни другому пользователю, ни организатору, ни администратору, ни гостю
+    for (const who of [anna, igor, admin, orgApproved, null]) {
+      expect(await reason(who)).toBeNull();
+    }
+  });
+
   it('карточка, лента, /me и ответы с ошибкой не кешируются', async () => {
     expect((await get(anna, eventId)).headers['cache-control']).toBe('no-store');
     expect((await get(null, eventId)).headers['cache-control']).toBe('no-store');

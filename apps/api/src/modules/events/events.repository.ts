@@ -14,6 +14,11 @@ const cardInclude = {
 
 export type EventWithCard = Prisma.EventGetPayload<{ include: typeof cardInclude }>;
 
+export interface ViewerParticipationRow {
+  status: ParticipationStatus;
+  decisionReason: string | null;
+}
+
 /** Фильтры ленты уже в терминах модели; что они значат для человека — решает сервис. */
 export interface FeedFilter {
   /** Не завершённые к этому моменту. */
@@ -154,17 +159,20 @@ export class EventsRepository {
    * последняя отменённая. `createdAt` — время Clock: после перемотки демо-часов назад
    * отменённая запись может оказаться «новее» активной, поэтому активная ищется первой.
    */
-  async viewerParticipation(eventId: string, userId: string): Promise<ParticipationStatus | null> {
+  async viewerParticipation(
+    eventId: string,
+    userId: string,
+  ): Promise<ViewerParticipationRow | null> {
+    const select = { status: true, decisionReason: true } as const;
     const active = await this.prisma.participation.findFirst({
       where: { eventId, userId, status: { not: 'cancelled' } },
-      select: { status: true },
+      select,
     });
-    if (active) return active.status;
-    const cancelled = await this.prisma.participation.findFirst({
+    if (active) return active;
+    return this.prisma.participation.findFirst({
       where: { eventId, userId },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      select: { status: true },
+      select,
     });
-    return cancelled?.status ?? null;
   }
 }
