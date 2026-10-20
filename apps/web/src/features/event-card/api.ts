@@ -2,11 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   Action,
   EventDisplayStatus,
+  EventLevel,
   ParticipationStatus,
   SportCategory,
 } from '@tandem/domain';
 import { apiRequest } from '../../shared/api';
-import type { EventLevel } from '../../shared/ui';
 
 /** Карточка мероприятия (`GET /events/:id`): время — строками ISO. */
 export interface EventCardView {
