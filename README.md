@@ -209,3 +209,13 @@ PR в `prod` и push в `prod`.
 Обложки групп направлений и пиктограммы — собственные, сторонних
 наборов нет. Источники и правила использования —
 [`apps/web/src/shared/illustrations/SOURCES.md`](apps/web/src/shared/illustrations/SOURCES.md).
+
+Шрифты — сторонние, раздаются вместе с приложением (пакеты
+`@fontsource-variable/golos-text` и `@fontsource-variable/unbounded`):
+
+| Шрифт      | Где                             | Лицензия    |
+| ---------- | ------------------------------- | ----------- |
+| Golos Text | текст интерфейса                | SIL OFL 1.1 |
+| Unbounded  | заголовки, число на листке даты | SIL OFL 1.1 |
+
+Тексты лицензий — в пакетах шрифтов и в `docs/design/fonts`.
