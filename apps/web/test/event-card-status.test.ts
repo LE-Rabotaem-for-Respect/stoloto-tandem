@@ -91,6 +91,18 @@ describe('статус в панели действия и строка полн
     });
   });
 
+  it('мест нет — причина кнопки не повторяет статус', () => {
+    const noSeats: Action = {
+      code: 'join',
+      enabled: false,
+      reason: 'Мест нет',
+      reasonCode: 'no_seats',
+    };
+    expect(cardStatus(event({ displayStatus: 'full' }), noSeats).full).toBe(
+      'Мест нет — можно встать в лист ожидания',
+    );
+  });
+
   it('гостю — обычный статус: кнопка у него активна и ведёт на вход', () => {
     const guest: Action = { code: 'join', enabled: false, requiresAuth: true, reason: 'Войдите' };
     expect(cardStatus(event(), guest)).toMatchObject({
