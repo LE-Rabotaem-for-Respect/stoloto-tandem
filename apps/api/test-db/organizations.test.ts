@@ -124,6 +124,15 @@ describe('профиль организации', () => {
     expect(badSite.status).toBe(400);
     expect(badSite.body.fields).toHaveProperty('website');
 
+    for (const website of ['https://vk.com@evil.com', 'https://user:pass@evil.com/club']) {
+      const withAuth = await http()
+        .patch(`/organizations/${id}`)
+        .set('Cookie', cookie)
+        .send({ website });
+      expect(withAuth.status).toBe(400);
+      expect(withAuth.body.fields).toHaveProperty('website');
+    }
+
     const badSport = await http()
       .patch(`/organizations/${id}`)
       .set('Cookie', cookie)

@@ -108,10 +108,11 @@ describe('каркас приложения', () => {
     expect(screen.getByRole('link', { name: 'Тандем' }).getAttribute('href')).toBe('/');
     const nav = screen.getByRole('navigation', { name: 'Основные разделы' });
     // Имена ссылок — полные слова: подпись с мягкими переносами только для показа
-    expect(within(nav).getAllByRole('link')).toHaveLength(5);
-    for (const name of ['Найти', 'Мои записи', 'Создать', 'Уведомления', 'Профиль']) {
-      within(nav).getByRole('link', { name });
-    }
+    const names = within(nav)
+      .getAllByRole('link')
+      .map((link) => (link.querySelector('.visually-hidden') ?? link).textContent);
+    expect(names).toEqual(['Найти', 'Мои записи', 'Создать', 'Уведомления', 'Профиль']);
+    for (const name of names) within(nav).getByRole('link', { name: name ?? '' });
     expect(await screen.findByRole('link', { name: 'Войти' })).toBeTruthy();
   });
 

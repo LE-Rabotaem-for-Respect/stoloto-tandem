@@ -170,6 +170,37 @@ describe('регистрация', () => {
   });
 });
 
+describe('почта при регистрации — латиницей', () => {
+  it.each([
+    ['кириллическая «а»', 'аnna'],
+    ['полноширинная «a»', 'ａnna'],
+    ['буква с комбинирующим знаком', 'anná'],
+  ])('двойник отклоняется: %s', async (_, local) => {
+    const response = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        accountType: 'person',
+        name: 'Анна',
+        email: `${local}${randomUUID().slice(0, 8)}@mail.ru`,
+        password: 'пароль-1234',
+      });
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toHaveProperty('email');
+  });
+
+  it('домен в punycode проходит', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        accountType: 'person',
+        name: 'Анна',
+        email: `anna-${randomUUID().slice(0, 8)}@xn--d1acufc.xn--p1ai`,
+        password: 'пароль-1234',
+      });
+    expect(response.status).toBe(201);
+  });
+});
+
 describe('вход, профиль и выход', () => {
   async function registered() {
     const address = email();
