@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { apiRequest } from '../../shared/api';
 import { useTheme } from '../../shared/theme';
 import type { ThemeSettings } from '../../shared/theme';
-import { ME_KEY, useMe } from './api';
+import { ME_KEY, SAVE_THEME_KEY, useMe } from './api';
 import type { Me } from './api';
 
 /** Оформление, сохранённое в аккаунте (`settings.theme`); чего там нет — то не задано. */
@@ -17,8 +17,6 @@ export function savedTheme(settings: unknown): Partial<ThemeSettings> {
     ...(typeof contrast === 'boolean' && { contrast }),
   };
 }
-
-const SAVE_THEME_KEY = ['save-theme'] as const;
 
 export const THEME_NOT_SAVED = 'Не сохранилось в аккаунте — выбор остался в этом браузере';
 
@@ -38,17 +36,32 @@ function useSaveTheme() {
   });
 }
 
-/** Последнее сохранение оформления этого аккаунта не удалось. */
+/**
+ * В аккаунте этого человека осталась несохранённая настройка: сохранение не удалось,
+ * и ни одно начатое после него удачное сохранение её не записало. Сравнение — по
+ * настройкам, а не по последнему ответу: при двух сохранениях подряд сбой первого
+ * может прийти уже после успеха второго.
+ */
 function useLastSaveFailed(userId: string | undefined): boolean {
   const saves = useMutationState({
     filters: { mutationKey: SAVE_THEME_KEY },
     select: (mutation) => ({
       status: mutation.state.status,
-      userId: (mutation.state.variables as SaveThemeVariables | undefined)?.userId,
+      ...(mutation.state.variables as SaveThemeVariables | undefined),
     }),
   });
-  const last = saves.filter((save) => save.userId === userId).at(-1);
-  return Boolean(userId) && last?.status === 'error';
+  if (!userId) return false;
+  const own = saves.filter((save) => save.userId === userId);
+  return own.some(
+    (save, index) =>
+      save.status === 'error' &&
+      Object.keys(save.patch ?? {}).some(
+        (key) =>
+          !own
+            .slice(index + 1)
+            .some((later) => later.status === 'success' && key in (later.patch ?? {})),
+      ),
+  );
 }
 
 /**
