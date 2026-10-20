@@ -3,22 +3,22 @@ import type { Action, ActionCode } from '@tandem/domain';
 /** Главная кнопка карточки — одна (ТЗ 2.2): запись или отмена записи, если api её даёт. */
 const PRIMARY: ActionCode[] = ['join', 'leave'];
 
-// Управление мероприятием api даёт только организатору
-const MANAGE: ActionCode[] = ['edit_event', 'reschedule_event', 'cancel_event'];
+// Свои места в карточке: «Изменить» — у названия, «Участники и заявки» — вкладкой
+const OWN_PLACE: ActionCode[] = ['edit_event', 'view_participants'];
 
 export function primaryAction(actions: Action[]): Action | undefined {
   return PRIMARY.map((code) => actions.find((action) => action.code === code)).find(Boolean);
 }
 
-/** Прочие действия — всё, кроме главной кнопки, в порядке ответа api. */
+/** Прочие действия — всё, кроме главной кнопки и действий со своим местом, в порядке api. */
 export function secondaryActions(actions: Action[]): Action[] {
   const primary = primaryAction(actions);
-  return actions.filter((action) => action !== primary);
+  return actions.filter((action) => action !== primary && !OWN_PLACE.includes(action.code));
 }
 
-/** Смотрит организатор: api дал ему действия управления мероприятием. */
-export const isOrganizerView = (actions: Action[]) =>
-  actions.some((action) => MANAGE.includes(action.code));
+/** Действие по коду из `actions[]`: права вычисляет api, интерфейс их не угадывает. */
+export const findAction = (actions: Action[], code: ActionCode) =>
+  actions.find((action) => action.code === code);
 
 const LABELS: Partial<Record<ActionCode, string>> = {
   leave: 'Отменить запись',

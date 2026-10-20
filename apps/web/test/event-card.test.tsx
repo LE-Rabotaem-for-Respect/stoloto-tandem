@@ -7,7 +7,7 @@ import { AppProviders, AppRoutes, createQueryClient } from '../src/App';
 import {
   actionLabel,
   actionTarget,
-  isOrganizerView,
+  findAction,
   primaryAction,
   secondaryActions,
 } from '../src/features/event-card/actions';
@@ -39,6 +39,7 @@ const card = (patch: Record<string, unknown> = {}) => ({
   statusReason: null,
   displayStatus: 'open',
   participation: null,
+  participationReason: null,
   participantInfo: null,
   actions: [{ code: 'join', enabled: true }],
   ...patch,
@@ -120,10 +121,12 @@ describe('действия карточки по actions[]', () => {
     expect(secondaryActions([join, message, cancel])).toEqual([message, cancel]);
   });
 
-  it('организатора видно по действиям управления', () => {
-    expect(isOrganizerView([join, message])).toBe(false);
-    expect(isOrganizerView([message, cancel])).toBe(true);
-    expect(isOrganizerView([{ code: 'reschedule_event', enabled: false, reason: 'x' }])).toBe(true);
+  it('«Изменить» и «Участники и заявки» — только по своим кодам, не среди прочих действий', () => {
+    const edit: Action = { code: 'edit_event', enabled: true };
+    const participants: Action = { code: 'view_participants', enabled: true };
+    expect(findAction([message, edit], 'edit_event')).toBe(edit);
+    expect(findAction([message, cancel], 'edit_event')).toBeUndefined();
+    expect(secondaryActions([join, edit, participants, cancel])).toEqual([cancel]);
   });
 
   it('подпись записи — по режиму', () => {
@@ -152,7 +155,8 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     inCard.getByText('Бег');
     inCard.getByText('07:30–08:30');
     inCard.getByText('Любитель');
-    inCard.getByText('Красноярск, Остров Татышев, Вход у моста');
+    // Место — в первом блоке и полностью в «Условиях»
+    expect(inCard.getAllByText('Красноярск, Остров Татышев, Вход у моста')).toHaveLength(2);
     inCard.getByText('Набор открыт');
     inCard.getByText('Свободно');
     expect(inCard.getAllByRole('button')).toHaveLength(1);
@@ -175,7 +179,7 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     const user = userEvent.setup();
     renderCard();
 
-    await screen.findByText('Войдите, чтобы записаться');
+    await screen.findByRole('button', { name: 'Записаться' });
     await user.click(screen.getByRole('button', { name: 'Записаться' }));
     expect(calls).not.toContain('POST /api/events/e1/join');
 
@@ -194,7 +198,7 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     );
   });
 
-  it('недоступная запись — причина рядом с кнопкой; статус записи и информация участникам', async () => {
+  it('участник: в панели — статус записи, строка полного статуса, информация участникам', async () => {
     fakeApi({
       cardFor: () =>
         json(
@@ -213,8 +217,10 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
 
     const button = await screen.findByRole('button', { name: 'Подать заявку' });
     expect((button as HTMLButtonElement).disabled).toBe(true);
-    screen.getByText('Вы уже участник');
     screen.getByText('Вы участник');
+    const full = screen.getByText('Набор открыт. Вы участник');
+    // Кнопка ссылается на строку полного статуса
+    expect(button.getAttribute('aria-describedby')).toBe(full.id);
 
     await user.click(screen.getByText('Условия'));
     screen.getByText('Сколько бегаете?');
@@ -237,7 +243,7 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     });
     renderCard();
     await screen.findByText('Отменено организатором');
-    screen.getByText('Причина: Гроза');
+    screen.getByText('Отменено организатором. Причина: Гроза');
   });
 
   it('организатор: «Изменить», вкладка «Участники и заявки», прочие действия по actions[]', async () => {
@@ -247,7 +253,14 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
           200,
           card({
             actions: [
-              { code: 'join', enabled: false, reason: 'Организатор не записывается' },
+              {
+                code: 'join',
+                enabled: false,
+                reason: 'Нельзя записаться на своё мероприятие',
+                reasonCode: 'own_event',
+              },
+              { code: 'edit_event', enabled: true },
+              { code: 'view_participants', enabled: true },
               { code: 'post_message', enabled: true },
               { code: 'reschedule_event', enabled: true },
               { code: 'cancel_event', enabled: false, reason: 'Мероприятие уже идёт' },
@@ -259,6 +272,9 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     renderCard();
 
     const edit = await screen.findByRole('link', { name: 'Изменить' });
+    // Кнопка недоступна, а статус говорит «можно»: в панели — короткая причина, полная — строкой
+    screen.getByText('Это ваше мероприятие');
+    screen.getByText('Набор открыт. Нельзя записаться на своё мероприятие');
     expect(edit.getAttribute('href')).toBe('/events/e1/edit');
     expect(screen.getByRole('link', { name: 'Перенести' }).getAttribute('href')).toBe(
       '/events/e1/edit',
@@ -368,5 +384,66 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     expect(screen.getByRole('link', { name: 'Найти другое занятие' }).getAttribute('href')).toBe(
       '/',
     );
+  });
+
+  it('«Изменить» — только по edit_event: без него ссылки нет, неактивное — с причиной', async () => {
+    let actions: Action[] = [
+      { code: 'reschedule_event', enabled: false, reason: 'Мероприятие уже началось' },
+      { code: 'cancel_event', enabled: false, reason: 'Мероприятие уже началось' },
+    ];
+    fakeApi({ cardFor: () => json(200, card({ actions })) });
+    renderCard();
+    await screen.findByRole('article', { name: 'Пробежка 5 км на Татышеве' });
+    expect(screen.queryByRole('link', { name: 'Изменить' })).toBeNull();
+    cleanup();
+
+    actions = [
+      {
+        code: 'edit_event',
+        enabled: false,
+        reason: 'Мероприятие уже началось: изменить его нельзя',
+      },
+    ];
+    renderCard();
+    await screen.findByText('Изменить: Мероприятие уже началось: изменить его нельзя');
+    expect(screen.queryByRole('link', { name: 'Изменить' })).toBeNull();
+  });
+
+  it('гостю прочее действие ведёт на вход с возвратом', async () => {
+    fakeApi({
+      cardFor: () =>
+        json(
+          200,
+          card({
+            actions: [
+              guestJoin,
+              { code: 'post_message', enabled: false, requiresAuth: true, reason: 'Войдите' },
+            ],
+          }),
+        ),
+    });
+    renderCard();
+    const link = await screen.findByRole('link', { name: 'Написать в обсуждение' });
+    expect(link.getAttribute('href')).toBe('/login?next=%2Fevents%2Fe1');
+  });
+
+  it('отказ с ошибкой поля — текст поля, а не «Проверьте поля формы»', async () => {
+    fakeApi({ signedIn: true });
+    const base = vi.mocked(fetch).getMockImplementation();
+    vi.mocked(fetch).mockImplementation(async (url, init) =>
+      String(url) === '/api/events/e1/join'
+        ? json(400, {
+            code: 'validation_failed',
+            message: 'Проверьте поля формы',
+            fields: { answer: 'Ответьте на вопрос организатора' },
+          })
+        : base
+          ? base(url, init)
+          : json(404, {}),
+    );
+    const user = userEvent.setup();
+    renderCard();
+    await user.click(await screen.findByRole('button', { name: 'Записаться' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Ответьте на вопрос организатора');
   });
 });

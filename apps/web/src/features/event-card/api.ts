@@ -29,6 +29,8 @@ export interface EventCardView {
   displayStatus: EventDisplayStatus;
   /** Запись того, кто смотрит; `null` — записи нет. */
   participation: ParticipationStatus | null;
+  /** Причина отказа по своей отклонённой заявке, если организатор её указал. */
+  participationReason: string | null;
   /** Только участникам, организатору и администратору; остальным — `null`. */
   participantInfo: string | null;
   actions: Action[];

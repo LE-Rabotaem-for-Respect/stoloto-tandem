@@ -1,20 +1,33 @@
 /* Карточка мероприятия: первый экран на 360 px — обложка, название, дата, место, статусы, кнопка. */
 
+/* Без overflow: hidden — иначе панель действия не прилипает к краю экрана */
 .event-card {
-  overflow: hidden;
   border: var(--border-width) solid var(--color-line);
   border-radius: var(--radius-card);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
 }
 
-/* Обложка — полосой: на 360 px первый экран должен вместить всё до главной кнопки */
+/* Обложка — полоса 5:1 (3:1 шире 768 px), рисунок целиком на фоне группы — обрезать
+   нельзя (docs/design.md, «Иллюстрации») */
 .event-card-cover {
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 4 / 1;
-  object-fit: cover;
+  aspect-ratio: 5 / 1;
+  object-fit: contain;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+}
+
+@media (min-width: 768px) {
+  .event-card-cover {
+    aspect-ratio: 3 / 1;
+  }
+}
+
+/* Контурная обложка в <img> рисуется чёрным: на чёрном фоне темы — инверсия */
+[data-theme='contrast'] .event-card-cover {
+  filter: invert(1);
 }
 
 .event-card-body {
@@ -28,10 +41,72 @@
   gap: var(--space-2);
 }
 
-.event-card-statuses {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-4);
+/* Панель действия: статус короткой формой и главная кнопка */
+.event-card-action {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.event-card-full-status {
+  margin: 0;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+}
+
+/* Строка полного статуса — тоном статуса из панели */
+.event-card-full-status[data-tone='ok'] {
+  color: var(--status-ok-fg);
+}
+
+.event-card-full-status[data-tone='wait'] {
+  color: var(--status-wait-fg);
+}
+
+.event-card-full-status[data-tone='queue'] {
+  color: var(--status-queue-fg);
+}
+
+.event-card-full-status[data-tone='bad'] {
+  color: var(--status-bad-fg);
+}
+
+.event-card-full-status[data-tone='warn'] {
+  color: var(--status-warn-fg);
+}
+
+.event-card-full-status[data-tone='off'] {
+  color: var(--status-off-fg);
+}
+
+/* До 768 px панель прилипает над нижней панелью в пределах первого блока: статус и
+   кнопка видны без прокрутки (docs/design.md, «Первый экран карточки события») */
+@media (max-width: 767px) {
+  .event-card-action {
+    position: sticky;
+    bottom: var(--app-nav-height, var(--nav-height));
+    z-index: 1;
+    margin: 0 calc(var(--space-4) * -1);
+    padding: var(--space-2) var(--space-4);
+    border-top: var(--border-width) solid var(--color-line);
+    background: var(--color-surface);
+  }
+
+  .event-card-action .status {
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--fs-caption);
+  }
+
+  /* Название и адрес в обычном тексте — до двух строк, хвост — многоточием; полный
+     текст в разметке читает диктор, полный адрес — в «Условиях» */
+  [data-text='normal'] .event-card-title,
+  [data-text='normal'] .event-card-place-text {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
 }
 
 .event-card-heading {
@@ -66,7 +141,17 @@
   overflow-wrap: anywhere;
 }
 
-.event-card-hint,
+/* Ссылка — областью нажатия не меньше 48 px */
+.event-card-organizer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+}
+
+.event-card-edit {
+  justify-self: start;
+}
+
 .event-card-soon,
 .event-card-action-off {
   margin: 0;

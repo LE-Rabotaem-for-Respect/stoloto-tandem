@@ -1,8 +1,7 @@
-import { EVENT_STATUS_VIEW, PARTICIPATION_STATUS_VIEW } from '@tandem/domain';
 import type { Action } from '@tandem/domain';
 import { useId, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useLocation, useParams } from 'react-router';
 import { ApiRequestError } from '../../shared/api';
 import { useClock } from '../../shared/clock';
 import { coverAlt, coverUrl } from '../../shared/illustrations';
@@ -16,16 +15,11 @@ import {
   PrimaryButton,
   StatusBadge,
 } from '../../shared/ui';
-import { useAuthAction } from '../auth';
+import { loginPath, useAuthAction } from '../auth';
 import { useEventCard, useParticipationAction } from './api';
 import type { EventCardView } from './api';
-import {
-  actionLabel,
-  actionTarget,
-  isOrganizerView,
-  primaryAction,
-  secondaryActions,
-} from './actions';
+import { actionLabel, actionTarget, findAction, primaryAction, secondaryActions } from './actions';
+import { cardStatus } from './status';
 
 const LEVEL_TEXT = {
   beginner: 'Подойдёт новичкам',
@@ -34,26 +28,42 @@ const LEVEL_TEXT = {
   any: 'Любой уровень',
 } as const;
 
-/** Главная кнопка: гостю — вход и возврат к действию, недоступная — с причиной рядом. */
-function MainAction({ event, action }: { event: EventCardView; action: Action }) {
+// Ошибка поля важнее общей: «Ответьте на вопрос организатора», а не «Проверьте поля формы»
+function errorText(error: unknown): string {
+  if (!(error instanceof ApiRequestError)) return 'Не получилось. Попробуйте ещё раз';
+  return Object.values(error.fields)[0] ?? error.message;
+}
+
+/**
+ * Главная кнопка: гостю — вход и возврат к действию; недоступная — `disabled`, почему —
+ * в строке полного статуса или в плашке панели (`describedBy`).
+ */
+function MainAction({
+  event,
+  action,
+  describedBy,
+}: {
+  event: EventCardView;
+  action: Action;
+  describedBy: string;
+}) {
   const participation = useParticipationAction(event.id);
   const run = useAuthAction(action.code, () => {
     if (action.code === 'join' || action.code === 'leave') participation.mutate(action.code);
   });
-  const error = participation.error;
+  const unavailable = !action.enabled && !action.requiresAuth;
   return (
     <>
       <PrimaryButton
         onClick={run}
-        disabled={participation.isPending}
-        reason={action.enabled || action.requiresAuth ? undefined : action.reason}
+        disabled={participation.isPending || unavailable}
+        aria-describedby={describedBy}
       >
         {actionLabel(action.code, event.mode)}
       </PrimaryButton>
-      {action.requiresAuth && <p className="event-card-hint">{action.reason}</p>}
-      {error && (
+      {participation.error && (
         <p className="form-error" role="alert">
-          {error instanceof ApiRequestError ? error.message : 'Не получилось. Попробуйте ещё раз'}
+          {errorText(participation.error)}
         </p>
       )}
     </>
@@ -61,29 +71,25 @@ function MainAction({ event, action }: { event: EventCardView; action: Action })
 }
 
 /**
- * Прочие действия по `actions[]`: доступные — ссылками на свои экраны, недоступные — с
- * причиной. У организатора первым — «Изменить».
+ * Прочие действия по `actions[]`: доступные — ссылками на свои экраны, гостю — на вход
+ * с возвратом (ТЗ 2.6), недоступные — с причиной.
  */
 function OtherActions({ event, actions }: { event: EventCardView; actions: Action[] }) {
-  // «Изменить» — своей кнопкой, пока api не отдаёт edit_event отдельно
-  const editLink =
-    isOrganizerView(event.actions) && !actions.some((action) => action.code === 'edit_event');
-  if (actions.length === 0 && !editLink) return null;
+  const location = useLocation();
+  if (actions.length === 0) return null;
   return (
     <ul className="event-card-actions">
-      {editLink && (
-        <li>
-          <Link className="button" to={`/events/${event.id}/edit`}>
-            <Icon name="action-edit" />
-            Изменить
-          </Link>
-        </li>
-      )}
       {actions.map((action) => {
         const label = actionLabel(action.code, event.mode);
         const target = actionTarget(action.code, event.id);
         let content;
-        if (!action.enabled) {
+        if (action.requiresAuth) {
+          content = (
+            <Link className="button" to={loginPath(location.pathname + location.search)}>
+              {label}
+            </Link>
+          );
+        } else if (!action.enabled) {
           content = (
             <span className="event-card-action-off">
               {label}: {action.reason}
@@ -110,6 +116,25 @@ function OtherActions({ event, actions }: { event: EventCardView; actions: Actio
   );
 }
 
+/** «Изменить» — только если api дал `edit_event`; неактивное — с причиной. */
+function EditLink({ event }: { event: EventCardView }) {
+  const edit = findAction(event.actions, 'edit_event');
+  if (!edit) return null;
+  if (!edit.enabled) {
+    return (
+      <p className="event-card-action-off">
+        {actionLabel('edit_event', event.mode)}: {edit.reason}
+      </p>
+    );
+  }
+  return (
+    <Link className="button event-card-edit" to={`/events/${event.id}/edit`}>
+      <Icon name="action-edit" />
+      {actionLabel('edit_event', event.mode)}
+    </Link>
+  );
+}
+
 function Organizer({ organizer }: { organizer: EventCardView['organizer'] }) {
   return (
     <p className="event-card-organizer">
@@ -127,25 +152,29 @@ function Organizer({ organizer }: { organizer: EventCardView['organizer'] }) {
 function CardBody({ event }: { event: EventCardView }) {
   const now = useClock();
   const { contrast } = useTheme();
+  const id = useId();
   const main = primaryAction(event.actions);
   const others = secondaryActions(event.actions);
-  const view = EVENT_STATUS_VIEW[event.displayStatus];
-  const reason =
-    event.displayStatus === 'cancelled' || event.displayStatus === 'unpublished'
-      ? event.statusReason
-      : null;
+  const status = cardStatus(event, main);
+  const fullId = `${id}-full`;
+  const panelId = `${id}-panel`;
+  const place = `${event.city}, ${event.area}, ${event.placeText}`;
 
   return (
     <article className="event-card" aria-labelledby="event-title">
       <img
         className="event-card-cover"
+        // Поля вписанного рисунка — фон группы; в «Контрасте» — фон темы: инверсия
+        // контурной обложки перекрасила бы и фон
+        style={contrast ? undefined : { background: `var(--cover-${event.sport.category})` }}
         src={coverUrl(event.sport.category, { contrast })}
         alt={coverAlt(event.sport.category)}
         width={360}
-        height={90}
+        height={72}
       />
       <div className="event-card-body">
-        {/* Первый экран на 360 px (ТЗ 2.11): всё для решения и главная кнопка без прокрутки */}
+        {/* Первый экран на 360 px (ТЗ 2.11, docs/design.md): всё для решения, а статус и
+            главная кнопка — в панели действия, которая до 768 px липнет над нижней панелью */}
         <div className="event-card-first">
           <div className="event-card-heading">
             <p className="event-card-sport">{event.sport.name}</p>
@@ -164,18 +193,27 @@ function CardBody({ event }: { event: EventCardView }) {
           </EventDate>
           <p className="event-card-place">
             <Icon name="action-location" />
-            <span>
-              {event.city}, {event.area}, {event.placeText}
-            </span>
+            <span className="event-card-place-text">{place}</span>
           </p>
-          <div className="event-card-statuses">
-            <StatusBadge view={view} reason={reason} compact />
-            {event.participation && (
-              <StatusBadge view={PARTICIPATION_STATUS_VIEW[event.participation]} compact />
+          <div className="event-card-action">
+            <div id={panelId} aria-describedby={status.full ? fullId : undefined}>
+              <StatusBadge view={status.panel} compact />
+            </div>
+            {main && (
+              <MainAction
+                event={event}
+                action={main}
+                describedBy={status.full ? fullId : panelId}
+              />
             )}
           </div>
-          {main && <MainAction event={event} action={main} />}
+          {status.full && (
+            <p id={fullId} className="event-card-full-status" data-tone={status.panel.tone}>
+              {status.full}
+            </p>
+          )}
         </div>
+        <EditLink event={event} />
         <Organizer organizer={event.organizer} />
         <OtherActions event={event} actions={others} />
 
@@ -186,6 +224,8 @@ function CardBody({ event }: { event: EventCardView }) {
         <details className="event-card-section">
           <summary>Условия</summary>
           <dl className="facts">
+            <dt>Место</dt>
+            <dd>{place}</dd>
             <dt>Уровень</dt>
             <dd>{LEVEL_TEXT[event.level]}</dd>
             <dt>Запись</dt>
@@ -228,7 +268,7 @@ const TABS = [
 type Tab = (typeof TABS)[number]['key'];
 
 /** У организатора — вкладки «Карточка» и «Участники и заявки» (ТЗ 2.2, 2.4). */
-function OrganizerTabs({ event }: { event: EventCardView }) {
+function ParticipantsTabs({ event }: { event: EventCardView }) {
   const id = useId();
   const [tab, setTab] = useState<Tab>('card');
 
@@ -270,11 +310,13 @@ function OrganizerTabs({ event }: { event: EventCardView }) {
       >
         <CardBody event={event} />
       </div>
+      {/* Панель без фокусируемого содержимого сама в обходе Tab (шаблон APG) */}
       <div
         role="tabpanel"
         id={`${id}-participants`}
         aria-labelledby={`${id}-participants-tab`}
         hidden={tab !== 'participants'}
+        tabIndex={0}
       >
         <p className="event-card-soon">Здесь будут участники и заявки на это мероприятие.</p>
       </div>
@@ -306,8 +348,8 @@ export function EventCardScreen() {
   const event = card.data;
   return (
     <div className="page page-narrow">
-      {isOrganizerView(event.actions) ? (
-        <OrganizerTabs event={event} />
+      {findAction(event.actions, 'view_participants') ? (
+        <ParticipantsTabs event={event} />
       ) : (
         <CardBody event={event} />
       )}
