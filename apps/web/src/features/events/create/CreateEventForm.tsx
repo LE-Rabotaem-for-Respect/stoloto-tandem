@@ -133,10 +133,11 @@ export function CreateEventForm({
   const [focusMessage, setFocusMessage] = useState(0);
   const messageRef = useRef<HTMLParagraphElement>(null);
   // Открытость «Дополнительно» — своим состоянием: исправление поля не сворачивает блок
-  const [moreOpen, setMoreOpen] = useState<Record<OptionalField, boolean>>({
-    participantInfo: false,
-    applyQuestion: false,
-  });
+  // При изменении блок с уже заполненным текстом открыт: организатор видит, что там написано
+  const [moreOpen, setMoreOpen] = useState<Record<OptionalField, boolean>>(() => ({
+    participantInfo: Boolean(edit?.initial.participantInfo),
+    applyQuestion: Boolean(edit?.initial.applyQuestion),
+  }));
   // Счётчик запросов «перевести фокус на первое поле с ошибкой»
   const [focusInvalid, setFocusInvalid] = useState(0);
   const form = useRef<HTMLFormElement>(null);

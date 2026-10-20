@@ -160,3 +160,10 @@
   margin: 0;
   color: var(--color-ink-muted);
 }
+
+/* Поле только для чтения отличается от изменяемого и без причины рядом */
+.create-event-locked input {
+  border-style: dashed;
+  background: var(--color-paper);
+  color: var(--color-ink-muted);
+}

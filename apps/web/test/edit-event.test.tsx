@@ -78,6 +78,10 @@ function renderEdit() {
   );
 }
 
+/** Текст, на который ссылается aria-describedby поля. */
+const describedBy = (element: HTMLElement) =>
+  document.getElementById(element.getAttribute('aria-describedby') ?? '')?.textContent;
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -111,6 +115,8 @@ describe('поля формы изменения', () => {
       applyQuestion: 'Ваш опыт?',
     });
     expect(toUpdateBody({ ...state, mode: 'free' }).applyQuestion).toBeNull();
+    // Очистить информацию для участников — пустой строкой: null сервер не примет
+    expect(toUpdateBody({ ...state, participantInfo: '  ' }).participantInfo).toBe('');
   });
 
   it('при изменении дата и время не проверяются — их меняет перенос', () => {
@@ -135,14 +141,15 @@ describe('экран «Изменить»', { timeout: 15_000 }, () => {
     const sport = screen.getByLabelText('Направление') as HTMLInputElement;
     expect(sport.value).toBe('Футбол');
     expect(sport.readOnly).toBe(true);
-    screen.getByText('Направление после публикации не меняется');
+    // Причина связана с полем — её прочитает экранный диктор
+    expect(describedBy(sport)).toBe('Направление после публикации не меняется');
 
     await user.clear(title);
     await user.type(title, 'Футбол по четвергам');
     await user.click(screen.getByRole('button', { name: 'Далее' }));
     const schedule = (await screen.findByLabelText('Дата и время')) as HTMLInputElement;
     expect(schedule.value).toBe('25.10.2026, 19:00–20:30');
-    screen.getByText('Дату и время меняют через «Перенести»');
+    expect(describedBy(schedule)).toBe('Дату и время меняют через «Перенести»');
     await user.click(screen.getByRole('button', { name: 'Далее' }));
     await user.click(await screen.findByRole('button', { name: 'Далее' }));
     await user.click(await screen.findByRole('button', { name: 'Сохранить' }));
