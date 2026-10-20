@@ -126,7 +126,7 @@ sh scripts/stands.sh down            # остановить; данные сте
 - Сдвиг демо-часов и время последнего сброса хранятся в базе своего стенда:
   `POST /demo/reset` и `POST /demo/clock` на одном стенде другие не трогают.
 - Стереть данные стенда целиком (новый сид при следующем старте):
-  `docker compose -p stand-1 --env-file stands/stand-1.env down -v`.
+  `docker compose -f docker-compose.yml -p stand-1 --env-file stands/stand-1.env down -v`.
 
 ## Ядро API
 

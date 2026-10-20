@@ -78,7 +78,8 @@ const composeVariables = [
   ...new Set(
     [
       ...readFileSync(resolve(standsDir, '../docker-compose.yml'), 'utf8').matchAll(
-        /\$\{([A-Z_]+)/g,
+        // ${VAR} и $VAR в любом регистре, кроме экранированного $$
+        /(?<!\$)\$\{?([A-Za-z_][A-Za-z0-9_]*)/g,
       ),
     ].map((match) => match[1] ?? ''),
   ),
