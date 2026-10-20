@@ -60,9 +60,14 @@ interface FakeOptions {
   cardFor?: (signedIn: boolean) => Response;
   /** Тело каждого запроса — чтобы проверить, что ушло в api. */
   onBody?: (body: unknown) => void;
+  /** «Участники и заявки» организатора; решение по заявке меняет список. */
+  participants?: Record<'pending' | 'confirmed' | 'waitlist' | 'archive', unknown[]>;
 }
 
-function fakeApi({ signedIn = false, cardFor, onBody }: FakeOptions = {}) {
+const empty = { pending: [], confirmed: [], waitlist: [], archive: [] };
+
+function fakeApi({ signedIn = false, cardFor, onBody, participants = empty }: FakeOptions = {}) {
+  let list = participants;
   let me = signedIn;
   const calls: string[] = [];
   vi.stubGlobal(
@@ -90,7 +95,30 @@ function fakeApi({ signedIn = false, cardFor, onBody }: FakeOptions = {}) {
           return json(201, { status: 'confirmed' });
         case 'POST /api/events/e1/leave':
           return json(200, { status: 'cancelled' });
+        case 'GET /api/events/e1/participants':
+          return json(200, list);
         default:
+          if (call.startsWith('POST /api/participations/')) {
+            // Принятая заявка — к участникам, отклонённая — в архив с причиной
+            const [, id, decision] = /participations\/([^/]+)\/(accept|reject)$/.exec(url) ?? [];
+            const person = list.pending.find((item) => (item as { id: string }).id === id) as
+              Record<string, unknown> | undefined;
+            if (!person) return json(404, { code: 'not_found', message: 'Не найдено' });
+            const reason = init?.body
+              ? (JSON.parse(String(init.body)) as { reason?: string }).reason
+              : undefined;
+            const moved =
+              decision === 'accept'
+                ? { ...person, status: 'confirmed', actions: [] }
+                : { ...person, status: 'rejected', decisionReason: reason ?? null, actions: [] };
+            list = {
+              ...list,
+              pending: list.pending.filter((item) => item !== person),
+              confirmed: decision === 'accept' ? [...list.confirmed, moved] : list.confirmed,
+              archive: decision === 'reject' ? [...list.archive, moved] : list.archive,
+            };
+            return json(200, { status: moved.status });
+          }
           return json(404, { code: 'not_found', message: 'Не найдено' });
       }
     }),
@@ -363,13 +391,128 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     expect(participants.tabIndex).toBe(0);
     expect(cardTab.tabIndex).toBe(-1);
     expect(document.getElementById(cardTab.getAttribute('aria-controls') ?? '')).not.toBeNull();
-    screen.getByText('Здесь будут участники и заявки на это мероприятие.');
+    await screen.findByRole('heading', { name: /Ждут решения/ });
     expect(screen.queryByRole('article')).toBeNull();
 
     await user.keyboard('{ArrowLeft}');
     expect(cardTab.getAttribute('aria-selected')).toBe('true');
     expect(cardTab).toBe(document.activeElement);
     screen.getByRole('article', { name: 'Пробежка 5 км на Татышеве' });
+  });
+
+  it('«Участники и заявки»: разделы, ответ на вопрос, «Принять» и «Отклонить» с причиной', async () => {
+    const pendingAction = (enabledAccept: boolean) => [
+      enabledAccept
+        ? { code: 'accept_participation', enabled: true }
+        : {
+            code: 'accept_participation',
+            enabled: false,
+            reason: 'Мест нет: увеличьте лимит или дождитесь отмены',
+            reasonCode: 'no_seats',
+          },
+      { code: 'reject_participation', enabled: true },
+    ];
+    const bodies: unknown[] = [];
+    const { calls } = fakeApi({
+      cardFor: () => json(200, card({ actions: [{ code: 'view_participants', enabled: true }] })),
+      onBody: (body) => bodies.push(body),
+      participants: {
+        pending: [
+          {
+            id: 'p-anna',
+            status: 'pending',
+            user: { id: 'u1', name: 'Анна' },
+            answer: 'Был один раз на скалодроме',
+            decisionReason: null,
+            actions: pendingAction(true),
+          },
+          {
+            id: 'p-ksenia',
+            status: 'pending',
+            user: { id: 'u2', name: 'Ксения' },
+            answer: 'Мне 12 лет',
+            decisionReason: null,
+            actions: pendingAction(true),
+          },
+        ],
+        confirmed: [],
+        waitlist: [],
+        archive: [],
+      },
+    });
+    const user = userEvent.setup();
+    renderCard();
+    await user.click(await screen.findByRole('tab', { name: 'Участники и заявки' }));
+
+    const waiting = await screen.findByRole('region', { name: /Ждут решения/ });
+    within(waiting).getByText('Был один раз на скалодроме');
+    const anna = within(waiting).getByText('Анна').closest('li') as HTMLElement;
+    await user.click(within(anna).getByRole('button', { name: 'Принять' }));
+    await waitFor(() => expect(calls).toContain('POST /api/participations/p-anna/accept'));
+    // Строка заявки ушла в «Участники» — фокус на заголовке «Ждут решения», а не на body
+    await waitFor(() => expect(document.activeElement?.textContent).toMatch(/^Ждут решения/));
+    // Решение сразу меняет списки
+    const people = await screen.findByRole('region', { name: /Участники/ });
+    await within(people).findByText('Анна');
+
+    const ksenia = within(screen.getByRole('region', { name: /Ждут решения/ }))
+      .getByText('Ксения')
+      .closest('li') as HTMLElement;
+    // «Отмена» закрывает форму причины и возвращает фокус на «Отклонить»
+    await user.click(within(ksenia).getByRole('button', { name: 'Отклонить' }));
+    await user.click(within(ksenia).getByRole('button', { name: 'Отмена' }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(ksenia).getByRole('button', { name: 'Отклонить' }),
+      ),
+    );
+    await user.click(within(ksenia).getByRole('button', { name: 'Отклонить' }));
+    await user.type(
+      within(ksenia).getByLabelText('Причина (необязательно)'),
+      'Детская группа — по субботам',
+    );
+    await user.click(within(ksenia).getByRole('button', { name: 'Отклонить заявку' }));
+    await waitFor(() => expect(calls).toContain('POST /api/participations/p-ksenia/reject'));
+    expect(bodies).toContainEqual({ reason: 'Детская группа — по субботам' });
+    const archive = await screen.findByRole('region', { name: /Архив/ });
+    await within(archive).findByText('Ксения');
+    within(archive).getByText(/Детская группа — по субботам/);
+  });
+
+  it('мест нет — «Принять» неактивна с подсказкой', async () => {
+    fakeApi({
+      cardFor: () => json(200, card({ actions: [{ code: 'view_participants', enabled: true }] })),
+      participants: {
+        pending: [
+          {
+            id: 'p-anna',
+            status: 'pending',
+            user: { id: 'u1', name: 'Анна' },
+            answer: null,
+            decisionReason: null,
+            actions: [
+              {
+                code: 'accept_participation',
+                enabled: false,
+                reason: 'Мест нет: увеличьте лимит или дождитесь отмены',
+                reasonCode: 'no_seats',
+              },
+              { code: 'reject_participation', enabled: true },
+            ],
+          },
+        ],
+        confirmed: [],
+        waitlist: [],
+        archive: [],
+      },
+    });
+    const user = userEvent.setup();
+    renderCard();
+    await user.click(await screen.findByRole('tab', { name: 'Участники и заявки' }));
+    const accept = await screen.findByRole('button', { name: 'Принять' });
+    expect((accept as HTMLButtonElement).disabled).toBe(true);
+    const hint = document.getElementById(accept.getAttribute('aria-describedby') ?? '');
+    expect(hint?.textContent).toBe('Мест нет: увеличьте лимит или дождитесь отмены');
   });
 
   it('администратор: модерация не ведёт на экран изменения организатора', async () => {
