@@ -24,6 +24,8 @@ const event = (patch: Partial<EventCardView> = {}): EventCardView => ({
   participation: null,
   participationReason: null,
   participantInfo: null,
+  capacity: null,
+  confirmedCount: 0,
   actions: [],
   ...patch,
 });
@@ -87,6 +89,18 @@ describe('статус в панели действия и строка полн
       panel: { text: 'Это ваше мероприятие', tone: 'off', icon: 'action-reject' },
       full: 'Набор открыт. Нельзя записаться на своё мероприятие',
     });
+  });
+
+  it('мест нет — причина кнопки не повторяет статус', () => {
+    const noSeats: Action = {
+      code: 'join',
+      enabled: false,
+      reason: 'Мест нет',
+      reasonCode: 'no_seats',
+    };
+    expect(cardStatus(event({ displayStatus: 'full' }), noSeats).full).toBe(
+      'Мест нет — можно встать в лист ожидания',
+    );
   });
 
   it('гостю — обычный статус: кнопка у него активна и ведёт на вход', () => {
