@@ -1,5 +1,6 @@
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
 import {
+  AppearanceSettings,
   LoginForm,
   QuickLogin,
   RegisterForm,
@@ -126,6 +127,7 @@ function Profile() {
           </>
         )}
       </dl>
+      <AppearanceSettings />
     </div>
   );
 }

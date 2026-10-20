@@ -1,9 +1,16 @@
 import { useLayoutEffect, useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { IconName } from '../../shared/illustrations';
-import { useTheme } from '../../shared/theme';
 import { Icon } from '../../shared/ui/Icon';
-import { loginPath, returnPath, useLogout, useMe, usePendingActionRelay } from '../auth';
+import {
+  loginPath,
+  returnPath,
+  useLogout,
+  useMe,
+  usePendingActionRelay,
+  useThemeFromAccount,
+  useThemeSettings,
+} from '../auth';
 
 /** Пять пунктов (ТЗ 2.8): нижняя панель на мобильном, верхнее меню на компьютере. */
 export const NAV_ITEMS: readonly { to: string; label: string; icon: IconName }[] = [
@@ -15,7 +22,7 @@ export const NAV_ITEMS: readonly { to: string; label: string; icon: IconName }[]
 ];
 
 function ThemeSwitches() {
-  const theme = useTheme();
+  const theme = useThemeSettings();
   return (
     <div className="theme-switches">
       <button
@@ -113,6 +120,7 @@ function useStickyTopHeight() {
 
 export function AppLayout() {
   usePendingActionRelay();
+  useThemeFromAccount();
   const top = useStickyTopHeight();
   return (
     <div className="app">
