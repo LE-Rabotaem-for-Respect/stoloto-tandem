@@ -354,11 +354,15 @@ PR в `prod` и push в `prod`.
 [`apps/web/src/shared/illustrations/SOURCES.md`](apps/web/src/shared/illustrations/SOURCES.md).
 
 Шрифты — сторонние, раздаются вместе с приложением (пакеты
-`@fontsource-variable/golos-text` и `@fontsource-variable/unbounded`):
+`@fontsource-variable/jost`, `@fontsource-variable/unbounded` и
+`@fontsource-variable/caveat`):
 
-| Шрифт      | Где                             | Лицензия    |
-| ---------- | ------------------------------- | ----------- |
-| Golos Text | текст интерфейса                | SIL OFL 1.1 |
-| Unbounded  | заголовки, число на листке даты | SIL OFL 1.1 |
+| Шрифт     | Где                                         | Лицензия    |
+| --------- | ------------------------------------------- | ----------- |
+| Jost      | текст интерфейса                            | SIL OFL 1.1 |
+| Unbounded | заголовки, логотип, число на листке даты    | SIL OFL 1.1 |
+| Caveat    | подписи «от руки» (декор, скрыт от диктора) | SIL OFL 1.1 |
 
-Тексты лицензий — в пакетах шрифтов и в `docs/design/fonts`.
+Тексты лицензий — в пакетах шрифтов и в `docs/design/fonts`
+(`OFL-jost.txt`, `OFL-unbounded.txt`, `OFL-caveat.txt`). Файлы Golos Text в
+`docs/design/fonts` остались для образца `docs/design/event-card.html`.
