@@ -269,6 +269,11 @@
   gap: var(--space-3);
 }
 
+/* Полоса мест в карточке уже общей: подпись «Осталось N из M» помещается в ту же строку */
+.event-card-first .seats-bar {
+  flex-basis: 5rem;
+}
+
 /* «Участники и заявки» организатора */
 .participants {
   display: grid;

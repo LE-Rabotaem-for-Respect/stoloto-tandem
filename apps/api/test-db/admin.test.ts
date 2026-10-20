@@ -3,12 +3,12 @@ import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/configure-app';
 import { REAL_TIME } from '../src/core/clock';
 import { AUTH_LIMITS } from '../src/modules/auth/attempt-limiter';
-import { createSport, createUser, databaseUrl, prisma } from './db';
+import { createSport, createUser, databaseUrl, eventData, participation, prisma } from './db';
 
 // Среда, 21 октября 2026, 10:00 по Красноярску
 const NOW = '2026-10-21T03:00:00Z';
@@ -96,6 +96,10 @@ describe('доступ к админке', () => {
       () => http().get('/admin/messages'),
       () =>
         http().post(`/admin/organizations/${randomUUID()}/decision`).send({ decision: 'approve' }),
+      () =>
+        http()
+          .post(`/admin/events/${randomUUID()}/moderation`)
+          .send({ action: 'unpublish', reason: 'Реклама' }),
     ];
     for (const route of routes) {
       expect((await route()).status).toBe(401);
@@ -370,7 +374,9 @@ describe('поиск', () => {
       statusReason: 'Реклама',
       organizer: { kind: 'user', id: organizer.id, name: 'Анна' },
     });
+    // Кроме полей строки — только её actions[] (DECISION-002): кнопки модерации по ним
     expect(Object.keys(all.body.items[1] as object).sort()).toEqual([
+      'actions',
       'city',
       'createdAt',
       'id',
@@ -502,5 +508,186 @@ describe('плитки ведут к своим спискам', () => {
     const cookie = await admin();
     const overview = await http().get('/admin/overview').set('Cookie', cookie);
     expect(overview.headers['cache-control']).toContain('no-store');
+  });
+});
+
+describe('модерация мероприятий (ТЗ 2.10, сценарий 6)', () => {
+  /** Опубликованное мероприятие пользователя с одним подтверждённым участником. */
+  async function eventWithParticipant(title: string) {
+    const [organizer, sport, member] = await Promise.all([
+      createUser(),
+      createSport(),
+      signUp('person'),
+    ]);
+    const event = await prisma.event.create({
+      data: { ...eventData(sport.id), title, organizerUserId: organizer.id },
+    });
+    await participation(event.id, member.body.id, 'confirmed');
+    return { event, organizer, member };
+  }
+
+  const moderate = (cookie: string, id: string, body: object) =>
+    http().post(`/admin/events/${id}/moderation`).set('Cookie', cookie).send(body);
+
+  it('без причины снять нельзя — ошибка поля, статус не меняется', async () => {
+    const cookie = await admin();
+    const { event } = await eventWithParticipant(`Блиц ${tag} без причины`);
+    for (const body of [{ action: 'unpublish' }, { action: 'unpublish', reason: '   ' }]) {
+      const response = await moderate(cookie, event.id, body);
+      expect(response.status).toBe(400);
+      expect(response.body.fields).toEqual({ reason: 'Укажите причину' });
+    }
+    // Причина из одних знаков на карточке выглядит пустой
+    for (const reason of ['.', '—', '­']) {
+      const response = await moderate(cookie, event.id, { action: 'unpublish', reason });
+      expect(response.status).toBe(400);
+      expect(response.body.fields.reason).toBeTruthy();
+    }
+    expect((await prisma.event.findUniqueOrThrow({ where: { id: event.id } })).status).toBe(
+      'published',
+    );
+  });
+
+  it('«Снять с публикации»: нет в ленте, записи целы, запись — 409, журнал и уведомления', async () => {
+    const cookie = await admin();
+    const title = `Блиц ${tag} снятие`;
+    const { event, organizer, member } = await eventWithParticipant(title);
+    const reason = 'Турнир перенесён клубом, сведения устарели';
+    expect((await http().get('/events').query({ q: title })).body.total).toBe(1);
+
+    const response = await moderate(cookie, event.id, {
+      action: 'unpublish',
+      reason: ` ${reason} `,
+    });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      id: event.id,
+      status: 'unpublished',
+      statusReason: reason,
+    });
+
+    // Лента и поиск — без снятого
+    const feed = await http().get('/events').query({ q: title });
+    expect(feed.body.total).toBe(0);
+
+    // По прямой ссылке постороннему — «Мероприятие недоступно», участнику — статус и причина
+    const stranger = await signUp('person');
+    const strangerCard = await http().get(`/events/${event.id}`).set('Cookie', stranger.cookie);
+    expect(strangerCard.status).toBe(404);
+    expect(strangerCard.body.message).toBe('Мероприятие недоступно');
+    const memberCard = await http().get(`/events/${event.id}`).set('Cookie', member.cookie);
+    expect(memberCard.body).toMatchObject({
+      status: 'unpublished',
+      displayStatus: 'unpublished',
+      statusReason: reason,
+      participation: 'confirmed',
+    });
+    // Новые действия с записью заблокированы
+    expect(memberCard.body.actions).toContainEqual(
+      expect.objectContaining({ code: 'leave', enabled: false }),
+    );
+    const leave = await http().post(`/events/${event.id}/leave`).set('Cookie', member.cookie);
+    expect(leave.status).toBe(409);
+
+    // Запись — 409 с текстом из сценария 6
+    const join = await http().post(`/events/${event.id}/join`).set('Cookie', stranger.cookie);
+    expect(join.status).toBe(409);
+    expect(join.body.message).toBe('Мероприятие недоступно для записи');
+    expect(
+      await prisma.participation.count({ where: { eventId: event.id, status: 'confirmed' } }),
+    ).toBe(1);
+
+    const log = await prisma.moderationLog.findMany({ where: { objectId: event.id } });
+    expect(log).toEqual([
+      expect.objectContaining({
+        action: 'unpublish',
+        objectType: 'event',
+        reason,
+        createdAt: new Date(NOW),
+      }),
+    ]);
+
+    // Уведомления — организатору и участнику (обработчики профиля talk)
+    await vi.waitFor(async () => {
+      const notified = await prisma.notification.findMany({
+        where: { type: 'event_unpublished', link: `/events/${event.id}` },
+      });
+      expect(notified.map((n) => n.userId).sort()).toEqual([organizer.id, member.body.id].sort());
+    });
+  });
+
+  it('«Удалить» — мягко: строка остаётся со статусом deleted; повторно — 409', async () => {
+    const cookie = await admin();
+    const { event, organizer, member } = await eventWithParticipant(`Блиц ${tag} удаление`);
+
+    const response = await moderate(cookie, event.id, {
+      action: 'delete',
+      reason: 'Мошенничество',
+    });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ status: 'deleted', statusReason: 'Мошенничество' });
+    // Удалённое ни снять, ни удалить: кнопок в строке нет
+    expect(
+      (response.body.actions as { code: string; enabled: boolean }[]).map(({ code, enabled }) => [
+        code,
+        enabled,
+      ]),
+    ).toEqual([
+      ['unpublish_event', false],
+      ['delete_event', false],
+    ]);
+    expect(await prisma.event.findUnique({ where: { id: event.id } })).toMatchObject({
+      status: 'deleted',
+      statusChangedAt: new Date(NOW),
+    });
+    expect(await prisma.participation.count({ where: { eventId: event.id } })).toBe(1);
+    const memberCard = await http().get(`/events/${event.id}`).set('Cookie', member.cookie);
+    expect(memberCard.body.displayStatus).toBe('deleted');
+
+    for (const action of ['delete', 'unpublish']) {
+      const again = await moderate(cookie, event.id, { action, reason: 'Ещё раз' });
+      expect(again.status).toBe(409);
+    }
+    expect(await prisma.moderationLog.count({ where: { objectId: event.id } })).toBe(1);
+
+    await vi.waitFor(async () => {
+      const notified = await prisma.notification.findMany({
+        where: { type: 'event_deleted', link: `/events/${event.id}` },
+      });
+      expect(notified.map((n) => n.userId).sort()).toEqual([organizer.id, member.body.id].sort());
+      expect(notified[0]?.payload).toMatchObject({ reason: 'Мошенничество' });
+    });
+  });
+
+  it('снятое можно удалить; два решения одновременно — одно проходит, второе 409', async () => {
+    const cookie = await admin();
+    const { event } = await eventWithParticipant(`Блиц ${tag} гонка`);
+    const both = await Promise.all([
+      moderate(cookie, event.id, { action: 'unpublish', reason: 'Реклама' }),
+      moderate(cookie, event.id, { action: 'unpublish', reason: 'Спам' }),
+    ]);
+    expect(both.map((r) => r.status).sort()).toEqual([200, 409]);
+    const unpublished = both.find((r) => r.status === 200);
+    expect(unpublished?.body.actions).toEqual([
+      { code: 'restore_event', enabled: true },
+      { code: 'delete_event', enabled: true },
+    ]);
+    expect(await prisma.moderationLog.count({ where: { objectId: event.id } })).toBe(1);
+
+    const deleted = await moderate(cookie, event.id, { action: 'delete', reason: 'Дубль' });
+    expect(deleted.body).toMatchObject({ status: 'deleted', statusReason: 'Дубль' });
+  });
+
+  it('неизвестное действие — ошибка поля; неверный адрес и нет такого — 404', async () => {
+    const cookie = await admin();
+    const { event } = await eventWithParticipant(`Блиц ${tag} ошибки`);
+    const unknown = await moderate(cookie, event.id, { action: 'restore', reason: 'Ошибка' });
+    expect(unknown.status).toBe(400);
+    expect(unknown.body.fields).toHaveProperty('action');
+    for (const id of ['not-a-uuid', randomUUID()]) {
+      const missing = await moderate(cookie, id, { action: 'unpublish', reason: 'Реклама' });
+      expect(missing.status).toBe(404);
+      expect(missing.body.message).toBe('Мероприятие не найдено');
+    }
   });
 });

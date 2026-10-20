@@ -33,6 +33,10 @@ export interface EventCardView {
   participationReason: string | null;
   /** Только участникам, организатору и администратору; остальным — `null`. */
   participantInfo: string | null;
+  /** Лимит мест; `null` — без ограничения. */
+  capacity: number | null;
+  /** Подтверждённые участники. */
+  confirmedCount: number;
   actions: Action[];
 }
 
