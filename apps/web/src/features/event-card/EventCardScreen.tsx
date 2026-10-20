@@ -13,6 +13,7 @@ import {
   LevelScale,
   ModeBadge,
   PrimaryButton,
+  Seats,
   StatusBadge,
 } from '../../shared/ui';
 import { loginPath, useAuthAction } from '../auth';
@@ -211,6 +212,7 @@ function CardBody({ event }: { event: EventCardView }) {
             <Icon name="action-location" />
             <span className="event-card-place-text">{place}</span>
           </p>
+          <Seats capacity={event.capacity} taken={event.confirmedCount} />
           <div className="event-card-action">
             <div id={panelId} aria-describedby={status.full ? fullId : undefined}>
               <StatusBadge view={status.panel} compact />

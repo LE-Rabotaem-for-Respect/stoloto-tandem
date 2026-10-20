@@ -161,6 +161,10 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     expect(inCard.getAllByText('Красноярск, Остров Татышев, Вход у моста')).toHaveLength(2);
     inCard.getByText('Набор открыт');
     inCard.getByText('Свободно');
+    // Места — между местом и панелью действия (docs/design.md, «Первый экран карточки»)
+    const seats = inCard.getByText('Без ограничения мест');
+    const first = article.querySelector('.event-card-first');
+    expect(first?.contains(seats)).toBe(true);
     expect(inCard.getAllByRole('button')).toHaveLength(1);
     inCard.getByRole('button', { name: 'Записаться' });
     expect(inCard.getByRole('link', { name: 'Беговой клуб «Енисей»' }).getAttribute('href')).toBe(
@@ -174,6 +178,26 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     expect(inCard.getByText('Условия').closest('details')?.open).toBe(false);
     inCard.getByRole('heading', { name: 'Частые вопросы' });
     inCard.getByRole('heading', { name: 'Обсуждение' });
+  });
+
+  it('места: «Осталось N из M» по ответу карточки, при полном наборе — «Мест нет»', async () => {
+    fakeApi({
+      signedIn: true,
+      cardFor: () => json(200, card({ capacity: 10, confirmedCount: 7 })),
+    });
+    renderCard();
+    const article = await screen.findByRole('article', { name: 'Пробежка 5 км на Татышеве' });
+    within(article).getByText('Осталось 3 из 10');
+    expect(article.querySelectorAll('.seats-dots i[data-taken]')).toHaveLength(7);
+    cleanup();
+
+    fakeApi({
+      signedIn: true,
+      cardFor: () => json(200, card({ capacity: 10, confirmedCount: 10, displayStatus: 'full' })),
+    });
+    renderCard();
+    const full = await screen.findByRole('article', { name: 'Пробежка 5 км на Татышеве' });
+    expect(full.querySelector('.seats--full')?.textContent).toBe('Мест нет');
   });
 
   it('гость: кнопка ведёт на вход, после входа запись выполняется сама', async () => {
