@@ -242,25 +242,41 @@ export function FeedScreen() {
   const items = feed.data?.pages.flatMap((page) => page.items) ?? [];
   const total = feed.data?.pages[0]?.total ?? 0;
   // После «Показать ещё» фокус — на первой новой карточке: кнопка могла исчезнуть, и
-  // обход Tab иначе начался бы с начала страницы
-  const [focusIndex, setFocusIndex] = useState<number | null>(null);
+  // обход Tab иначе начался бы с начала страницы. Каждая догрузка — новый объект: после
+  // смены фильтров индекс может совпасть с прежним, а эффект должен сработать снова
+  const [focusRequest, setFocusRequest] = useState<{ index: number } | null>(null);
+  const focusIndex = focusRequest?.index ?? null;
   const focusTarget = useRef<HTMLAnchorElement>(null);
   useEffect(() => {
-    if (focusIndex !== null) focusTarget.current?.focus();
-  }, [focusIndex]);
+    if (focusRequest) focusTarget.current?.focus();
+  }, [focusRequest]);
+  // «Повторить» после сбоя перечитывания уже загруженной ленты (например, после перемотки
+  // демо-часов): ошибка ещё в состоянии, но запрос уже идёт. При первой загрузке без данных
+  // запрос сам возвращается в «pending»
+  const retrying = feed.isError && !feed.isFetchNextPageError && feed.isFetching;
 
   return (
     <div className="page">
       <h1>Найти занятие</h1>
       <FeedFiltersForm filters={filters} onChange={(next) => setParams(filterParams(next))} />
 
-      {feed.isPending && <p role="status">Загрузка…</p>}
+      {(feed.isPending || retrying) && <p role="status">Загрузка…</p>}
       {feed.isError && !feed.isFetchNextPageError && (
         <div className="feed-error">
-          <p className="form-error" role="alert">
-            {errorText(feed.error)}
-          </p>
-          <button className="button" type="button" onClick={() => void feed.refetch()}>
+          {!retrying && (
+            <p className="form-error" role="alert">
+              {errorText(feed.error)}
+            </p>
+          )}
+          {/* aria-disabled, а не disabled: фокус остаётся на кнопке, если повтор снова не удался */}
+          <button
+            className="button"
+            type="button"
+            aria-disabled={retrying || undefined}
+            onClick={() => {
+              if (!retrying) void feed.refetch();
+            }}
+          >
             Повторить
           </button>
         </div>
@@ -301,7 +317,7 @@ export function FeedScreen() {
           onClick={() => {
             const first = items.length;
             void feed.fetchNextPage().then((result) => {
-              if (!result.isError) setFocusIndex(first);
+              if (!result.isError) setFocusRequest({ index: first });
             });
           }}
         >
