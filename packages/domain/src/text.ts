@@ -46,11 +46,13 @@ export const MULTI_LINE_TEXT = new RegExp(`^(?:[^${HIDDEN}]|${ALLOWED}|${LINE_BR
 export const VISIBLE_TEXT = /[\p{L}\p{N}]/u;
 
 /**
- * Однострочный текст перед проверкой: без пробелов по краям и без мягких переносов —
- * в коротком поле они не нужны, а слово с ними не находится поиском.
+ * Однострочный текст перед проверкой: в форме NFC (буква со знаком — одним символом,
+ * как её набирают на Windows и Android; macOS и iOS присылают разложенную), без
+ * пробелов по краям и без мягких переносов — в коротком поле они не нужны, а слово с
+ * ними не находится поиском.
  */
 export function cleanSingleLine(text: string): string {
-  return text.replaceAll(String.fromCodePoint(0xad), '').trim();
+  return text.normalize('NFC').replaceAll(String.fromCodePoint(0xad), '').trim();
 }
 
 /** Переводы строк Windows и старых Mac (`\r\n`, `\r`) — к одному `\n`. */

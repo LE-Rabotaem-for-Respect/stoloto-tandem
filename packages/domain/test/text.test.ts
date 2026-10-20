@@ -140,6 +140,15 @@ describe('VISIBLE_TEXT: в однострочном поле есть буква
 });
 
 describe('cleanSingleLine', () => {
+  it('разложенная форма (macOS, iOS) приводится к NFC: «ё́» и вьетнамский проходят правило', () => {
+    for (const text of ['ё́лка', 'Nguyễn Thị']) {
+      const decomposed = text.normalize('NFD');
+      expect(SINGLE_LINE_TEXT.test(decomposed)).toBe(false);
+      expect(cleanSingleLine(decomposed)).toBe(text.normalize('NFC'));
+      expect(SINGLE_LINE_TEXT.test(cleanSingleLine(decomposed))).toBe(true);
+    }
+  });
+
   it('мягкий перенос в однострочном тексте убирается: название находится поиском', () => {
     expect(cleanSingleLine(`  Фут${char(0xad)}бол  `)).toBe('Футбол');
   });

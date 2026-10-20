@@ -1,10 +1,17 @@
-import { MULTI_LINE_TEXT, SINGLE_LINE_TEXT, normalizeLineBreaks } from '@tandem/domain';
+import {
+  MULTI_LINE_TEXT,
+  SINGLE_LINE_TEXT,
+  cleanSingleLine,
+  normalizeLineBreaks,
+} from '@tandem/domain';
 import { Transform } from 'class-transformer';
 import { Matches } from 'class-validator';
 
-/** Однострочный текст: пробелы по краям — прочь. */
+/** Однострочный текст: в форме NFC, без пробелов по краям и мягких переносов (`cleanSingleLine`). */
 export const trimLine = () =>
-  Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
+  Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? cleanSingleLine(value) : value,
+  );
 
 /** Многострочный текст: переводы строк Windows (`\r\n`) — к `\n`, пробелы по краям — прочь. */
 export const trimText = () =>
