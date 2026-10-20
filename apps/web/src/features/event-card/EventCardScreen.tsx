@@ -1,6 +1,7 @@
+import { PARTICIPATION_STATUS_VIEW } from '@tandem/domain';
 import type { Action } from '@tandem/domain';
 import { useId, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { FormEvent, KeyboardEvent } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { ApiRequestError } from '../../shared/api';
 import { useClock } from '../../shared/clock';
@@ -12,8 +13,10 @@ import {
   Icon,
   LevelScale,
   ModeBadge,
+  ParticipationStepper,
   PrimaryButton,
   StatusBadge,
+  TextAreaField,
 } from '../../shared/ui';
 import { loginPath, useAuthAction } from '../auth';
 import { useEventCard, useParticipationAction } from './api';
@@ -34,39 +37,135 @@ function errorText(error: unknown): string {
   return Object.values(error.fields)[0] ?? error.message;
 }
 
+type Participation = ReturnType<typeof useParticipationAction>;
+/** Что раскрыто под панелью действия: ответ на вопрос к заявке или подтверждение отмены. */
+type Step = 'idle' | 'answer' | 'confirm';
+
+const mainButtonId = (eventId: string) => `event-main-${eventId}`;
+
 /**
  * Главная кнопка: гостю — вход и возврат к действию; недоступная — `disabled`, почему —
- * в строке полного статуса или в плашке панели (`describedBy`).
+ * в строке полного статуса или в плашке панели (`describedBy`). Заявка с вопросом
+ * организатора и отмена записи сначала раскрывают форму под панелью (ТЗ 2.4, 3.3).
  */
 function MainAction({
   event,
   action,
   describedBy,
+  participation,
+  onStep,
 }: {
   event: EventCardView;
   action: Action;
   describedBy: string;
+  participation: Participation;
+  onStep(step: Step): void;
 }) {
-  const participation = useParticipationAction(event.id);
+  const needsAnswer =
+    action.code === 'join' && event.mode === 'approval' && Boolean(event.applyQuestion);
   const run = useAuthAction(action.code, () => {
-    if (action.code === 'join' || action.code === 'leave') participation.mutate(action.code);
+    if (needsAnswer) onStep('answer');
+    else if (action.code === 'leave') onStep('confirm');
+    else if (action.code === 'join') participation.mutate({ action: 'join' });
   });
   const unavailable = !action.enabled && !action.requiresAuth;
   return (
-    <>
-      <PrimaryButton
-        onClick={run}
-        disabled={participation.isPending || unavailable}
-        aria-describedby={describedBy}
-      >
-        {actionLabel(action.code, event.mode)}
-      </PrimaryButton>
-      {participation.error && (
-        <p className="form-error" role="alert">
-          {errorText(participation.error)}
-        </p>
+    <PrimaryButton
+      id={mainButtonId(event.id)}
+      onClick={run}
+      disabled={participation.isPending || unavailable}
+      aria-describedby={describedBy}
+    >
+      {actionLabel(action.code, event.mode)}
+    </PrimaryButton>
+  );
+}
+
+interface StepProps {
+  event: EventCardView;
+  participation: Participation;
+  onDone(): void;
+}
+
+/** Ответ на вопрос организатора перед заявкой (ТЗ 2.4). */
+function AnswerForm({ event, participation, onDone }: StepProps) {
+  const [answer, setAnswer] = useState('');
+  const submit = (form: FormEvent) => {
+    form.preventDefault();
+    participation.mutate({ action: 'join', answer }, { onSuccess: onDone });
+  };
+  return (
+    <form className="event-card-step" onSubmit={submit} aria-label="Заявка">
+      <TextAreaField
+        label={event.applyQuestion ?? ''}
+        value={answer}
+        maxLength={1000}
+        rows={3}
+        autoFocus
+        onChange={(change) => setAnswer(change.target.value)}
+      />
+      <div className="event-card-step-buttons">
+        <button className="button button-primary" type="submit" disabled={participation.isPending}>
+          Отправить заявку
+        </button>
+        <button className="button" type="button" onClick={onDone}>
+          Отмена
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** «Отменить запись» — только после подтверждения (ТЗ 3.3). */
+function LeaveConfirm({ event, participation, onDone }: StepProps) {
+  const questionId = useId();
+  return (
+    <div className="event-card-step" role="group" aria-labelledby={questionId}>
+      <p id={questionId}>Отменить запись на «{event.title}»?</p>
+      <div className="event-card-step-buttons">
+        <button
+          className="button button-primary"
+          type="button"
+          autoFocus
+          disabled={participation.isPending}
+          onClick={() => participation.mutate({ action: 'leave' }, { onSuccess: onDone })}
+        >
+          Да, отменить
+        </button>
+        <button className="button" type="button" onClick={onDone}>
+          Не отменять
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Своя запись крупным блоком (ТЗ 2.5, 2.11): статус текстом, пиктограммой и цветом и
+ * мини-степпер; подтверждённому — «Информация для участников», отказ — с причиной.
+ */
+function MyParticipation({ event }: { event: EventCardView }) {
+  if (!event.participation && !event.participantInfo) return null;
+  return (
+    <section className="event-card-mine" aria-label="Ваша запись">
+      {event.participation && (
+        <>
+          {/* Причина отказа — под шагом «Решение» степпера, без повтора в плашке */}
+          <StatusBadge view={PARTICIPATION_STATUS_VIEW[event.participation]} />
+          <ParticipationStepper
+            mode={event.mode}
+            status={event.participation}
+            reason={event.participationReason}
+          />
+        </>
       )}
-    </>
+      {event.participantInfo && (
+        <div className="event-card-info">
+          <h2>Информация для участников</h2>
+          <p className="event-card-text">{event.participantInfo}</p>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -158,6 +257,13 @@ function CardBody({ event }: { event: EventCardView }) {
   const status = cardStatus(event, main);
   const fullId = `${id}-full`;
   const panelId = `${id}-panel`;
+  const participation = useParticipationAction(event.id);
+  const [step, setStep] = useState<Step>('idle');
+  const done = () => {
+    setStep('idle');
+    // Форма закрылась — фокус обратно на главную кнопку, а не на body
+    requestAnimationFrame(() => document.getElementById(mainButtonId(event.id))?.focus());
+  };
   const place = `${event.city}, ${event.area}, ${event.placeText}`;
 
   return (
@@ -204,15 +310,29 @@ function CardBody({ event }: { event: EventCardView }) {
                 event={event}
                 action={main}
                 describedBy={status.full ? fullId : panelId}
+                participation={participation}
+                onStep={setStep}
               />
             )}
           </div>
+          {participation.error && (
+            <p className="form-error" role="alert">
+              {errorText(participation.error)}
+            </p>
+          )}
+          {step === 'answer' && (
+            <AnswerForm event={event} participation={participation} onDone={done} />
+          )}
+          {step === 'confirm' && (
+            <LeaveConfirm event={event} participation={participation} onDone={done} />
+          )}
           {status.full && (
             <p id={fullId} className="event-card-full-status" data-tone={status.panel.tone}>
               {status.full}
             </p>
           )}
         </div>
+        <MyParticipation event={event} />
         <EditLink event={event} />
         <Organizer organizer={event.organizer} />
         <OtherActions event={event} actions={others} />
@@ -244,12 +364,6 @@ function CardBody({ event }: { event: EventCardView }) {
               </>
             )}
           </dl>
-          {event.participantInfo && (
-            <div className="event-card-info">
-              <h2>Информация для участников</h2>
-              <p className="event-card-text">{event.participantInfo}</p>
-            </div>
-          )}
         </details>
         <section className="event-card-section" aria-labelledby="faq-title">
           <h2 id="faq-title">Частые вопросы</h2>

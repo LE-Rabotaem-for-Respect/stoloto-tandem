@@ -244,3 +244,27 @@
   border-bottom-color: var(--color-primary);
   color: var(--color-primary);
 }
+
+/* Ответ на вопрос к заявке и подтверждение отмены — под панелью действия */
+.event-card-step {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.event-card-step p {
+  margin: 0;
+  font-weight: 600;
+}
+
+.event-card-step-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Своя запись крупным блоком: статус, мини-степпер, информация участникам */
+.event-card-mine {
+  display: grid;
+  gap: var(--space-3);
+}

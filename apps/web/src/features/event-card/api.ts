@@ -49,10 +49,10 @@ export function useEventCard(id: string) {
 export function useParticipationAction(id: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (action: 'join' | 'leave') =>
+    mutationFn: ({ action, answer }: { action: 'join' | 'leave'; answer?: string }) =>
       apiRequest<unknown>(`/events/${encodeURIComponent(id)}/${action}`, {
         method: 'POST',
-        body: {},
+        body: answer === undefined ? {} : { answer },
       }),
     onSettled: () => client.invalidateQueries({ queryKey: eventCardKey(id) }),
   });

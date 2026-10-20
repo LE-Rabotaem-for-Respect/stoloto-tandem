@@ -56,9 +56,11 @@ interface FakeOptions {
   signedIn?: boolean;
   /** Карточка для вошедшего и для гостя. */
   cardFor?: (signedIn: boolean) => Response;
+  /** Тело каждого запроса — чтобы проверить, что ушло в api. */
+  onBody?: (body: unknown) => void;
 }
 
-function fakeApi({ signedIn = false, cardFor }: FakeOptions = {}) {
+function fakeApi({ signedIn = false, cardFor, onBody }: FakeOptions = {}) {
   let me = signedIn;
   const calls: string[] = [];
   vi.stubGlobal(
@@ -66,6 +68,7 @@ function fakeApi({ signedIn = false, cardFor }: FakeOptions = {}) {
     vi.fn(async (url: string, init?: RequestInit) => {
       const call = `${init?.method ?? 'GET'} ${url}`;
       calls.push(call);
+      if (init?.body) onBody?.(JSON.parse(String(init.body)));
       switch (call) {
         case 'GET /api/me':
           return me ? json(200, anna) : json(401, { code: 'unauthorized', message: 'Войдите' });
@@ -218,7 +221,8 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
 
     const button = await screen.findByRole('button', { name: 'Подать заявку' });
     expect((button as HTMLButtonElement).disabled).toBe(true);
-    screen.getByText('Вы участник');
+    // В панели и крупным блоком «Ваша запись»
+    expect(screen.getAllByText('Вы участник').length).toBeGreaterThan(0);
     const full = screen.getByText('Набор открыт. Вы участник');
     // Кнопка ссылается на строку полного статуса
     expect(button.getAttribute('aria-describedby')).toBe(full.id);
@@ -365,7 +369,92 @@ describe('карточка мероприятия', { timeout: 15_000 }, () => {
     const user = userEvent.setup();
     renderCard();
     await user.click(await screen.findByRole('button', { name: 'Отменить запись' }));
+    // Сначала подтверждение: без него запрос не уходит
+    screen.getByText('Отменить запись на «Пробежка 5 км на Татышеве»?');
+    expect(calls).not.toContain('POST /api/events/e1/leave');
+    await user.click(screen.getByRole('button', { name: 'Не отменять' }));
+    expect(screen.queryByText(/Отменить запись на/)).toBeNull();
+    await waitFor(() => expect(document.activeElement?.textContent).toBe('Отменить запись'));
+
+    await user.click(screen.getByRole('button', { name: 'Отменить запись' }));
+    await user.click(screen.getByRole('button', { name: 'Да, отменить' }));
     await waitFor(() => expect(calls).toContain('POST /api/events/e1/leave'));
+  });
+
+  it('заявка с вопросом организатора — сначала ответ, он уходит в запросе', async () => {
+    const bodies: unknown[] = [];
+    const { calls } = fakeApi({
+      signedIn: true,
+      cardFor: () =>
+        json(
+          200,
+          card({
+            mode: 'approval',
+            applyQuestion: 'Сколько бегаете?',
+            actions: [{ code: 'join', enabled: true }],
+          }),
+        ),
+      onBody: (body) => bodies.push(body),
+    });
+    const user = userEvent.setup();
+    renderCard();
+    await user.click(await screen.findByRole('button', { name: 'Подать заявку' }));
+    const answer = screen.getByLabelText('Сколько бегаете?');
+    expect(document.activeElement).toBe(answer);
+    expect(calls).not.toContain('POST /api/events/e1/join');
+    await user.type(answer, 'Два года по выходным');
+    await user.click(screen.getByRole('button', { name: 'Отправить заявку' }));
+    await waitFor(() => expect(calls).toContain('POST /api/events/e1/join'));
+    expect(bodies).toContainEqual({ answer: 'Два года по выходным' });
+  });
+
+  it('своя запись крупным блоком: статус, мини-степпер и информация участникам', async () => {
+    fakeApi({
+      signedIn: true,
+      cardFor: () =>
+        json(
+          200,
+          card({
+            participation: 'confirmed',
+            participantInfo: 'Сбор у входа в 7:20',
+            actions: [{ code: 'leave', enabled: true }],
+          }),
+        ),
+    });
+    renderCard();
+    const mine = await screen.findByRole('region', { name: 'Ваша запись' });
+    expect(within(mine).getByText('Вы участник', { selector: '.status-text' })).toBeTruthy();
+    // Свободная запись — один шаг с галочкой
+    within(mine).getByRole('list', { name: 'Запись: вы участник' });
+    // Информация видна сразу, без раскрытия «Условий»
+    expect(within(mine).getByText('Сбор у входа в 7:20').closest('details')).toBeNull();
+  });
+
+  it('отклонённая заявка — причина в блоке записи и на шаге «Решение»', async () => {
+    fakeApi({
+      signedIn: true,
+      cardFor: () =>
+        json(
+          200,
+          card({
+            mode: 'approval',
+            participation: 'rejected',
+            participationReason: 'Группа набрана',
+            actions: [
+              {
+                code: 'join',
+                enabled: false,
+                reason: 'После отказа повторная заявка на это мероприятие недоступна',
+                reasonCode: 'rejected_final',
+              },
+            ],
+          }),
+        ),
+    });
+    renderCard();
+    const mine = await screen.findByRole('region', { name: 'Ваша запись' });
+    expect(within(mine).getAllByText(/Группа набрана/).length).toBeGreaterThan(0);
+    within(mine).getByRole('list', { name: /Ход заявки/ });
   });
 
   it('участнику вкладок организатора нет', async () => {
