@@ -2,6 +2,7 @@ import { DEMO_ACCOUNT_KEYS, normalizeEmail } from '@tandem/domain';
 import type { DemoAccountKey } from '@tandem/domain';
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsEmail,
   IsIn,
   IsNotEmpty,
@@ -70,4 +71,18 @@ export class LoginDto {
 export class DemoLoginDto {
   @IsIn(DEMO_ACCOUNT_KEYS, { message: 'Такого демо-аккаунта нет' })
   account!: DemoAccountKey;
+}
+
+/** Настройки оформления (ТЗ 2.8): у вошедшего хранятся в аккаунте, а не только в браузере. */
+// Не передано — не меняется; null — не «нет», а ошибка
+const present = () => ValidateIf((_dto: object, value: unknown) => value !== undefined);
+
+export class UpdateSettingsDto {
+  @present()
+  @IsBoolean({ message: '«Крупный текст» — да или нет' })
+  largeText?: boolean;
+
+  @present()
+  @IsBoolean({ message: '«Высокий контраст» — да или нет' })
+  contrast?: boolean;
 }
