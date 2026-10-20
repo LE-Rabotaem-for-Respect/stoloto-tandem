@@ -3,7 +3,9 @@
 # Запускается на компьютере, с которого есть вход на сервер по SSH-ключу:
 #
 #   sh scripts/deploy.sh                    свежий origin/prod на все стенды
-#   DEPLOY_REF=<коммит> sh scripts/deploy.sh   нужный коммит (откат)
+#   DEPLOY_REF=<коммит> sh scripts/deploy.sh   нужный коммит из истории prod (откат)
+#   DEPLOY_RESET=1 sh scripts/deploy.sh     ещё и сбросить демо-данные стендов — перед
+#                                           передачей экспертам; во время проверки нельзя
 #
 # Код попадает на сервер архивом `git archive` — только отслеживаемые файлы, без .env
 # и .git. Сборка и запуск — `scripts/stands.sh up` на сервере; тома стендов (базы,
@@ -20,6 +22,11 @@ keep=3
 
 git fetch --quiet origin
 commit=$(git rev-parse --short=12 "$ref^{commit}")
+# На открытые стенды — только код, прошедший ревью и слитый в prod
+if ! git merge-base --is-ancestor "$commit" origin/prod; then
+  echo "Коммит $commit не из истории origin/prod — выкатывать нельзя" >&2
+  exit 1
+fi
 echo "Выпуск $commit ($ref) → $host"
 
 # Аргументы удалённых команд — только коммит из rev-parse (шестнадцатеричный) и число.
@@ -48,11 +55,12 @@ ls -1t "$base/releases" | tail -n +"$((keep + 1))" | while read -r old; do
 done
 REMOTE
 
-# Каждый стенд отвечает и отдаёт свой номер
+# Каждый стенд отвечает и отдаёт свой номер; список стендов — из выкатываемого коммита
 failed=0
-for file in stands/*.env; do
-  stand=$(sed -n 's/^STAND_ID=//p' "$file")
-  port=$(sed -n 's/^WEB_PORT=//p' "$file")
+for file in $(git ls-tree --name-only "$commit" stands/ | grep '\.env$'); do
+  settings=$(git show "$commit:$file")
+  stand=$(printf '%s\n' "$settings" | sed -n 's/^STAND_ID=//p')
+  port=$(printf '%s\n' "$settings" | sed -n 's/^WEB_PORT=//p')
   url="http://$address:$port"
   ok=0
   # До 2 минут: api ждёт базу, затем миграции
@@ -64,6 +72,9 @@ for file in stands/*.env; do
     fi
     sleep 5
   done
+  if [ "$ok" = 1 ] && [ "${DEPLOY_RESET:-}" = 1 ]; then
+    curl -fsS --max-time 30 -X POST "$url/api/demo/reset" >/dev/null || ok=0
+  fi
   if [ "$ok" = 1 ]; then
     echo "$stand — $url — работает"
   else

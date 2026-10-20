@@ -70,6 +70,26 @@ describe('стенды stand-1…3 (stands/*.env)', () => {
     expect(compose).toContain("'127.0.0.1:${API_PORT:-3000}:3000'");
   });
 
+  it('web находит api после его пересоздания: адрес — через DNS Docker, не один раз при старте', () => {
+    const nginx = readFileSync(resolve(standsDir, '../apps/web/nginx.conf'), 'utf8');
+    expect(nginx).toContain('resolver 127.0.0.11 valid=10s ipv6=off;');
+    expect(nginx).toContain('set $api api:3000;');
+    expect(nginx).toContain('proxy_pass http://$api;');
+    expect(nginx).not.toContain('proxy_pass http://api:3000');
+    expect(nginx).toContain('server_tokens off;');
+    const compose = readFileSync(resolve(standsDir, '../docker-compose.yml'), 'utf8');
+    expect(compose).toMatch(/api:
+\s+condition: service_healthy
+(\s+#.*
+)*\s+restart: true/);
+  });
+
+  it('журналы контейнеров ограничены по размеру у каждого сервиса', () => {
+    const compose = readFileSync(resolve(standsDir, '../docker-compose.yml'), 'utf8');
+    expect(compose).toContain('max-size: 10m');
+    expect(compose.match(/^\s+logging: \*logging$/gm)).toHaveLength(3);
+  });
+
   it('страницы стенда нельзя встроить в чужой сайт', () => {
     const nginx = readFileSync(resolve(standsDir, '../apps/web/nginx.conf'), 'utf8');
     expect(nginx).toContain(`add_header Content-Security-Policy "frame-ancestors 'none'" always;`);
