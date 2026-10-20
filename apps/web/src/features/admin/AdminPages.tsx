@@ -1,6 +1,6 @@
 import { EVENT_STATUSES, ORGANIZATION_STATUSES, ORGANIZATION_STATUS_VIEW } from '@tandem/domain';
 import type { ActionCode, EventStatus, OrganizationStatus, StatusTone } from '@tandem/domain';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import type { IconName } from '../../shared/illustrations';
@@ -490,10 +490,31 @@ function Moderation({ event }: { event: AdminEvent }) {
   const moderate = useEventModeration();
   const [action, setAction] = useState<ModerationAction | null>(null);
   const [reason, setReason] = useState('');
+  // Кнопка заменяется формой и обратно: фокус — на поле причины, после «Отмены» и решения —
+  // на кнопку действия (или первую оставшуюся), а не на body
+  const [returnTo, setReturnTo] = useState<ModerationAction | null>(null);
+  const reasonField = useRef<HTMLTextAreaElement>(null);
+  const buttons = useRef<HTMLDivElement>(null);
+  const close = () => {
+    setReturnTo(action);
+    setAction(null);
+  };
   const id = useId();
   const available = (['unpublish', 'delete'] as const).filter((code) =>
     event.actions.some((item) => item.code === MODERATION_CODE[code] && item.enabled),
   );
+  // После решения строка перезагружается и кнопка может исчезнуть: тогда фокус — на оставшейся
+  const shown = available.join();
+  useEffect(() => {
+    if (action) {
+      reasonField.current?.focus();
+      return;
+    }
+    const lost = document.activeElement === document.body;
+    if (!returnTo || !(lost || buttons.current?.contains(document.activeElement))) return;
+    const own = buttons.current?.querySelector<HTMLButtonElement>(`[data-action="${returnTo}"]`);
+    (own ?? buttons.current?.querySelector('button'))?.focus();
+  }, [action, returnTo, shown]);
   const fieldError =
     moderate.error instanceof ApiRequestError ? moderate.error.fields.reason : undefined;
   const formError = moderate.error && !fieldError ? errorText(moderate.error) : undefined;
@@ -509,7 +530,7 @@ function Moderation({ event }: { event: AdminEvent }) {
             { id: event.id, action, reason },
             {
               onSuccess: () => {
-                setAction(null);
+                close();
                 setReason('');
               },
             },
@@ -519,6 +540,7 @@ function Moderation({ event }: { event: AdminEvent }) {
         <div className="field">
           <label htmlFor={`${id}-reason`}>Причина — её увидят организатор и записавшиеся</label>
           <textarea
+            ref={reasonField}
             id={`${id}-reason`}
             value={reason}
             maxLength={500}
@@ -542,7 +564,7 @@ function Moderation({ event }: { event: AdminEvent }) {
             className="button"
             type="button"
             onClick={() => {
-              setAction(null);
+              close();
               moderate.reset();
             }}
           >
@@ -553,9 +575,15 @@ function Moderation({ event }: { event: AdminEvent }) {
     );
   }
   return (
-    <div className="admin-actions">
+    <div className="admin-actions" ref={buttons}>
       {available.map((code) => (
-        <button key={code} className="button" type="button" onClick={() => setAction(code)}>
+        <button
+          key={code}
+          className="button"
+          type="button"
+          data-action={code}
+          onClick={() => setAction(code)}
+        >
           {MODERATION_TEXT[code].button}
         </button>
       ))}

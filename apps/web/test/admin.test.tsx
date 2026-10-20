@@ -329,6 +329,8 @@ describe('админка', () => {
     renderAt('/admin/events');
     await userEvent.click(await screen.findByRole('button', { name: 'Снять с публикации' }));
     const reason = screen.getByLabelText('Причина — её увидят организатор и записавшиеся');
+    // Кнопка заменилась формой: фокус — на поле причины, а не на body
+    expect(reason).toBe(document.activeElement);
     await userEvent.type(reason, '   ');
     await userEvent.click(screen.getByRole('button', { name: 'Снять с этой причиной' }));
     expect(await screen.findByText('Укажите причину')).toBeTruthy();
@@ -345,9 +347,11 @@ describe('админка', () => {
       call: 'POST /api/admin/events/e1/moderation',
       body: { action: 'unpublish', reason: 'Сведения устарели' },
     });
-    // Снятое можно только удалить
+    // Снятое можно только удалить; фокус — на оставшейся кнопке
     expect(screen.queryByRole('button', { name: 'Снять с публикации' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Удалить' })).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Удалить' })).toBe(document.activeElement),
+    );
   });
 
   it('кнопки — по actions[] строки, а не по статусу: недоступное действие не показывается', async () => {
@@ -380,7 +384,7 @@ describe('админка', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Удалить' }));
     await userEvent.click(screen.getByRole('button', { name: 'Отмена' }));
-    expect(screen.getByRole('button', { name: 'Удалить' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Удалить' })).toBe(document.activeElement);
     expect(calls.some(({ call }) => call.startsWith('POST'))).toBe(false);
   });
 

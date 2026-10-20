@@ -535,6 +535,12 @@ describe('модерация мероприятий (ТЗ 2.10, сценарий
       expect(response.status).toBe(400);
       expect(response.body.fields).toEqual({ reason: 'Укажите причину' });
     }
+    // Причина из одних знаков на карточке выглядит пустой
+    for (const reason of ['.', '—', '­']) {
+      const response = await moderate(cookie, event.id, { action: 'unpublish', reason });
+      expect(response.status).toBe(400);
+      expect(response.body.fields.reason).toBeTruthy();
+    }
     expect((await prisma.event.findUniqueOrThrow({ where: { id: event.id } })).status).toBe(
       'published',
     );

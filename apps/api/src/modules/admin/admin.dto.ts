@@ -4,6 +4,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   IsIn,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
@@ -13,6 +14,7 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
+import { cleanLine, singleLine, visible } from '../../core/validation';
 import { EVENT_MODERATIONS } from '../events/events.service';
 import type { EventModeration } from '../events/events.service';
 
@@ -111,10 +113,12 @@ export class EventModerationDto {
   @IsIn(EVENT_MODERATIONS, { message: 'Действие: снять с публикации или удалить' })
   action!: EventModeration;
 
-  @trim()
-  @IsString({ message: 'Укажите причину' })
+  // Общие правила текста: «.» или «—» причиной не считаются, мягкие переносы убираются
+  @cleanLine()
+  @visible()
+  @singleLine()
   @MaxLength(500, { message: 'Причина — не длиннее 500 символов' })
-  @Matches(/\S/, { message: 'Укажите причину' })
-  @Matches(SINGLE_LINE_TEXT, { message: HIDDEN_CHARS })
+  @IsNotEmpty({ message: 'Укажите причину' })
+  @IsString({ message: 'Укажите причину' })
   reason!: string;
 }
