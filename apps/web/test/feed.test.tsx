@@ -144,7 +144,14 @@ describe('фильтры ленты в адресе', () => {
     expect(feedQuery(filters).has('sportName')).toBe(false);
     expect(hiddenFilterCount(filters)).toBe(1);
 
-    for (const sport of ['curling', '1; DROP', `${CURLING.id}x`]) {
+    for (const sport of [
+      'curling',
+      '1; DROP',
+      `${CURLING.id}x`,
+      // Hex в форме UUID, но без версии и варианта: api ответил бы 400
+      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      '11111111-1111-1111-1111-111111111111',
+    ]) {
       expect(readFilters(new URLSearchParams({ sport, sportName: 'x' })).sport).toBeUndefined();
     }
     const long = readFilters(new URLSearchParams({ sport: CURLING.id, sportName: 'к'.repeat(80) }));
@@ -289,6 +296,18 @@ describe('лента и поиск', { timeout: 15_000 }, () => {
     expect(screen.getByRole('combobox', { name: 'Направление' })).toHaveProperty(
       'value',
       CURLING.name,
+    );
+  });
+
+  it('направление из адреса без названия: поле не выглядит пустым фильтром', async () => {
+    const { last } = fakeApi();
+    const user = userEvent.setup();
+    renderFeed(`/?sport=${CURLING.id}`);
+    await waitFor(() => expect(last()?.get('sport')).toBe(CURLING.id));
+    await user.click(screen.getByText('Фильтры · 1'));
+    expect(screen.getByRole('combobox', { name: 'Направление' })).toHaveProperty(
+      'placeholder',
+      'Выбрано направление',
     );
   });
 

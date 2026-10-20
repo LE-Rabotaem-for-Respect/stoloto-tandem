@@ -1,8 +1,8 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import type { EventDisplayStatus, EventLevel, SportCategory } from '@tandem/domain';
 import { apiRequest } from '../../shared/api';
 import { feedQuery } from './filters';
-import type { FeedFilters, FeedSport } from './filters';
+import type { FeedFilters } from './filters';
 
 /** Строка ленты (`GET /events`): только то, что помещается в карточку ленты. */
 export interface FeedItem {
@@ -42,16 +42,5 @@ export function useFeed(filters: FeedFilters) {
     },
     getNextPageParam: (last) =>
       last.offset + last.items.length < last.total ? last.offset + last.items.length : undefined,
-  });
-}
-
-/** Направления каталога для фильтра (`GET /sports?q`): скрытых в подсказках нет. */
-export function useSportOptions(query: string) {
-  const q = query.trim();
-  return useQuery({
-    queryKey: ['sports', q],
-    queryFn: () => apiRequest<{ items: FeedSport[] }>(`/sports?q=${encodeURIComponent(q)}&limit=8`),
-    enabled: q.length > 0,
-    staleTime: 60_000,
   });
 }

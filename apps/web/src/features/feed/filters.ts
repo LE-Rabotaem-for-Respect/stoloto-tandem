@@ -1,4 +1,4 @@
-import { EVENT_LEVELS, SPORT_CATEGORIES, SPORT_NAME_MAX_LENGTH } from '@tandem/domain';
+import { EVENT_LEVELS, SPORT_CATEGORIES, SPORT_NAME_MAX_LENGTH, isUuid } from '@tandem/domain';
 import type { EventLevel, SportCategory } from '@tandem/domain';
 
 export const FEED_DATES = ['today', 'tomorrow', 'weekend'] as const;
@@ -16,9 +16,6 @@ export interface FeedSport {
   id: string;
   name: string;
 }
-
-// id направления api принимает только в виде UUID: иное из адреса в запрос не уходит
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Фильтры ленты (ТЗ 2.8): живут в адресе страницы — ссылкой можно поделиться. */
 export interface FeedFilters {
@@ -43,8 +40,9 @@ const clip = (value: string | null, max: number) =>
     .join('');
 
 function readSport(params: URLSearchParams): FeedSport | undefined {
+  // id, который api не примет, в запрос не уходит: иначе лента получила бы 400
   const id = params.get('sport') ?? '';
-  if (!UUID.test(id)) return undefined;
+  if (!isUuid(id)) return undefined;
   return { id, name: clip(params.get('sportName'), SPORT_NAME_MAX_LENGTH) };
 }
 

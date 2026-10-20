@@ -1,7 +1,7 @@
 import { SPORT_NAME_MAX_LENGTH } from '@tandem/domain';
 import { useId, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { useSportOptions } from './api';
+import { useSportSuggestions } from '../events/api';
 import type { FeedSport } from './filters';
 
 interface SportFilterProps {
@@ -19,7 +19,8 @@ export function SportFilter({ value, onChange }: SportFilterProps) {
   const [text, setText] = useState(value?.name ?? '');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const options = useSportOptions(open ? text : '');
+  // Те же подсказки, что при создании события: скрытых направлений в них нет
+  const options = useSportSuggestions(open ? text : '');
 
   // Фильтр сменился снаружи («Назад» в браузере) — поле показывает его название
   const [shown, setShown] = useState(value);
@@ -76,7 +77,8 @@ export function SportFilter({ value, onChange }: SportFilterProps) {
         aria-activedescendant={listOpen ? optionId(active) : undefined}
         autoComplete="off"
         maxLength={SPORT_NAME_MAX_LENGTH}
-        placeholder="Все направления"
+        // Ссылка без названия направления: фильтр действует, поле не должно казаться пустым
+        placeholder={value ? 'Выбрано направление' : 'Все направления'}
         value={text}
         onChange={(event) => {
           const next = event.target.value;
