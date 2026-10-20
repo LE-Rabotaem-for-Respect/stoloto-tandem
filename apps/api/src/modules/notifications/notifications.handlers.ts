@@ -75,8 +75,7 @@ export class NotificationHandlers {
       this.events.notificationTarget(event.eventId),
     ]);
     if (!message || !target) return;
-    const byOrganizer =
-      message.asOrganizationId !== null || message.authorUserId === target.organizerUserId;
+    const byOrganizer = message.fromOrganizer;
     const link = `${eventLink(event.eventId)}#discussion`;
     const payload = { eventTitle: target.title };
 

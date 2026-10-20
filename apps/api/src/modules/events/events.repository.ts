@@ -88,10 +88,11 @@ export class EventsRepository {
     return tx.event.create({ data, select: { id: true } });
   }
 
-  /** Название и кто организатор: пользователь или владелец организации-организатора. */
+  /** Название и кто организатор: пользователь или организация (с её владельцем). */
   findOrganizerOf(id: string): Promise<{
     title: string;
     organizerUserId: string | null;
+    organizerOrgId: string | null;
     organizerOrg: { ownerUserId: string } | null;
   } | null> {
     return this.prisma.event.findUnique({
@@ -99,6 +100,7 @@ export class EventsRepository {
       select: {
         title: true,
         organizerUserId: true,
+        organizerOrgId: true,
         organizerOrg: { select: { ownerUserId: true } },
       },
     });

@@ -92,7 +92,7 @@ describe('уведомления в web', () => {
     renderAt('/');
     const nav = screen.getByRole('navigation', { name: 'Основные разделы' });
     const link = within(nav).getByRole('link', { name: /Уведомления/ });
-    await waitFor(() => expect(link.textContent).toContain('1 непрочитанных'));
+    await waitFor(() => expect(link.textContent).toContain('непрочитанных: 1'));
   });
 
   it('гостю уведомления не запрашиваются и счётчика нет', async () => {

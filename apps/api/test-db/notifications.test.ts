@@ -216,6 +216,79 @@ describe('кто получает уведомления (ТЗ 3.3)', () => {
     expect(await notificationsOf(anna.id)).toMatchObject([{ type: 'answer_posted' }]);
   });
 
+  it('сторонняя организация в чужом обсуждении — не организатор: её вопрос — организатору, ответ — не «ответ организатора»', async () => {
+    const { organizer, event } = await eventByUser();
+    const anna = await createUser();
+    const outsider = await createOrganization();
+    const question = await prisma.message.create({
+      data: { eventId: event.id, authorUserId: anna.id, text: 'Где сбор?', createdAt: at },
+    });
+    const outsiderAnswer = await prisma.message.create({
+      data: {
+        eventId: event.id,
+        authorUserId: outsider.ownerUserId,
+        asOrganizationId: outsider.id,
+        parentId: question.id,
+        text: 'Приходите к нам',
+        createdAt: at,
+      },
+    });
+    const outsiderQuestion = await prisma.message.create({
+      data: {
+        eventId: event.id,
+        authorUserId: outsider.ownerUserId,
+        asOrganizationId: outsider.id,
+        text: 'Можно со своим мячом?',
+        createdAt: at,
+      },
+    });
+
+    for (const message of [outsiderAnswer, outsiderQuestion]) {
+      await handlers.messagePosted(
+        domainEvent('MessagePosted', {
+          messageId: message.id,
+          eventId: event.id,
+          authorId: outsider.ownerUserId,
+          ...meta(outsider.ownerUserId),
+        }),
+      );
+    }
+
+    expect(await notificationsOf(anna.id)).toHaveLength(0);
+    expect(await notificationsOf(organizer.id)).toMatchObject([{ type: 'question_posted' }]);
+  });
+
+  it('у мероприятия организации ответ её аккаунта — «ответ организатора»', async () => {
+    const organization = await createOrganization();
+    const sport = await createSport();
+    const event = await prisma.event.create({
+      data: { ...eventData(sport.id), organizerOrgId: organization.id },
+    });
+    const anna = await createUser();
+    const question = await prisma.message.create({
+      data: { eventId: event.id, authorUserId: anna.id, text: 'Где сбор?', createdAt: at },
+    });
+    const answer = await prisma.message.create({
+      data: {
+        eventId: event.id,
+        authorUserId: organization.ownerUserId,
+        asOrganizationId: organization.id,
+        parentId: question.id,
+        text: 'У входа',
+        createdAt: at,
+      },
+    });
+    await handlers.messagePosted(
+      domainEvent('MessagePosted', {
+        messageId: answer.id,
+        eventId: event.id,
+        authorId: organization.ownerUserId,
+        ...meta(organization.ownerUserId),
+      }),
+    );
+    expect(await notificationsOf(anna.id)).toMatchObject([{ type: 'answer_posted' }]);
+  });
+
   it('снятие модератором — всем записавшимся и организатору, отменившим — нет', async () => {
     const { organizer, event } = await eventByUser();
     const [anna, ksenia, petr, admin] = await Promise.all([

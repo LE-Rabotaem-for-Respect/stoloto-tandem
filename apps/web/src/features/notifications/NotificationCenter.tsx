@@ -24,15 +24,17 @@ export function UnreadBadge() {
   if (unread === 0) return null;
   return (
     <span className="badge">
+      <span className="visually-hidden">, непрочитанных: </span>
       {unread > 99 ? '99+' : unread}
-      <span className="visually-hidden"> непрочитанных</span>
     </span>
   );
 }
 
 function Row({ item }: { item: NotificationItem }) {
+  // «Новое» — внутри строки: при фокусе на ссылке диктор читает и его
   const content = (
     <>
+      {!item.read && <span className="visually-hidden">Новое: </span>}
       {isIcon(item.icon) && <Icon name={item.icon} />}
       <span className="notification-text">{item.text}</span>
       <time className="notification-time" dateTime={item.createdAt}>
@@ -49,7 +51,6 @@ function Row({ item }: { item: NotificationItem }) {
       ) : (
         <div className="notification-body">{content}</div>
       )}
-      {!item.read && <span className="visually-hidden">Новое</span>}
     </li>
   );
 }
