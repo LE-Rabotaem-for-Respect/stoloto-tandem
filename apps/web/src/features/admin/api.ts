@@ -64,6 +64,7 @@ export interface Page<T> {
 }
 
 export interface AdminSearch {
+  id?: string;
   q?: string;
   status?: string;
   organizationId?: string;

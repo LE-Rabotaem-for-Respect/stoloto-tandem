@@ -179,9 +179,10 @@ function SearchForm({
       if (value) next.set(key, value);
       else next.delete(key);
     }
-    // Новый поиск — с первой страницы; «за неделю» относится только к переходу с плитки
+    // Новый поиск — с первой страницы; «за неделю» и одна организация — только для перехода
     next.delete('offset');
     next.delete('period');
+    next.delete('id');
     setParams(next);
   };
   // key — адрес: переход по меню или плитке подставляет в поля новые значения
@@ -218,6 +219,7 @@ function SearchForm({
 function useSearch(): AdminSearch {
   const [params] = useSearchParams();
   return {
+    id: params.get('id') ?? undefined,
     q: params.get('q') ?? undefined,
     status: params.get('status') ?? undefined,
     organizationId: params.get('organizationId') ?? undefined,
@@ -386,6 +388,14 @@ function Organizations() {
       <h1>Организации</h1>
       <AdminNav />
       <SearchForm statuses={ORGANIZATION_FILTERS} label="Поиск организаций" />
+      {search.id && (
+        <p>
+          Одна организация.{' '}
+          <Link className="admin-link" to="/admin/organizations">
+            Показать все
+          </Link>
+        </p>
+      )}
       <Loading error={list.error} isPending={list.isPending} />
       {list.data && (
         <>
@@ -452,10 +462,7 @@ function Discussion({ eventId }: { eventId: string }) {
 function EventRow({ event }: { event: AdminEvent }) {
   const organizer =
     event.organizer.kind === 'organization' ? (
-      <Link
-        className="admin-link"
-        to={`/admin/organizations?q=${encodeURIComponent(event.organizer.name)}`}
-      >
+      <Link className="admin-link" to={`/admin/organizations?id=${event.organizer.id}`}>
         {event.organizer.name}
       </Link>
     ) : (

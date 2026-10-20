@@ -166,7 +166,7 @@ export class OrganizationsService {
   /** Организации для администратора (ТЗ 2.10): заявка целиком — статус, причина, представитель. */
   async adminList(
     actor: Actor,
-    filter: { text?: string; status?: OrganizationStatus },
+    filter: { text?: string; status?: OrganizationStatus; id?: string },
     page: { limit: number; offset: number },
   ): Promise<{ items: OwnOrganizationView[]; total: number; limit: number; offset: number }> {
     allowOrThrow(canModerate(actor));

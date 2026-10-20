@@ -44,7 +44,7 @@ export class AdminController {
   organizationsList(@CurrentActor() actor: Actor, @Query() query: AdminOrganizationsQuery) {
     return this.organizations.adminList(
       actor,
-      { text: query.q || undefined, status: query.status },
+      { text: query.q || undefined, status: query.status, id: query.id },
       page(query),
     );
   }

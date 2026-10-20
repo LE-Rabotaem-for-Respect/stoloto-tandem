@@ -47,6 +47,11 @@ export class AdminOrganizationsQuery extends AdminPageQuery {
   @IsOptional()
   @IsIn(ORGANIZATION_STATUSES, { message: 'Выберите статус из списка' })
   status?: OrganizationStatus;
+
+  /** Одна организация — переход от организатора мероприятия. */
+  @IsOptional()
+  @IsUUID('all', { message: 'Неверная организация' })
+  id?: string;
 }
 
 export class AdminEventsQuery extends AdminPageQuery {

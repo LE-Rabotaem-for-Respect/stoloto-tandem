@@ -296,6 +296,12 @@ describe('поиск', () => {
       .set('Cookie', cookie);
     expect(approvedOnly.body.items).toEqual([]);
 
+    const byId = await http()
+      .get('/admin/organizations')
+      .query({ id: found.id })
+      .set('Cookie', cookie);
+    expect((byId.body.items as { id: string }[]).map((item) => item.id)).toEqual([found.id]);
+
     const percent = await http()
       .get('/admin/organizations')
       .query({ q: `%${tag}` })

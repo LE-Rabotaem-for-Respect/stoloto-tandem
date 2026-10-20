@@ -57,7 +57,16 @@
 
 .admin-search .field {
   flex: 1 1 12rem;
+  /* Колонка сетки поля не шире формы: иначе список статусов растягивается под самый
+     длинный пункт и на 360 px в «Крупном тексте» появляется горизонтальная прокрутка */
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   margin: 0;
+}
+
+.admin-search select {
+  width: 100%;
+  max-width: 100%;
 }
 
 .admin-list {
@@ -120,7 +129,8 @@
   background: var(--status-wait-bg);
 }
 
-.admin-tile--wait .admin-tile-value {
+.admin-tile--wait .admin-tile-value,
+.admin-tile--wait .icon {
   color: var(--status-wait-fg);
 }
 

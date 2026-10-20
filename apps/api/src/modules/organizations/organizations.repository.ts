@@ -36,10 +36,11 @@ export class OrganizationsRepository {
    * остальные — по названию.
    */
   async adminSearch(
-    filter: { text?: string; status?: OrganizationStatus },
+    filter: { text?: string; status?: OrganizationStatus; id?: string },
     page: { offset: number; limit: number },
   ): Promise<{ organizations: OrganizationRecord[]; total: number }> {
     const where: Prisma.OrganizationWhereInput = {
+      ...(filter.id && { id: filter.id }),
       ...(filter.status && { status: filter.status }),
       ...(filter.text && {
         name: { contains: escapeLike(filter.text), mode: 'insensitive' as const },
