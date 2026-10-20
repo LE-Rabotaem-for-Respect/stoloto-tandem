@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router';
 import { ApiRequestError } from '../../shared/api';
 import { useClock } from '../../shared/clock';
 import { EmptyState, EventDate, StatusBadge } from '../../shared/ui';
+import { linkLabel } from '../../shared/links';
 import { useOrganization, useOrganizationEvents } from './api';
 
 /** Ссылку на сайт показываем только для http и https: другой адрес — просто текстом. */
@@ -93,6 +94,8 @@ function PublicOrganization({ id }: { id: string }) {
   }
   const data = organization.data;
   const href = data.website ? websiteHref(data.website) : undefined;
+  // Подпись — хост в punycode и путь: «vк.com» с кириллической «к» видна как xn--…
+  const label = data.website ? linkLabel(data.website) : null;
   return (
     <>
       <h1>{data.name}</h1>
@@ -111,9 +114,9 @@ function PublicOrganization({ id }: { id: string }) {
       <p className="org-contacts">{data.contacts}</p>
       {data.website && (
         <p className="org-website">
-          {href ? (
+          {href && label ? (
             <a href={href} target="_blank" rel="noopener noreferrer nofollow">
-              {data.website}
+              {label}
             </a>
           ) : (
             data.website
