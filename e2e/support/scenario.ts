@@ -1,8 +1,9 @@
 import type { Page } from '@playwright/test';
-import { TIME_ZONE } from '@tandem/domain';
 import { expect } from './fixtures';
 
 const DAY_MS = 86_400_000;
+// Пояс пользователей платформы, как в playwright.config.ts
+const TIME_ZONE = 'Asia/Krasnoyarsk';
 
 /** Дата через `days` дней по часам стенда — в виде ГГГГ-ММ-ДД, как в поле даты. */
 export async function standDate(page: Page, days: number): Promise<string> {

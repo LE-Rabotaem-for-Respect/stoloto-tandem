@@ -1,4 +1,3 @@
-import { ORGANIZATION_STATUS_VIEW } from '@tandem/domain';
 import type { Page } from '@playwright/test';
 import { expect, test } from '../support/fixtures';
 import { fillEventForm, navLink, standDate, switchAccount } from '../support/scenario';
@@ -22,7 +21,7 @@ test('сценарий 2: допуск организации, публикац�
   await loginAs('padel');
   await page.goto('/organization');
   await expect(orgStepper(page).locator('[aria-current="step"]')).toHaveText('Проверка');
-  await expect(page.getByText(ORGANIZATION_STATUS_VIEW.pending.text)).toBeVisible();
+  await expect(page.getByText('На рассмотрении')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Создать мероприятие' })).toHaveCount(0);
 
   // 2. Администратор: плитка «Заявки организаций ждут решения» → в очереди обе организации
@@ -41,7 +40,7 @@ test('сценарий 2: допуск организации, публикац�
   await switchAccount(page, PADEL);
   await page.goto('/organization');
   await expect(orgStepper(page).locator('[aria-current="step"]')).toHaveText('Публикуйте события');
-  await expect(page.getByText(ORGANIZATION_STATUS_VIEW.approved.text)).toBeVisible();
+  await expect(page.getByText('Допущена к публикации')).toBeVisible();
 
   // 5. «Создать» → «Падел для начинающих» → публикуется сразу, без согласования
   await navLink(page, 'Создать').click();
@@ -98,9 +97,7 @@ test('сценарий 2: допуск организации, публикац�
   await switchAccount(page, STOLBY);
   await page.goto('/organization');
   const decision = orgStepper(page).locator('[data-state="error"]');
-  await expect(decision).toContainText(
-    `Решение: ${ORGANIZATION_STATUS_VIEW.rejected.text.toLowerCase()}`,
-  );
+  await expect(decision).toContainText('Решение: отклонена');
   await expect(decision).toContainText('Не указаны контакты представителя');
   await expect(page.getByRole('button', { name: 'Отправить на проверку' })).toBeEnabled();
 });
