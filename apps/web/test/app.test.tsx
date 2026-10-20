@@ -592,14 +592,18 @@ describe('экран входа и прилипающая шапка', () => {
     const rect = vi
       .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
       .mockImplementation(() => ({ height }) as DOMRect);
-    fakeApi();
-    renderApp('/');
-    await screen.findByRole('link', { name: 'Войти' });
-    const root = document.documentElement.style;
-    expect(root.getPropertyValue('--app-top-height')).toBe('106px');
-    height = 204;
-    notify();
-    expect(root.getPropertyValue('--app-top-height')).toBe('204px');
-    rect.mockRestore();
+    try {
+      fakeApi();
+      renderApp('/');
+      await screen.findByRole('link', { name: 'Войти' });
+      const root = document.documentElement.style;
+      expect(root.getPropertyValue('--app-top-height')).toBe('106px');
+      height = 204;
+      notify();
+      expect(root.getPropertyValue('--app-top-height')).toBe('204px');
+    } finally {
+      // Подмена прототипа не должна пережить упавший тест
+      rect.mockRestore();
+    }
   });
 });
