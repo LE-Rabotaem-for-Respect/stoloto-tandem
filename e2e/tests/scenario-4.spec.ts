@@ -42,11 +42,18 @@ test('сценарий 4: заявка с ответом, решение Иго�
   const mine = page.getByRole('region', { name: 'Ваша запись' });
   await expect(mine.locator('.status-text')).toHaveText('Заявка на рассмотрении');
   await expect(page.getByRole('heading', { name: 'Информация для участников' })).toHaveCount(0);
+  // …и в «Моих записях» — в «Ждут решения»
+  await navLink(page, 'Мои записи').click();
+  await expect(
+    page
+      .getByRole('region', { name: 'Ждут решения' })
+      .getByRole('link', { name: new RegExp(CLIMBING) }),
+  ).toBeVisible();
 
   // 3. Игорь: уведомление «Новая заявка»
   await switchAccount(page, 'Игорь');
   await navLink(page, 'Уведомления').click();
-  await expect(page.getByText(`Новая заявка на «${CLIMBING}»`).first()).toBeVisible();
+  await expect(page.getByText(`Новая заявка на «${CLIMBING}»`)).toBeVisible();
 
   // 4. «Участники и заявки» → «Ждут решения»: Ксения, Артём и Анна с ответом
   await page.goto(eventUrl);
