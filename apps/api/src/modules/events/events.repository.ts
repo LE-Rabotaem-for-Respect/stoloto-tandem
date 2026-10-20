@@ -247,6 +247,21 @@ export class EventsRepository {
     });
   }
 
+  /** Объединение направлений: мероприятия переходят на целевое (ТЗ 2.3). */
+  async moveSport(fromId: string, toId: string, tx: Db): Promise<void> {
+    await tx.event.updateMany({ where: { sportId: fromId }, data: { sportId: toId } });
+  }
+
+  /** Мероприятия по направлениям, в любом статусе; направлений без мероприятий в ответе нет. */
+  async countBySports(sportIds: readonly string[]): Promise<Map<string, number>> {
+    const rows = await this.prisma.event.groupBy({
+      by: ['sportId'],
+      where: { sportId: { in: [...sportIds] } },
+      _count: { _all: true },
+    });
+    return new Map(rows.map((row) => [row.sportId, row._count._all]));
+  }
+
   /** Сколько мероприятий перешло в этот статус начиная с момента `since`. */
   countStatusSince(status: EventStatus, since: Date): Promise<number> {
     return this.prisma.event.count({ where: { status, statusChangedAt: { gte: since } } });
