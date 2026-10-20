@@ -414,6 +414,15 @@ describe('POST /participations/:id/reject', () => {
     expect(await statusOf(id)).toBe('pending');
   });
 
+  it('причина не строкой — сообщение о поле, а не о символах', async () => {
+    const event = await createEvent();
+    const id = await apply(anna, event.id);
+    const response = await reject(organizer, id, { reason: 5 });
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toEqual({ reason: 'Причина — текст' });
+    expect(await statusOf(id)).toBe('pending');
+  });
+
   it('у администратора отклонения нет', async () => {
     const event = await createEvent();
     const id = await apply(anna, event.id);
