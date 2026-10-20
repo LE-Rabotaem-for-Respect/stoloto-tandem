@@ -7,6 +7,7 @@ export type MarkdownBlock =
   | { type: 'table'; head: string[]; rows: string[][] };
 
 const LIST_ITEM = /^[-*]\s+(.*)$/;
+const HEADING = /^(#{1,6})\s+(.*)$/;
 const isTableRow = (line: string) => line.trim().startsWith('|');
 const isTableDivider = (line: string) => /^\|?[\s|:-]+\|?$/.test(line.trim());
 
@@ -22,6 +23,10 @@ const cells = (line: string) =>
  * абзацы, списки, таблицы. HTML из документа не исполняется — всё становится
  * текстом React.
  */
+// Строка, с которой начинается заголовок, таблица или список
+const startsBlock = (line: string) =>
+  HEADING.test(line) || isTableRow(line) || LIST_ITEM.test(line);
+
 export function parseMarkdown(source: string): MarkdownBlock[] {
   const lines = source.split(/\r?\n/);
   const at = (index: number) => lines[index] ?? '';
@@ -29,7 +34,7 @@ export function parseMarkdown(source: string): MarkdownBlock[] {
   let i = 0;
   while (i < lines.length) {
     const line = at(i);
-    const heading = /^(#{1,6})\s+(.*)$/.exec(line);
+    const heading = HEADING.exec(line);
     if (!line.trim()) {
       i += 1;
     } else if (heading) {
@@ -52,7 +57,11 @@ export function parseMarkdown(source: string): MarkdownBlock[] {
       blocks.push({ type: 'list', items });
     } else {
       const text: string[] = [];
-      for (; i < lines.length && at(i).trim() && !/^(#|\||[-*]\s)/.test(at(i)); i += 1) {
+      for (
+        let first = true;
+        i < lines.length && at(i).trim() && (first || !startsBlock(at(i)));
+        i += 1, first = false
+      ) {
         text.push(at(i).trim());
       }
       blocks.push({ type: 'paragraph', text: text.join(' ') });

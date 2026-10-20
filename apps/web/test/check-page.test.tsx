@@ -155,3 +155,22 @@ describe('страница /check «Как проверить» (ТЗ 4.6)', () 
     );
   });
 });
+
+describe('маршруты /check — проверки ТЗ 4.7 не теряются', () => {
+  const route = (id: string) => CHECK_ROUTES.find((item) => item.id === id);
+
+  it('сценарий 2: Анна видит страницу «Падел-клуба» с его событием', () => {
+    const step = route('2')?.steps.find(
+      (item) => 'account' in item.who && item.who.account === 'anna',
+    );
+    expect(step?.expected).toMatch(/Падел-клуба Енисей/);
+  });
+
+  it('сценарий 6: «Ладья» видит баннер, а запись по прямой ссылке API отклоняет', () => {
+    const steps = route('6')?.steps ?? [];
+    expect(
+      steps.find((item) => 'account' in item.who && item.who.account === 'ladya')?.expected,
+    ).toMatch(/баннер/i);
+    expect(steps.some((item) => /409/.test(item.expected))).toBe(true);
+  });
+});

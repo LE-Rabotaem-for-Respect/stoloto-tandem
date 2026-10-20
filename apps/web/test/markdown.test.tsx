@@ -62,3 +62,14 @@ describe('показ docs/scenarios.md', () => {
     expect(screen.getByText('<img src=x onerror="alert(1)">')).toBeTruthy();
   });
 });
+
+describe('строки, похожие на заголовок', () => {
+  it('«#5», «#тег» и «#» без текста — абзац, разбор не зацикливается', () => {
+    expect(parseMarkdown('#5 в начале строки\n#тег\n#')).toEqual([
+      { type: 'paragraph', text: '#5 в начале строки #тег #' },
+    ]);
+    expect(parseMarkdown('####### семь решёток')).toEqual([
+      { type: 'paragraph', text: '####### семь решёток' },
+    ]);
+  });
+});

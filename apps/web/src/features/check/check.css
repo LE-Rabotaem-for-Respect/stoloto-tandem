@@ -69,3 +69,12 @@
 .markdown-table {
   overflow-x: auto;
 }
+
+/* Ссылки «Открыть экран», стенды, документ и «назад» — с областью нажатия не меньше 44 px (ТЗ 2.8) */
+.check-tools a,
+.check-stands a,
+.check-page > p a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+}
