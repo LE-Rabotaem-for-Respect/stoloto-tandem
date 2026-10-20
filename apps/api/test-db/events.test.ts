@@ -160,6 +160,15 @@ describe('POST /events', () => {
     expect(search.body.items).toEqual([expect.objectContaining({ id: response.body.sport.id })]);
   });
 
+  it('не строка в названии и городе — сообщение о поле, а не о символах', async () => {
+    const response = await post(anna, { ...validEvent(), title: 5, city: 5 });
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toMatchObject({
+      title: 'Укажите название',
+      city: 'Укажите город',
+    });
+  });
+
   it('эмодзи с соединителем и селектором начертания и мягкий перенос — допустимы', async () => {
     const runner = String.fromCodePoint(0x1f3c3, 0x200d, 0x2640, 0xfe0f);
     const softHyphen = String.fromCodePoint(0xad);
@@ -454,6 +463,39 @@ describe('GET /events/:id', () => {
     expect(response.body.participantInfo).toBe('Раздевалка открыта с 18:30');
   });
 
+  it('причина отказа — только тому, кому отказали; без причины и у других статусов — null', async () => {
+    const id = (await post(igor, validEvent())).body.id as string;
+    const [refused, refusedSilently, other] = await Promise.all([
+      account('user'),
+      account('user'),
+      account('user'),
+    ]);
+    const decided = (userId: string, status: 'rejected' | 'confirmed', reason: string | null) =>
+      prisma.participation.create({
+        data: {
+          eventId: id,
+          userId,
+          status,
+          decisionReason: reason,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+    await decided(refused.id, 'rejected', 'Группа уже набрана');
+    await decided(refusedSilently.id, 'rejected', null);
+    // Причина у принятой записи не показывается, даже если в базе она есть
+    await decided(other.id, 'confirmed', 'Ждём в 18:30');
+
+    const reason = async (who: Account | null) => (await get(who, id)).body.participationReason;
+    expect(await reason(refused)).toBe('Группа уже набрана');
+    expect(await reason(refusedSilently)).toBeNull();
+    expect(await reason(other)).toBeNull();
+    // Чужая отклонённая заявка: ни другому пользователю, ни организатору, ни администратору, ни гостю
+    for (const who of [anna, igor, admin, orgApproved, null]) {
+      expect(await reason(who)).toBeNull();
+    }
+  });
+
   it('карточка, лента, /me и ответы с ошибкой не кешируются', async () => {
     expect((await get(anna, eventId)).headers['cache-control']).toBe('no-store');
     expect((await get(null, eventId)).headers['cache-control']).toBe('no-store');
@@ -466,6 +508,34 @@ describe('GET /events/:id', () => {
     const missing = await get(anna, randomUUID());
     expect(missing.status).toBe(404);
     expect(missing.headers['cache-control']).toBe('no-store');
+  });
+
+  it('главная кнопка по статусу записи: «Отменить запись» или «Записаться»', async () => {
+    const id = (await post(igor, validEvent())).body.id as string;
+    const expected = {
+      pending: { code: 'leave', enabled: true },
+      confirmed: { code: 'leave', enabled: true },
+      waitlist: { code: 'leave', enabled: true },
+      cancelled: { code: 'join', enabled: true },
+      rejected: {
+        code: 'join',
+        enabled: false,
+        reason: expect.stringMatching(/После отказа/),
+        reasonCode: 'rejected_final',
+      },
+    } as const;
+    for (const [status, action] of Object.entries(expected)) {
+      const viewer = await account('user');
+      await participation(id, viewer.id, status as keyof typeof expected);
+      const response = await get(viewer, id);
+      expect(response.status, status).toBe(200);
+      const codes = (response.body.actions as { code: string }[]).map((item) => item.code);
+      expect(response.body.actions[0], status).toEqual(action);
+      expect(
+        codes.filter((code) => code === 'join' || code === 'leave'),
+        status,
+      ).toHaveLength(1);
+    }
   });
 
   it('гость видит опубликованное мероприятие, запись предлагает после входа', async () => {

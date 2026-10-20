@@ -277,11 +277,12 @@ describe('PATCH /events/:id — что не меняется', () => {
     const card = await http().get(`/events/${id}`).set('Cookie', igor.cookie);
     expect(card.body.actions).toEqual(
       expect.arrayContaining([
-        {
+        expect.objectContaining({
           code: 'edit_event',
           enabled: false,
           reason: 'Мероприятие уже началось: изменить его нельзя',
-        },
+          reasonCode: 'event_started',
+        }),
       ]),
     );
   });

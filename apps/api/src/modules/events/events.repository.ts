@@ -32,6 +32,10 @@ export type EditableFields = {
   [Field in keyof Prisma.EventGetPayload<{ select: typeof editableSelect }>]?:
     Prisma.EventGetPayload<{ select: typeof editableSelect }>[Field] | undefined;
 };
+export interface ViewerParticipationRow {
+  status: ParticipationStatus;
+  decisionReason: string | null;
+}
 
 /** Фильтры ленты уже в терминах модели; что они значат для человека — решает сервис. */
 export interface FeedFilter {
@@ -43,6 +47,7 @@ export interface FeedFilter {
   sportText?: string;
   sportId?: string;
   category?: SportCategory;
+  organizationId?: string;
   startsFrom?: Date;
   startsBefore?: Date;
   city?: string;
@@ -86,6 +91,7 @@ function feedWhere(filter: FeedFilter): Prisma.EventWhereInput {
   } else if (filter.category) {
     and.push({ sport: { category: filter.category, status: 'active' } });
   }
+  if (filter.organizationId) and.push({ organizerOrgId: filter.organizationId });
   if (filter.startsFrom) and.push({ startsAt: { gte: filter.startsFrom } });
   if (filter.startsBefore) and.push({ startsAt: { lt: filter.startsBefore } });
   if (filter.city) and.push({ city: insensitive(filter.city) });
@@ -116,8 +122,30 @@ export class EventsRepository {
     return tx.event.update({ where: { id }, data, select: { id: true } });
   }
 
+  /** Название и кто организатор: пользователь или организация (с её владельцем). */
+  findOrganizerOf(id: string): Promise<{
+    title: string;
+    organizerUserId: string | null;
+    organizerOrgId: string | null;
+    organizerOrg: { ownerUserId: string } | null;
+  } | null> {
+    return this.prisma.event.findUnique({
+      where: { id },
+      select: {
+        title: true,
+        organizerUserId: true,
+        organizerOrgId: true,
+        organizerOrg: { select: { ownerUserId: true } },
+      },
+    });
+  }
+
   findCard(id: string): Promise<EventWithCard | null> {
     return this.prisma.event.findUnique({ where: { id }, include: cardInclude });
+  }
+
+  findCards(ids: string[]): Promise<EventWithCard[]> {
+    return this.prisma.event.findMany({ where: { id: { in: ids } }, include: cardInclude });
   }
 
   /** Страница ленты: по дате начала, при равной — по id, чтобы страницы не перекрывались. */
@@ -158,17 +186,20 @@ export class EventsRepository {
    * последняя отменённая. `createdAt` — время Clock: после перемотки демо-часов назад
    * отменённая запись может оказаться «новее» активной, поэтому активная ищется первой.
    */
-  async viewerParticipation(eventId: string, userId: string): Promise<ParticipationStatus | null> {
+  async viewerParticipation(
+    eventId: string,
+    userId: string,
+  ): Promise<ViewerParticipationRow | null> {
+    const select = { status: true, decisionReason: true } as const;
     const active = await this.prisma.participation.findFirst({
       where: { eventId, userId, status: { not: 'cancelled' } },
-      select: { status: true },
+      select,
     });
-    if (active) return active.status;
-    const cancelled = await this.prisma.participation.findFirst({
+    if (active) return active;
+    return this.prisma.participation.findFirst({
       where: { eventId, userId },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      select: { status: true },
+      select,
     });
-    return cancelled?.status ?? null;
   }
 }

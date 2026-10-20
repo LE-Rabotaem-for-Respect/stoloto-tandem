@@ -3,7 +3,8 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiRequestError } from '../../shared/api';
 import { Field } from '../../shared/ui/Field';
-import { useDemoLogin, useLogin, useRegister, useStandInfo } from './api';
+import { useStandInfo } from '../../shared/clock';
+import { useDemoLogin, useLogin, useRegister } from './api';
 import type { RegisterBody } from './api';
 
 interface FormError {
@@ -11,7 +12,7 @@ interface FormError {
   fields: Record<string, string>;
 }
 
-function formError(error: unknown): FormError {
+export function formError(error: unknown): FormError {
   if (!error) return { fields: {} };
   if (error instanceof ApiRequestError) {
     // Ошибки полей показываются у полей; общий текст — когда полей нет
@@ -21,7 +22,7 @@ function formError(error: unknown): FormError {
   return { message: 'Что-то пошло не так. Попробуйте ещё раз', fields: {} };
 }
 
-function FormMessage({ text }: { text?: string }) {
+export function FormMessage({ text }: { text?: string }) {
   if (!text) return null;
   return (
     <p className="form-error" role="alert">

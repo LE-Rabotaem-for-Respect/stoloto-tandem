@@ -132,6 +132,8 @@ jobs:
       WEB_BIND: 127.0.0.1
       # Окружение стенда задаёт задание, а не переменные окружения runner'а участника
       DEMO_MODE: 'true'
+      # Тесты сбрасывают демо-данные перед каждым тестом: интервал между сбросами не нужен
+      DEMO_RESET_INTERVAL_SECONDS: '0'
       SESSION_SECRET: ''
       STAND_ID: ''
       POSTGRES_PASSWORD: tandem

@@ -1,0 +1,49 @@
+/* «Мои записи» */
+.my-group + .my-group {
+  margin-top: var(--space-5);
+}
+
+.my-participations {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.my-participation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.my-participation:hover {
+  border-color: var(--color-line-strong);
+}
+
+.my-participation-text {
+  display: grid;
+  flex: 1 1 12rem;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.my-participation-title {
+  font-weight: 700;
+  font-size: var(--fs-lead);
+  overflow-wrap: anywhere;
+}
+
+.my-participation-meta {
+  color: var(--color-ink-muted);
+  font-size: var(--fs-caption);
+  overflow-wrap: anywhere;
+}

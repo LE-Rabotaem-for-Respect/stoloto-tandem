@@ -8,6 +8,8 @@ import {
   safeNext,
   useMe,
 } from '../features/auth';
+import { NotificationCenter } from '../features/notifications';
+import { MyParticipations } from '../features/participations';
 
 function useReturnAfterSignIn() {
   const [params] = useSearchParams();
@@ -40,7 +42,7 @@ export function LoginPage() {
       <LoginForm onSignedIn={done} />
       <p>
         Нет аккаунта?{' '}
-        <Link to={registerLink} state={carry}>
+        <Link to={registerLink} state={carry} replace>
           Зарегистрироваться
         </Link>
       </p>
@@ -60,7 +62,7 @@ export function RegisterPage() {
       <RegisterForm onSignedIn={done} />
       <p>
         Уже есть аккаунт?{' '}
-        <Link to={loginLink} state={carry}>
+        <Link to={loginLink} state={carry} replace>
           Войти
         </Link>
       </p>
@@ -88,7 +90,10 @@ export const EventPage = () => (
 
 export const MyParticipationsPage = () => (
   <RequireAuth>
-    <Section title="Мои записи" text="Здесь будут ваши записи и заявки." />
+    <div className="page">
+      <h1>Мои записи</h1>
+      <MyParticipations />
+    </div>
   </RequireAuth>
 );
 
@@ -100,7 +105,10 @@ export const CreateEventPage = () => (
 
 export const NotificationsPage = () => (
   <RequireAuth>
-    <Section title="Уведомления" text="Здесь будут уведомления о ваших записях и мероприятиях." />
+    <div className="page">
+      <h1>Уведомления</h1>
+      <NotificationCenter />
+    </div>
   </RequireAuth>
 );
 
@@ -122,7 +130,9 @@ function Profile() {
         {me.data.organization && (
           <>
             <dt>Организация</dt>
-            <dd>{me.data.organization.name}</dd>
+            <dd>
+              <Link to="/organization">{me.data.organization.name}</Link>
+            </dd>
           </>
         )}
       </dl>
