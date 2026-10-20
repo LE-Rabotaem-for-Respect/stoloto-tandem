@@ -78,10 +78,7 @@ describe('стенды stand-1…3 (stands/*.env)', () => {
     expect(nginx).not.toContain('proxy_pass http://api:3000');
     expect(nginx).toContain('server_tokens off;');
     const compose = readFileSync(resolve(standsDir, '../docker-compose.yml'), 'utf8');
-    expect(compose).toMatch(/api:
-\s+condition: service_healthy
-(\s+#.*
-)*\s+restart: true/);
+    expect(compose).toMatch(/api:\n\s+condition: service_healthy\n(\s+#.*\n)*\s+restart: true/);
   });
 
   it('журналы контейнеров ограничены по размеру у каждого сервиса', () => {
