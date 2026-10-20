@@ -482,3 +482,129 @@ describe('действие гостя', () => {
     await waitFor(() => expect(onJoin).toHaveBeenCalledTimes(1));
   });
 });
+
+function JoinEvent({ id, onJoin }: { id: string; onJoin(id: string): void }) {
+  const join = useAuthAction(`join:${id}`, () => onJoin(id));
+  return (
+    <button type="button" onClick={join}>
+      Записаться на {id}
+    </button>
+  );
+}
+
+describe('несколько действий гостя на одной странице', () => {
+  it('после входа выполняется только нажатое: intent у каждой кнопки свой', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp(
+      '/events',
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route
+            path="events"
+            element={
+              <>
+                <JoinEvent id="1" onJoin={onJoin} />
+                <JoinEvent id="2" onJoin={onJoin} />
+              </>
+            }
+          />
+          <Route path="login" element={<LoginPage />} />
+        </Route>
+      </Routes>,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться на 2' }));
+    await userEvent.type(await screen.findByLabelText('Почта'), 'anna@demo');
+    await userEvent.type(screen.getByLabelText('Пароль'), 'demo');
+    await userEvent.click(screen.getByRole('button', { name: 'Войти' }));
+
+    await screen.findByRole('button', { name: 'Записаться на 1' });
+    await waitFor(() => expect(onJoin).toHaveBeenCalledTimes(1));
+    expect(onJoin).toHaveBeenCalledWith('2');
+  });
+
+  it('одинаковый intent у двух кнопок страницы — ошибка в консоли разработчика', async () => {
+    fakeApi();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    renderApp(
+      '/events/1',
+      <Routes>
+        <Route
+          path="events/:id"
+          element={
+            <>
+              <JoinButton onJoin={vi.fn()} />
+              <JoinButton onJoin={vi.fn()} />
+            </>
+          }
+        />
+      </Routes>,
+    );
+    await screen.findAllByRole('button', { name: 'Записаться' });
+    expect(error).toHaveBeenCalledWith(expect.stringMatching(/intent «join».*уникальн/));
+    error.mockRestore();
+  });
+
+  it('разные intent ошибок не дают', async () => {
+    fakeApi();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    renderApp(
+      '/events',
+      <Routes>
+        <Route
+          path="events"
+          element={
+            <>
+              <JoinEvent id="1" onJoin={vi.fn()} />
+              <JoinEvent id="2" onJoin={vi.fn()} />
+            </>
+          }
+        />
+      </Routes>,
+    );
+    await screen.findByRole('button', { name: 'Записаться на 2' });
+    expect(error).not.toHaveBeenCalledWith(expect.stringMatching(/intent/));
+    error.mockRestore();
+  });
+});
+
+describe('экран входа и прилипающая шапка', () => {
+  it('«Войти» в шапке на экране входа ведёт на заданный next, а не на сам вход', async () => {
+    fakeApi();
+    renderApp('/login?next=%2Fmy');
+    const link = await screen.findByRole('link', { name: 'Войти' });
+    expect(link.getAttribute('href')).toBe('/login?next=%2Fmy');
+  });
+
+  it('фокус не прячется под шапкой: отступ прокрутки — по её фактической высоте', async () => {
+    let notify: () => void = () => undefined;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          notify = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    let height = 106;
+    const rect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(() => ({ height }) as DOMRect);
+    try {
+      fakeApi();
+      renderApp('/');
+      await screen.findByRole('link', { name: 'Войти' });
+      const root = document.documentElement.style;
+      expect(root.getPropertyValue('--app-top-height')).toBe('106px');
+      height = 204;
+      notify();
+      expect(root.getPropertyValue('--app-top-height')).toBe('204px');
+    } finally {
+      // Подмена прототипа не должна пережить упавший тест
+      rect.mockRestore();
+    }
+  });
+});

@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { IconName } from '../../shared/illustrations';
 import { useTheme } from '../../shared/theme';
@@ -89,14 +90,36 @@ function Account() {
   );
 }
 
+/**
+ * Высота прилипающей шапки — в `--app-top-height` для `scroll-padding-top`: она
+ * меняется с шириной экрана, темой «Крупный текст» и длиной имени аккаунта.
+ */
+function useStickyTopHeight() {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const top = ref.current;
+    if (!top) return;
+    const root = document.documentElement.style;
+    const update = () =>
+      root.setProperty('--app-top-height', `${Math.ceil(top.getBoundingClientRect().height)}px`);
+    update();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(update);
+    observer.observe(top);
+    return () => observer.disconnect();
+  }, []);
+  return ref;
+}
+
 export function AppLayout() {
   usePendingActionRelay();
+  const top = useStickyTopHeight();
   return (
     <div className="app">
       <a className="skip-link" href="#main">
         Перейти к содержимому
       </a>
-      <div className="app-top">
+      <div className="app-top" ref={top}>
         <header className="app-header">
           <Link className="brand" to="/">
             Тандем
