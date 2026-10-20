@@ -1,4 +1,3 @@
-import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -10,9 +9,7 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
-
-const trim = () =>
-  Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
+import { multiLine, singleLine, trimLine, trimText } from '../../core/validation';
 
 /**
  * Профиль организации (ТЗ 2.9). Все поля необязательны: правка частичная,
@@ -20,32 +17,37 @@ const trim = () =>
  */
 export class UpdateOrganizationDto {
   @IsOptional()
-  @trim()
+  @trimLine()
   @IsString({ message: 'Укажите название' })
   @Length(2, 120, { message: 'Название — от 2 до 120 символов' })
+  @singleLine()
   name?: string;
 
   @IsOptional()
-  @trim()
+  @trimText()
   @IsString({ message: 'Расскажите, чем занимается организация' })
   @MaxLength(2000, { message: 'Описание — не длиннее 2000 символов' })
+  @multiLine()
   description?: string;
 
   @IsOptional()
-  @trim()
+  @trimLine()
   @IsString({ message: 'Укажите город' })
   @MaxLength(80, { message: 'Город — не длиннее 80 символов' })
+  @singleLine()
   city?: string;
 
+  // Телефон, мессенджер и часы работы — можно с новой строки
   @IsOptional()
-  @trim()
+  @trimText()
   @IsString({ message: 'Укажите контакты' })
   @MaxLength(300, { message: 'Контакты — не длиннее 300 символов' })
+  @multiLine()
   contacts?: string;
 
   /** Пустая строка — сайта нет. */
   @IsOptional()
-  @trim()
+  @trimLine()
   @ValidateIf((dto: UpdateOrganizationDto) => dto.website !== '')
   @IsUrl(
     { require_protocol: true, protocols: ['http', 'https'] },
@@ -55,15 +57,17 @@ export class UpdateOrganizationDto {
   website?: string;
 
   @IsOptional()
-  @trim()
+  @trimLine()
   @IsString({ message: 'Укажите, кто представитель' })
   @MaxLength(120, { message: 'Имя представителя — не длиннее 120 символов' })
+  @singleLine()
   representativeName?: string;
 
   @IsOptional()
-  @trim()
+  @trimLine()
   @IsString({ message: 'Укажите роль представителя' })
   @MaxLength(120, { message: 'Роль — не длиннее 120 символов' })
+  @singleLine()
   representativeRole?: string;
 
   @IsOptional()

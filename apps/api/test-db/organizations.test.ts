@@ -147,6 +147,61 @@ describe('профиль организации', () => {
     expect(repeated.body.sports).toEqual([expect.objectContaining({ id: sport.id })]);
   });
 
+  it.each([
+    ['переворот текста в названии', { name: 'Клуб ‮Ладья' }, 'name'],
+    ['невидимый оператор внутри названия', { name: `Лад${'⁣'}ья` }, 'name'],
+    ['заполнитель хангыля вместо города', { city: 'ㅤ'.repeat(3) }, 'city'],
+    ['невидимый пробел в контактах', { contacts: `+7 900 ${'​'}000-00-00` }, 'contacts'],
+    ['изоляция направления в описании', { description: `Турниры ${'⁧'}для всех` }, 'description'],
+    [
+      'управляющий символ у представителя',
+      { representativeName: 'Иван\u0007 Петров' },
+      'representativeName',
+    ],
+    [
+      'разделитель строк в должности',
+      { representativeRole: `Тренер${' '}клуба` },
+      'representativeRole',
+    ],
+    ['перевод строки в названии', { name: 'Клуб\nЛадья' }, 'name'],
+  ])('%s — 400 с полем', async (_, change, field) => {
+    const { cookie, id } = await organizationAccount();
+    const response = await http().patch(`/organizations/${id}`).set('Cookie', cookie).send(change);
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toHaveProperty(field);
+  });
+
+  it('эмодзи и переводы строк в описании допустимы; переводы строк Windows — как обычные', async () => {
+    const { cookie, id } = await organizationAccount();
+    const chess = String.fromCodePoint(0x265f, 0xfe0f);
+    const response = await http()
+      .patch(`/organizations/${id}`)
+      .set('Cookie', cookie)
+      .send({ name: `Ладья ${chess}`, description: 'Турниры\r\nи занятия' });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      name: `Ладья ${chess}`,
+      description: 'Турниры\nи занятия',
+    });
+  });
+
+  it('при регистрации организации имя и название проверяются тем же правилом', async () => {
+    for (const change of [{ organizationName: 'Клуб ‮Ладья' }, { name: `Иван${'⁣'}` }]) {
+      const response = await http()
+        .post('/auth/register')
+        .send({
+          accountType: 'organization',
+          name: 'Иван Петров',
+          email: `org-${randomUUID()}@example.ru`,
+          password: 'пароль-1234',
+          organizationName: 'Шахматный клуб',
+          ...change,
+        });
+      expect(response.status).toBe(400);
+      expect(Object.keys(response.body.fields)).toEqual(Object.keys(change));
+    }
+  });
+
   it('чужую организацию не правит ни другая организация, ни пользователь; гостю — 401', async () => {
     const { id } = await organizationAccount();
     const otherOrg = await organizationAccount();
