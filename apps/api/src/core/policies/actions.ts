@@ -1,14 +1,22 @@
-import { errorMessage, eventMachine, participationMachine } from '@tandem/domain';
+import {
+  errorMessage,
+  eventMachine,
+  organizationMachine,
+  participationMachine,
+} from '@tandem/domain';
 import type {
   Action,
   ActionCode,
   ErrorCode,
   EventAction,
   EventMode,
+  OrganizationStatus,
   ParticipationStatus,
 } from '@tandem/domain';
 import {
+  canCreateEvent,
   canDecideParticipation,
+  canEditOrganization,
   canJoin,
   canLeave,
   canManageEvent,
@@ -82,6 +90,7 @@ export function eventActions(
   }
   actions.push(toAction('post_message', canPostMessage(actor, event)));
   if (canManageEvent(actor, event).allowed) {
+    actions.push(eventAction('edit_event', 'edit', event, now));
     actions.push(eventAction('reschedule_event', 'reschedule', event, now));
     actions.push(eventAction('cancel_event', 'cancel', event, now));
   }
@@ -121,4 +130,38 @@ export function participationActions(
       : disabled('accept_participation', accept.error),
     { code: 'reject_participation', enabled: true },
   ];
+}
+
+/**
+ * `actions[]` профиля организации (ТЗ 2.9): владельцу — правка, отправка на
+ * проверку и создание мероприятия, администратору — решение по заявке.
+ * Одобренная организация на проверку больше не отправляется — действия нет.
+ */
+export function organizationActions(
+  actor: Actor,
+  organization: { id: string; status: OrganizationStatus },
+): Action[] {
+  const actions: Action[] = [];
+  if (canEditOrganization(actor, organization.id).allowed) {
+    actions.push({ code: 'edit_organization', enabled: true });
+    if (organization.status !== 'approved') {
+      const submit = organizationMachine.check(organization.status, 'submit', {});
+      actions.push(
+        submit.ok
+          ? { code: 'submit_organization', enabled: true }
+          : disabled('submit_organization', submit.error),
+      );
+    }
+    actions.push(toAction('create_event', canCreateEvent(actor)));
+  }
+  if (canModerate(actor).allowed) {
+    // Причина решения вводится в форме: доступность — до ввода
+    const review = organizationMachine.check(organization.status, 'approve', {});
+    actions.push(
+      review.ok
+        ? { code: 'review_organization', enabled: true }
+        : disabled('review_organization', review.error),
+    );
+  }
+  return actions;
 }

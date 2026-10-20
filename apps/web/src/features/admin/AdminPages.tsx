@@ -371,7 +371,9 @@ function OrganizationRow({ organization }: { organization: AdminOrganization }) 
       <Link className="admin-link" to={`/admin/events?organizationId=${organization.id}`}>
         Мероприятия организации
       </Link>
-      {organization.status === 'pending' && <Decision organization={organization} />}
+      {organization.actions.some(
+        (action) => action.code === 'review_organization' && action.enabled,
+      ) && <Decision organization={organization} />}
     </li>
   );
 }

@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { EventDisplayStatus, OrganizationStatus, SportCategory } from '@tandem/domain';
+import type { Action, EventDisplayStatus, OrganizationStatus, SportCategory } from '@tandem/domain';
 import { apiRequest } from '../../shared/api';
 import { ME_KEY } from '../auth/api';
 
@@ -27,6 +27,8 @@ export interface OwnOrganization extends PublicOrganization {
   status: OrganizationStatus;
   decisionReason: string | null;
   submittedAt: string | null;
+  /** Что можно сделать с профилем: экран показывает кнопки только по ним. */
+  actions: Action[];
 }
 
 /** Поля формы профиля — тело `PATCH /organizations/:id`. */

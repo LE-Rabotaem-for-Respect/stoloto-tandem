@@ -1,4 +1,5 @@
-import { ORGANIZATION_STATUS_VIEW, organizationMachine } from '@tandem/domain';
+import { ORGANIZATION_STATUS_VIEW } from '@tandem/domain';
+import type { Action, ActionCode } from '@tandem/domain';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router';
@@ -25,6 +26,9 @@ const NEXT_STEP: Record<OwnOrganization['status'], string> = {
   approved: 'Организация допущена: мероприятия создаются обычным экраном и выходят от её имени.',
 };
 
+const findAction = (actions: Action[], code: ActionCode) =>
+  actions.find((action) => action.code === code);
+
 type ProfileForm = Omit<OrganizationProfile, 'sportIds'> & { sports: OrganizationSport[] };
 
 function toForm(organization: OwnOrganization): ProfileForm {
@@ -50,7 +54,8 @@ function ProfileEditor({ organization }: { organization: OwnOrganization }) {
   const { save, submit } = useOrganizationActions(organization.id);
   const pending = save.isPending || submit.isPending;
   const error = formError(submit.error ?? save.error);
-  const canSubmit = organizationMachine.canTransition(organization.status, 'submit', {});
+  const edit = findAction(organization.actions, 'edit_organization');
+  const submitAction = findAction(organization.actions, 'submit_organization');
   const set = (patch: Partial<ProfileForm>) => {
     setSaved(false);
     setForm((current) => ({ ...current, ...patch }));
@@ -106,14 +111,20 @@ function ProfileEditor({ organization }: { organization: OwnOrganization }) {
         </p>
       )}
       <div className="org-form-actions">
-        {canSubmit && (
-          <PrimaryButton disabled={pending} onClick={onSubmit}>
+        {submitAction && (
+          <PrimaryButton
+            disabled={pending}
+            reason={submitAction.enabled ? undefined : submitAction.reason}
+            onClick={onSubmit}
+          >
             Отправить на проверку
           </PrimaryButton>
         )}
-        <button className="button" type="submit" disabled={pending}>
-          Сохранить
-        </button>
+        {edit?.enabled && (
+          <button className="button" type="submit" disabled={pending}>
+            Сохранить
+          </button>
+        )}
       </div>
     </form>
   );
@@ -139,7 +150,7 @@ function OwnOrganizationScreen({ id }: { id: string }) {
       <OrganizationStepper status={data.status} reason={data.decisionReason} />
       <StatusBadge view={view} />
       <p>{NEXT_STEP[data.status]}</p>
-      {data.status === 'approved' && (
+      {findAction(data.actions, 'create_event')?.enabled && (
         <div className="org-approved">
           <Link className="button button-primary" to="/create">
             Создать мероприятие

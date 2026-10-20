@@ -151,6 +151,7 @@ describe('метки доступа маршрутов приложения', ()
         'AuthController.demoLogin',
         'AuthController.logout',
         'AuthController.me',
+        'AuthController.updateSettings',
         'ClockController.get',
         'EventsController.create',
         'EventsController.feed',

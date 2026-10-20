@@ -81,6 +81,30 @@ function fakeApi(items: MyParticipation[] | 'error') {
           return items === 'error'
             ? json(500, { code: 'internal', message: 'Ошибка' })
             : json(200, { items });
+        case 'GET /api/events/e4':
+          return json(200, {
+            id: 'e4',
+            title: 'Шахматы в парке',
+            description: 'Играем на поле у школы',
+            sport: { id: 's1', name: 'Футбол', category: 'team', isCustom: false },
+            organizer: { kind: 'user', id: 'u2', name: 'Игорь' },
+            startsAt: '2026-10-25T06:00:00Z',
+            endsAt: '2026-10-25T08:00:00Z',
+            previousStartsAt: null,
+            city: 'Красноярск',
+            area: 'Центральный',
+            placeText: 'Поле у школы',
+            mode: 'free',
+            applyQuestion: null,
+            level: 'any',
+            status: 'published',
+            statusReason: null,
+            displayStatus: 'open',
+            participation: null,
+            participationReason: null,
+            participantInfo: null,
+            actions: [],
+          });
         case 'GET /api/notifications':
           return json(200, { items: [], unread: 0 });
         default:
@@ -159,7 +183,7 @@ describe('«Мои записи»', () => {
     const link = (await screen.findByText('Шахматы в парке')).closest('a');
     expect(link?.getAttribute('href')).toBe('/events/e4');
     await userEvent.click(link as HTMLElement);
-    expect(await screen.findByRole('heading', { name: 'Мероприятие', level: 1 })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Шахматы в парке', level: 1 })).toBeTruthy();
   });
 
   it('записей нет — пустое состояние с кнопкой «Найти событие»', async () => {

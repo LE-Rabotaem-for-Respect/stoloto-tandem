@@ -183,6 +183,7 @@ describe('очередь заявок организаций', () => {
       status: 'pending',
       representativeName: 'Иван Петров',
       representativeRole: 'Тренер',
+      actions: [{ code: 'review_organization', enabled: true }],
     });
   });
 
@@ -196,6 +197,15 @@ describe('очередь заявок организаций', () => {
       .send({ decision: 'approve' });
     expect(approved.status).toBe(200);
     expect(approved.body).toMatchObject({ status: 'approved' });
+    // Решать по одобренной больше нельзя — неактивно с причиной автомата
+    expect(approved.body.actions).toEqual([
+      {
+        code: 'review_organization',
+        enabled: false,
+        reason: 'Решение принимается только по заявке на проверке',
+        reasonCode: 'invalid_transition',
+      },
+    ]);
 
     const own = await http()
       .get(`/organizations/${organization.id}`)

@@ -32,6 +32,14 @@ const pending = {
   decisionReason: null,
   submittedAt: '2026-10-19T05:00:00Z',
   sports: [{ id: 's1', name: 'Падел' }],
+  actions: [{ code: 'review_organization', enabled: true }],
+};
+
+// Как api: решать можно только заявку на проверке
+const reviewed = {
+  code: 'review_organization',
+  enabled: false,
+  reason: 'Решение принимается только по заявке на проверке',
 };
 
 const event = {
@@ -47,8 +55,10 @@ const event = {
 };
 
 /** api админки в памяти: решения меняют статус заявки, запросы записываются. */
-function fakeAdminApi(me: typeof adminMe = adminMe) {
-  const organizations = [{ ...pending }];
+function fakeAdminApi(
+  me: typeof adminMe = adminMe,
+  { organizations = [{ ...pending }] }: { organizations?: (typeof pending)[] } = {},
+) {
   const calls: { call: string; body?: unknown }[] = [];
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     const call = `${init?.method ?? 'GET'} ${url}`;
@@ -80,6 +90,7 @@ function fakeAdminApi(me: typeof adminMe = adminMe) {
       Object.assign(organizations[0] ?? {}, {
         status: decision === 'approve' ? 'approved' : 'rejected',
         decisionReason: reason?.trim() ?? null,
+        actions: [reviewed],
       });
       return json(200, organizations[0]);
     }
@@ -202,6 +213,14 @@ describe('админка', () => {
       decision: 'approve',
     });
     expect(screen.queryByRole('button', { name: 'Одобрить' })).toBeNull();
+  });
+
+  it('кнопки решения — по actions[], а не по статусу заявки', async () => {
+    fakeAdminApi(adminMe, { organizations: [{ ...pending, actions: [reviewed] }] });
+    renderAt('/admin/organizations');
+    expect(await screen.findByText('Иван Петров, Тренер')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Одобрить' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Отклонить' })).toBeNull();
   });
 
   it('«Отклонить» — сначала причина; без неё ошибка у поля', async () => {
