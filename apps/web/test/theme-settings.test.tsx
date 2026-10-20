@@ -318,15 +318,57 @@ describe('переключатели «Крупный текст» и «Высо
   });
 
   it('в профиле сбой прокручивается в видимую область', async () => {
+    const original = Element.prototype.scrollIntoView;
     const scrolled = vi.fn();
     Element.prototype.scrollIntoView = scrolled;
+    try {
+      fakeApi({ signedIn: true, saveFails: true });
+      const user = userEvent.setup();
+      renderApp('/profile');
+      const section = await screen.findByRole('region', { name: 'Оформление' });
+      await user.click(section.querySelector('button') as HTMLButtonElement);
+      const alert = await screen.findByRole('alert');
+      await waitFor(() => expect(scrolled).toHaveBeenCalled());
+      expect(scrolled.mock.contexts.at(-1)).toBe(alert);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  it('после выхода и входа тем же аккаунтом прежний сбой не показывается', async () => {
     fakeApi({ signedIn: true, saveFails: true });
     const user = userEvent.setup();
-    renderApp('/profile');
-    const section = await screen.findByRole('region', { name: 'Оформление' });
-    await user.click(section.querySelector('button') as HTMLButtonElement);
-    const alert = await screen.findByRole('alert');
-    await waitFor(() => expect(scrolled).toHaveBeenCalled());
-    expect(scrolled.mock.contexts.at(-1)).toBe(alert);
+    renderApp('/');
+    await screen.findByRole('button', { name: 'Сменить аккаунт' });
+    await user.click(screen.getByRole('button', { name: /Крупный текст/ }));
+    expect(await screen.findByRole('alert')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Сменить аккаунт' }));
+    await user.type(await screen.findByLabelText('Почта'), 'anna@demo');
+    await user.type(screen.getByLabelText('Пароль'), 'demo');
+    await user.click(screen.getByRole('button', { name: 'Войти' }));
+    await screen.findByRole('button', { name: 'Сменить аккаунт' });
+    expect(screen.queryByText(/Не сохранилось в аккаунте/)).toBeNull();
+  });
+
+  it('сбой помнится и через 5 минут, когда переключатели уже на другой странице', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      fakeApi({ signedIn: true, saveFails: true });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderApp('/profile');
+      const section = await screen.findByRole('region', { name: 'Оформление' });
+      await user.click(section.querySelector('button') as HTMLButtonElement);
+      await screen.findByRole('alert');
+
+      // Уход из профиля: мутация «Оформления» осталась без подписчика
+      await user.click(screen.getByRole('link', { name: 'Найти' }));
+      await vi.advanceTimersByTimeAsync(6 * 60_000);
+      expect((await screen.findByRole('alert')).textContent).toBe(
+        'Не сохранилось в аккаунте — выбор остался в этом браузере',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -30,6 +30,9 @@ function useSaveTheme() {
   const client = useQueryClient();
   return useMutation({
     mutationKey: SAVE_THEME_KEY,
+    // Сбой помнится, пока вход не сменился (forgetThemeSaves), а не 5 минут по умолчанию:
+    // иначе сообщение пропадёт, а настройка так и останется несохранённой
+    gcTime: Infinity,
     mutationFn: ({ patch }: SaveThemeVariables) =>
       apiRequest<Me>('/me/settings', { method: 'PATCH', body: patch }),
     onSuccess: (me) => client.setQueryData(ME_KEY, me),
