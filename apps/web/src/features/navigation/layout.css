@@ -9,7 +9,7 @@ html {
   --nav-height: 64px;
   /* Фокус при обходе Tab не прячется ни под шапкой, ни под нижней панелью */
   scroll-padding-top: calc(var(--app-top-height, 0px) + var(--space-2));
-  scroll-padding-bottom: calc(var(--nav-height) + var(--space-2));
+  scroll-padding-bottom: calc(var(--app-nav-height, var(--nav-height)) + var(--space-2));
 }
 
 /* Шапка и верхнее меню прилипают вместе: меню не наезжает на шапку любой высоты */
