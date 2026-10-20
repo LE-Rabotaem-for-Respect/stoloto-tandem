@@ -436,6 +436,55 @@ describe('лента и поиск', { timeout: 15_000 }, () => {
     );
   });
 
+  // Лента загрузилась, перечитывание упало, «Повторить» — третий запрос, его ответ задержан
+  async function retryHeld(client: ReturnType<typeof createQueryClient>) {
+    let release: () => void = () => undefined;
+    const third = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    fakeApi(
+      1,
+      (_offset, attempt) => attempt === 2,
+      (attempt) => (attempt === 3 ? third : undefined),
+    );
+    const user = userEvent.setup();
+    render(
+      <AppProviders client={client}>
+        <MemoryRouter initialEntries={['/']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AppProviders>,
+    );
+    await screen.findByRole('link', { name: /Пробежка 5 км на Татышеве/ });
+    await client.refetchQueries({ queryKey: ['feed'] });
+    await screen.findByRole('alert');
+    await user.click(screen.getByRole('button', { name: 'Повторить' }));
+    await screen.findByText('Загрузка…');
+    return { user, release };
+  }
+
+  it('во время «Повторить» выбран фильтр: ответ повтора фокус с фильтра не уводит', async () => {
+    const client = createQueryClient();
+    const { user, release } = await retryHeld(client);
+    const today = screen.getByRole('radio', { name: 'Сегодня' });
+    await user.click(today);
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(document.activeElement).toBe(today);
+  });
+
+  it('во время «Повторить» человек ушёл в поиск: ответ повтора ввод не прерывает', async () => {
+    const client = createQueryClient();
+    const { user, release } = await retryHeld(client);
+    const search = screen.getByRole('searchbox');
+    await user.click(search);
+    await user.type(search, 'бег');
+    release();
+    await waitFor(() => expect(screen.queryByText('Загрузка…')).toBeNull());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(document.activeElement).toBe(search);
+  });
+
   it('фильтр сменили, пока шла догрузка: её ответ фокус с фильтров не уводит', async () => {
     let release: () => void = () => undefined;
     const held = new Promise<void>((resolve) => {
