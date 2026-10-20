@@ -44,7 +44,7 @@ test('сценарий 1: Анна создаёт событие с новым �
   await form.getByRole('button', { name: 'Опубликовать' }).click();
   await expect(page).toHaveURL(/\/events\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Кёрлинг для новичков' })).toBeVisible();
-  await expect(page.locator('.event-card-action')).toContainText('Набор открыт');
+  await expect(page.locator('.event-card-first')).toContainText('Набор открыт');
   // Новое направление — пользовательское, в группе «Другое» (ТЗ 2.3)
   const eventId = page.url().split('/').pop();
   const published = await (await page.request.get(`/api/events/${eventId}`)).json();

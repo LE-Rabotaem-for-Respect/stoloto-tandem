@@ -59,7 +59,7 @@ test('сценарий 2: допуск организации, публикац�
   });
   await page.getByRole('button', { name: 'Опубликовать' }).click();
   await expect(page).toHaveURL(/\/events\/[0-9a-f-]{36}$/);
-  await expect(page.locator('.event-card-action')).toContainText('Набор открыт');
+  await expect(page.locator('.event-card-first')).toContainText('Набор открыт');
   await expect(page.locator('.event-card-organizer')).toContainText(PADEL);
 
   // 6. Анна находит событие в ленте → карточка → ссылка на организатора
