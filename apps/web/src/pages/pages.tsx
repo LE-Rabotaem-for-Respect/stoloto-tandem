@@ -74,16 +74,6 @@ export function RegisterPage() {
   );
 }
 
-/** Раздел, наполнение которого появится вместе со своим модулем. */
-function Section({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="page">
-      <h1>{title}</h1>
-      <p>{text}</p>
-    </div>
-  );
-}
-
 export const FeedPage = () => <FeedScreen />;
 
 export const EventPage = () => <EventCardScreen />;
