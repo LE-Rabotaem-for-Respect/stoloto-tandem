@@ -46,6 +46,30 @@ const complete: Organization = {
   sports: [{ id: 's-padel', name: 'Падел', category: 'other' }],
 };
 
+/** `actions[]` владельца — как их строит api по статусу. */
+function ownerActions(status: string) {
+  const actions: Record<string, unknown>[] = [{ code: 'edit_organization', enabled: true }];
+  if (status === 'pending') {
+    actions.push({
+      code: 'submit_organization',
+      enabled: false,
+      reason: 'Заявка уже на проверке или одобрена',
+    });
+  } else if (status !== 'approved') {
+    actions.push({ code: 'submit_organization', enabled: true });
+  }
+  actions.push(
+    status === 'approved'
+      ? { code: 'create_event', enabled: true }
+      : {
+          code: 'create_event',
+          enabled: false,
+          reason: 'Организация ещё не допущена администратором',
+        },
+  );
+  return actions;
+}
+
 const json = (status: number, body?: unknown) =>
   new Response(body === undefined ? null : JSON.stringify(body), {
     status,
@@ -59,6 +83,8 @@ interface FakeOptions {
   submitFields?: Record<string, string>;
   events?: unknown[];
   eventsTotal?: number;
+  /** Подменить `actions[]` ответа — проверить, что экран не решает по статусу сам. */
+  actions?: Record<string, unknown>[];
 }
 
 /** api в памяти: свой профиль организации, поиск направлений, лента её мероприятий. */
@@ -69,7 +95,12 @@ function fakeApi({
   submitFields,
   events = [],
   eventsTotal = events.length,
+  actions,
 }: FakeOptions = {}) {
+  const withActions = (organization: Organization) => ({
+    ...organization,
+    actions: actions ?? ownerActions(organization.status),
+  });
   let current = organization;
   const calls: { call: string; body?: unknown }[] = [];
   vi.stubGlobal(
@@ -100,7 +131,9 @@ function fakeApi({
         });
       }
       if (call === `GET /api/organizations/${ORG_ID}`) {
-        return current ? json(200, current) : json(404, { code: 'not_found', message: 'Нет' });
+        return current
+          ? json(200, withActions(current))
+          : json(404, { code: 'not_found', message: 'Нет' });
       }
       if (call === `PATCH /api/organizations/${ORG_ID}` && current) {
         const { sportIds, website, ...profile } = body as Record<string, unknown> & {
@@ -117,7 +150,7 @@ function fakeApi({
             category: 'other',
           })),
         };
-        return json(200, current);
+        return json(200, withActions(current));
       }
       if (call === `POST /api/organizations/${ORG_ID}/submit` && current) {
         if (submitFields) {
@@ -128,7 +161,7 @@ function fakeApi({
           });
         }
         current = { ...current, status: 'pending', decisionReason: null };
-        return json(200, current);
+        return json(200, withActions(current));
       }
       if (call.startsWith('GET /api/sports?q=')) {
         // Как у сервера: запрос длиннее предела — ошибка поля
@@ -191,7 +224,10 @@ describe('своя организация: /organization', () => {
 
     expect(await screen.findByText('На рассмотрении')).toBeTruthy();
     expect((await stepper()).getAttribute('aria-label')).toBe('Путь организации: шаг 2 из 4');
-    expect(screen.queryByRole('button', { name: 'Отправить на проверку' })).toBeNull();
+    // На проверке отправка неактивна — с причиной из actions[]
+    const again = screen.getByRole('button', { name: 'Отправить на проверку' });
+    expect(again).toHaveProperty('disabled', true);
+    expect(screen.getByText('Заявка уже на проверке или одобрена')).toBeTruthy();
     const writes = calls.filter(({ call }) => !call.startsWith('GET'));
     expect(writes.map(({ call }) => call)).toEqual([
       `PATCH /api/organizations/${ORG_ID}`,
@@ -327,6 +363,17 @@ describe('своя организация: /organization', () => {
     renderApp('/organization');
     const website = await screen.findByLabelText('Сайт (необязательно)');
     expect(website.getAttribute('maxlength')).toBe('300');
+  });
+
+  it('кнопки — только по actions[], а не по статусу', async () => {
+    fakeApi({
+      organization: { ...complete, status: 'draft' },
+      actions: [{ code: 'create_event', enabled: true }],
+    });
+    renderApp('/organization');
+    expect(await screen.findByRole('link', { name: 'Создать мероприятие' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Отправить на проверку' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Сохранить' })).toBeNull();
   });
 
   it('аккаунт человека: раздел не для него', async () => {
