@@ -24,6 +24,7 @@ export interface FeedFilter {
   sportText?: string;
   sportId?: string;
   category?: SportCategory;
+  organizationId?: string;
   startsFrom?: Date;
   startsBefore?: Date;
   city?: string;
@@ -67,6 +68,7 @@ function feedWhere(filter: FeedFilter): Prisma.EventWhereInput {
   } else if (filter.category) {
     and.push({ sport: { category: filter.category, status: 'active' } });
   }
+  if (filter.organizationId) and.push({ organizerOrgId: filter.organizationId });
   if (filter.startsFrom) and.push({ startsAt: { gte: filter.startsFrom } });
   if (filter.startsBefore) and.push({ startsAt: { lt: filter.startsBefore } });
   if (filter.city) and.push({ city: insensitive(filter.city) });
