@@ -21,7 +21,7 @@ const ALLOWED = `${ZWJ}|${SELECTOR}|${SOFT_HYPHEN}`;
 // («Ку⃣бок») прячет слово от поиска. Исключение — рамка клавиши U+20E3 в keycap («1️⃣»).
 // Невидимые знаки (U+034F, селекторы начертания) и рамка клавиши сюда не входят:
 // у них свои правила выше и ниже
-const MARK = String.raw`(?<=\p{L})(?![${HIDDEN}\u{20E3}])\p{M}(?!\p{M})`;
+const MARK = String.raw`(?<=\p{L})(?![${HIDDEN}])(?!\u{20E3})\p{M}(?!\p{M})`;
 const KEYCAP = String.raw`(?<=[0-9#*]\u{FE0F}?)\u{20E3}`;
 // В многострочном тексте — ещё перевод строки и табуляция
 const LINE_BREAKS = String.raw`[\n\t]`;
