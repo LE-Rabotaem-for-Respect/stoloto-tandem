@@ -1,7 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useMe } from './api';
-import { pendingActionFrom } from './return-path';
+import { isAuthPage, pendingActionFrom } from './return-path';
 import type { PendingAction } from './return-path';
 
 /**
@@ -49,13 +49,21 @@ function subscribe(listener: () => void) {
  * Номер последнего действия, выданного кликом гостя в этой вкладке. Действие из
  * `state` навигации принимается, только если несёт этот номер, и один раз: старые
  * записи истории — вход, брошенный раньше, «Назад» после смены аккаунта — его не
- * запустят. Номер сбрасывается и при смене пользователя вне того входа, что его несёт.
+ * запустят. Номер сбрасывается, когда гость ушёл с экранов входа и регистрации, не войдя,
+ * и при смене пользователя вне того входа, что его несёт.
  */
-let issuedToken: number | null = null;
+let issuedToken: string | null = null;
 let nextToken = 1;
 
+// История вкладки переживает перезагрузку и копируется в дублированную вкладку, а
+// счётчик — нет. Случайная часть не даёт номеру новой загрузки совпасть со старой
+// записью входа (getRandomValues, в отличие от randomUUID, есть и на стенде по http)
+const documentId = Array.from(crypto.getRandomValues(new Uint32Array(2)), (part) =>
+  part.toString(36),
+).join('');
+
 export function issuePendingAction(path: string, intent: string): PendingAction {
-  issuedToken = nextToken;
+  issuedToken = `${documentId}:${nextToken}`;
   nextToken += 1;
   return { path, intent, token: issuedToken };
 }
@@ -95,8 +103,11 @@ export function usePendingActionRelay() {
   useEffect(() => {
     const pending = pendingActionFrom(state);
     const carried = pending !== null && pending.token === issuedToken;
-    // Вошёл или вышел кто-то не тем входом, что несёт выданное действие, — оно не нужно
-    if (previousUserId.current !== userId && !carried) issuedToken = null;
+    // Вошёл или вышел кто-то не тем входом, что несёт выданное действие, или гость ушёл
+    // со входа, не войдя, — оно не нужно: иначе к брошенному входу вернулись бы «Назад»
+    if (!carried && (previousUserId.current !== userId || !isAuthPage(pathname))) {
+      issuedToken = null;
+    }
     previousUserId.current = userId;
     // На экранах входа и регистрации действие ещё в пути — его несёт их state
     if (pending && pending.path === pathname) {

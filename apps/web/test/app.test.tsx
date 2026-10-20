@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import userEvent from '@testing-library/user-event';
 import { StrictMode, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router';
 import type { InitialEntry } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppProviders, AppRoutes, createQueryClient } from '../src/App';
@@ -233,6 +233,26 @@ let joinVisible = true;
 
 function MaybeJoin({ onJoin }: { onJoin(): void }) {
   return joinVisible ? <JoinButton onJoin={onJoin} /> : <p>Кнопки нет</p>;
+}
+
+// state экрана входа — чтобы тест вернул ту же запись истории, что осталась бы в браузере
+let loginState: unknown = null;
+const rememberLoginState = (state: unknown) => {
+  loginState = state;
+};
+function RememberState() {
+  const { state } = useLocation();
+  useEffect(() => rememberLoginState(state), [state]);
+  return null;
+}
+
+function ReplayLogin() {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => void navigate('/events/1', { state: loginState })}>
+      Повторить запись входа
+    </button>
+  );
 }
 
 function JoinButton({ onJoin }: { onJoin(): void }) {
@@ -772,7 +792,7 @@ describe('отложенное действие — только ответ на
         {
           pathname: '/login',
           search: '?next=%2Fevents%2F1',
-          state: { pendingAction: { path: '/events/1', intent: 'join', token: 0 } },
+          state: { pendingAction: { path: '/events/1', intent: 'join', token: 'old:1' } },
         },
       ],
       routes(<JoinButton onJoin={onJoin} />),
@@ -853,6 +873,118 @@ describe('отложенное действие — только ответ на
     fireEvent.click(document.body);
     act(() => reveal());
     await screen.findByRole('button', { name: 'Записаться' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).not.toHaveBeenCalled();
+  });
+
+  it('гость бросил вход, не войдя: «Назад» к этому входу и вход другого действие не запускает', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp(
+      '/events/1',
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route index element={<BackButton />} />
+          <Route path="events/:id" element={<JoinButton onJoin={onJoin} />} />
+          <Route
+            path="login"
+            element={
+              <>
+                <BackButton />
+                <LoginPage />
+              </>
+            }
+          />
+        </Route>
+      </Routes>,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    await screen.findByLabelText('Почта');
+    // Ушёл по логотипу и отошёл; за компьютер сел другой и вернулся «Назад» к тому входу
+    await userEvent.click(screen.getByRole('link', { name: 'Тандем' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Назад' }));
+    await signIn('igor@demo');
+    await screen.findByRole('button', { name: 'Сменить аккаунт' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).not.toHaveBeenCalled();
+  });
+
+  it('номер действия не повторяется в новой загрузке страницы: старые записи входа не совпадут', async () => {
+    const tokenOfNewLoad = async () => {
+      vi.resetModules();
+      const { issuePendingAction } = await import('../src/features/auth/pending-action');
+      return issuePendingAction('/events/1', 'join').token;
+    };
+    const first = await tokenOfNewLoad();
+    const second = await tokenOfNewLoad();
+    expect(second).not.toBe(first);
+  });
+
+  it('выполненное действие номер тратит: та же запись входа второй раз ничего не запускает', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp(
+      '/events/1',
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route
+            path="events/:id"
+            element={
+              <>
+                <JoinButton onJoin={onJoin} />
+                <ReplayLogin />
+              </>
+            }
+          />
+          <Route
+            path="login"
+            element={
+              <>
+                <RememberState />
+                <LoginPage />
+              </>
+            }
+          />
+        </Route>
+      </Routes>,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    await signIn();
+    await waitFor(() => expect(onJoin).toHaveBeenCalledTimes(1));
+    await userEvent.click(screen.getByRole('button', { name: 'Повторить запись входа' }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).toHaveBeenCalledTimes(1);
+  });
+
+  it('номер не переживает размонтирование каркаса: в новом приложении старая запись входа пуста', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    const withLogin = (
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="events/:id" element={<JoinButton onJoin={onJoin} />} />
+          <Route
+            path="login"
+            element={
+              <>
+                <RememberState />
+                <LoginPage />
+              </>
+            }
+          />
+        </Route>
+      </Routes>
+    );
+    renderApp('/events/1', withLogin);
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    await screen.findByLabelText('Почта');
+    cleanup();
+    renderApp(
+      ['/events/1', { pathname: '/login', search: '?next=%2Fevents%2F1', state: loginState }],
+      withLogin,
+    );
+    await signIn('igor@demo');
+    await screen.findByRole('button', { name: 'Сменить аккаунт' });
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(onJoin).not.toHaveBeenCalled();
   });

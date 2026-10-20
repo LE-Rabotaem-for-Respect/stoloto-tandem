@@ -26,13 +26,16 @@ export function safeNext(value: string | null): string {
 
 const AUTH_PAGES = new Set(['/login', '/register']);
 
+/** Экран входа или регистрации. */
+export const isAuthPage = (pathname: string) => AUTH_PAGES.has(pathname);
+
 /**
  * Куда вернуться после входа с текущей страницы. На экранах входа и регистрации
  * это уже заданный `next`, а не сам экран — иначе после входа человек снова
  * увидит форму, а `next` вложится сам в себя.
  */
 export function returnPath(pathname: string, search: string): string {
-  if (AUTH_PAGES.has(pathname)) return safeNext(new URLSearchParams(search).get('next'));
+  if (isAuthPage(pathname)) return safeNext(new URLSearchParams(search).get('next'));
   return pathname + search;
 }
 
@@ -43,7 +46,7 @@ export function returnPath(pathname: string, search: string): string {
 export interface PendingAction {
   path: string;
   intent: string;
-  token: number;
+  token: string;
 }
 
 /**
@@ -58,7 +61,7 @@ export function pendingActionFrom(state: unknown): PendingAction | null {
   const pending: unknown = (state as { pendingAction?: unknown }).pendingAction;
   if (typeof pending !== 'object' || pending === null) return null;
   const { path, intent, token } = pending as Record<string, unknown>;
-  return typeof path === 'string' && typeof intent === 'string' && typeof token === 'number'
+  return typeof path === 'string' && typeof intent === 'string' && typeof token === 'string'
     ? { path, intent, token }
     : null;
 }
