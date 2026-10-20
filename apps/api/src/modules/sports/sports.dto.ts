@@ -28,9 +28,9 @@ export class SearchSportsQuery {
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? cleanSingleLine(value) : value,
   )
-  @IsString({ message: 'Запрос — строка' })
-  @MaxLength(SPORT_NAME_MAX_LENGTH, { message: `Не длиннее ${SPORT_NAME_MAX_LENGTH} символов` })
   @Matches(SINGLE_LINE_TEXT, { message: 'В запросе есть недопустимые символы' })
+  @MaxLength(SPORT_NAME_MAX_LENGTH, { message: `Не длиннее ${SPORT_NAME_MAX_LENGTH} символов` })
+  @IsString({ message: 'Запрос — строка' })
   q?: string;
 
   @IsOptional()

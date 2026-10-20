@@ -60,6 +60,7 @@ export { EVENT_LEVELS, EVENT_LEVEL_TITLES } from './event-levels';
 export type { EventLevel } from './event-levels';
 export {
   MULTI_LINE_TEXT,
+  PLAIN_TEXT,
   SINGLE_LINE_TEXT,
   VISIBLE_TEXT,
   cleanSingleLine,

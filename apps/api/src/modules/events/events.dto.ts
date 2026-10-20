@@ -1,13 +1,4 @@
-import {
-  EVENT_LEVELS,
-  EVENT_MODES,
-  MULTI_LINE_TEXT,
-  SINGLE_LINE_TEXT,
-  SPORT_CATEGORIES,
-  VISIBLE_TEXT,
-  cleanSingleLine,
-  normalizeLineBreaks,
-} from '@tandem/domain';
+import { EVENT_LEVELS, EVENT_MODES, SPORT_CATEGORIES } from '@tandem/domain';
 import type { EventLevel, EventMode, SportCategory } from '@tandem/domain';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -27,13 +18,8 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
+import { cleanLine, multiLine, singleLine, trimText, visible } from '../../core/validation';
 import { NewSportDto } from '../sports/sports.dto';
-
-// Однострочный текст: пробелы по краям и мягкие переносы — прочь (правило — в @tandem/domain)
-const cleanLine = () =>
-  Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? cleanSingleLine(value) : value,
-  );
 
 // Время приходит строкой ISO 8601 с поясом; «2026-10-21» без времени — не дата начала
 const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
@@ -52,19 +38,6 @@ const isoDate = () =>
       : value,
   );
 
-// Невидимые и переворачивающие текст символы запрещены (правило — в @tandem/domain)
-const HIDDEN_CHARS = 'В тексте есть недопустимые символы';
-const singleLine = () => Matches(SINGLE_LINE_TEXT, { message: HIDDEN_CHARS });
-const multiLine = () => Matches(MULTI_LINE_TEXT, { message: HIDDEN_CHARS });
-// Строка из точек, тире или одних эмодзи на карточке выглядит пустой
-const visible = () => Matches(VISIBLE_TEXT, { message: 'Нужна хотя бы одна буква или цифра' });
-
-// Многострочный текст: переводы строк Windows (\r\n) — к \n, пробелы по краям — прочь
-const trimText = () =>
-  Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? normalizeLineBreaks(value).trim() : value,
-  );
-
 /**
  * Создание мероприятия (ТЗ 2.2). Организатор не вводится — его задаёт аккаунт.
  * Направление — либо `sportId` из подсказок, либо `newSport` («Добавить как новое»).
@@ -72,17 +45,17 @@ const trimText = () =>
  */
 export class CreateEventDto {
   @cleanLine()
-  @IsString({ message: 'Укажите название' })
-  @Length(5, 80, { message: 'Название — от 5 до 80 символов' })
-  @singleLine()
   @visible()
+  @singleLine()
+  @Length(5, 80, { message: 'Название — от 5 до 80 символов' })
+  @IsString({ message: 'Укажите название' })
   title!: string;
 
   @trimText()
-  @IsString({ message: 'Добавьте описание' })
+  @multiLine()
   @IsNotEmpty({ message: 'Добавьте описание' })
   @MaxLength(2000, { message: 'Описание — не длиннее 2000 символов' })
-  @multiLine()
+  @IsString({ message: 'Добавьте описание' })
   description!: string;
 
   @ValidateIf((dto: CreateEventDto) => dto.newSport == null)
@@ -105,31 +78,31 @@ export class CreateEventDto {
   endsAt!: Date;
 
   @cleanLine()
-  @IsString({ message: 'Укажите город' })
-  @Length(2, 80, { message: 'Город — от 2 до 80 символов' })
-  @singleLine()
   @visible()
+  @singleLine()
+  @Length(2, 80, { message: 'Город — от 2 до 80 символов' })
+  @IsString({ message: 'Укажите город' })
   city!: string;
 
   @cleanLine()
-  @IsString({ message: 'Укажите район или ориентир' })
-  @Length(2, 120, { message: 'Район или ориентир — от 2 до 120 символов' })
-  @singleLine()
   @visible()
+  @singleLine()
+  @Length(2, 120, { message: 'Район или ориентир — от 2 до 120 символов' })
+  @IsString({ message: 'Укажите район или ориентир' })
   area!: string;
 
   @cleanLine()
-  @IsString({ message: 'Укажите адрес или опишите место' })
-  @Length(3, 300, { message: 'Адрес или описание места — от 3 до 300 символов' })
-  @singleLine()
   @visible()
+  @singleLine()
+  @Length(3, 300, { message: 'Адрес или описание места — от 3 до 300 символов' })
+  @IsString({ message: 'Укажите адрес или опишите место' })
   placeText!: string;
 
   @IsOptional()
   @trimText()
-  @IsString({ message: 'Информация для участников — текст' })
-  @MaxLength(2000, { message: 'Информация для участников — не длиннее 2000 символов' })
   @multiLine()
+  @MaxLength(2000, { message: 'Информация для участников — не длиннее 2000 символов' })
+  @IsString({ message: 'Информация для участников — текст' })
   participantInfo?: string;
 
   @IsIn(EVENT_MODES, { message: 'Выберите режим записи' })
@@ -137,9 +110,9 @@ export class CreateEventDto {
 
   @IsOptional()
   @trimText()
-  @IsString({ message: 'Вопрос к заявке — текст' })
-  @MaxLength(300, { message: 'Вопрос к заявке — не длиннее 300 символов' })
   @multiLine()
+  @MaxLength(300, { message: 'Вопрос к заявке — не длиннее 300 символов' })
+  @IsString({ message: 'Вопрос к заявке — текст' })
   applyQuestion?: string;
 
   @IsIn(EVENT_LEVELS, { message: 'Выберите уровень' })
@@ -155,9 +128,9 @@ const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
 export class EventFeedQuery {
   @IsOptional()
   @cleanLine()
-  @IsString({ message: 'Запрос — строка' })
-  @MaxLength(100, { message: 'Запрос — не длиннее 100 символов' })
   @singleLine()
+  @MaxLength(100, { message: 'Запрос — не длиннее 100 символов' })
+  @IsString({ message: 'Запрос — строка' })
   q?: string;
 
   @IsOptional()
@@ -182,16 +155,16 @@ export class EventFeedQuery {
 
   @IsOptional()
   @cleanLine()
-  @IsString({ message: 'Город — строка' })
-  @MaxLength(80, { message: 'Город — не длиннее 80 символов' })
   @singleLine()
+  @MaxLength(80, { message: 'Город — не длиннее 80 символов' })
+  @IsString({ message: 'Город — строка' })
   city?: string;
 
   @IsOptional()
   @cleanLine()
-  @IsString({ message: 'Район — строка' })
-  @MaxLength(120, { message: 'Район — не длиннее 120 символов' })
   @singleLine()
+  @MaxLength(120, { message: 'Район — не длиннее 120 символов' })
+  @IsString({ message: 'Район — строка' })
   area?: string;
 
   @IsOptional()
