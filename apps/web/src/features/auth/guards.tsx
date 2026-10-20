@@ -2,9 +2,8 @@ import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 import { useMe } from './api';
-import { takePendingAction, usePendingSlot } from './pending-action';
+import { issuePendingAction, takePendingAction, usePendingSlot } from './pending-action';
 import { loginPath } from './return-path';
-import type { PendingAction } from './return-path';
 
 /** Раздел только для вошедших: гостя отправляет на вход и возвращает сюда же. */
 export function RequireAuth({ children }: { children: ReactNode }) {
@@ -81,7 +80,7 @@ export function useAuthAction(intent: string, action: () => void): () => void {
       action();
       return;
     }
-    const pendingAction: PendingAction = { path: pathname, intent };
+    const pendingAction = issuePendingAction(pathname, intent);
     void navigate(loginPath(pathname + search), { state: { pendingAction } });
   };
 }

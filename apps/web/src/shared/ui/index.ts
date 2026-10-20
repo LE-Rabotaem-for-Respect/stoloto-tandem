@@ -1,4 +1,4 @@
-export { Field } from './Field';
+export { Field, TextAreaField } from './Field';
 export { Icon } from './Icon';
 export {
   DateLeaf,
