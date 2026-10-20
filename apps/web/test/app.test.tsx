@@ -1,10 +1,12 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { StrictMode } from 'react';
+import { StrictMode, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppProviders, AppRoutes, createQueryClient } from '../src/App';
 import { useAuthAction } from '../src/features/auth';
+import { takePendingAction } from '../src/features/auth/pending-action';
 import { AppLayout } from '../src/features/navigation/AppLayout';
 import { LoginPage, RegisterPage } from '../src/pages/pages';
 
@@ -17,6 +19,7 @@ interface Me {
 }
 
 const anna: Me = { id: 'u1', role: 'user', name: 'Анна', email: 'anna@demo', organization: null };
+const igor: Me = { id: 'u2', role: 'user', name: 'Игорь', email: 'igor@demo', organization: null };
 
 const json = (status: number, body?: unknown) =>
   new Response(body === undefined ? null : JSON.stringify(body), {
@@ -43,11 +46,11 @@ function fakeApi({ demoMode = false, signedIn = null as Me | null, meDown = fals
           lastResetAt: null,
         });
       case 'POST /api/auth/login': {
-        const body = JSON.parse(String(init?.body)) as { password: string };
+        const body = JSON.parse(String(init?.body)) as { email: string; password: string };
         if (body.password !== 'demo') {
           return json(401, { code: 'invalid_credentials', message: 'Неверная почта или пароль' });
         }
-        me = anna;
+        me = body.email === igor.email ? igor : anna;
         return json(200, me);
       }
       case 'POST /api/auth/demo-login':
@@ -363,7 +366,7 @@ describe('действие гостя', () => {
     expect(onJoin).not.toHaveBeenCalled();
   });
 
-  it('после смены аккаунта отложенное действие прежнего гостя не выполняется', async () => {
+  it('после смены аккаунта отложенное действие прежнего гостя не выполняется для другого', async () => {
     fakeApi();
     const onJoin = vi.fn();
     renderApp(
@@ -393,7 +396,7 @@ describe('действие гостя', () => {
 
     // Другой человек: «Сменить аккаунт», вход, затем кнопка видна
     await userEvent.click(screen.getByRole('button', { name: 'Сменить аккаунт' }));
-    await userEvent.type(await screen.findByLabelText('Почта'), 'anna@demo');
+    await userEvent.type(await screen.findByLabelText('Почта'), 'igor@demo');
     await userEvent.type(screen.getByLabelText('Пароль'), 'demo');
     joinVisible = true;
     await userEvent.click(screen.getByRole('button', { name: 'Войти' }));
@@ -605,6 +608,145 @@ describe('экран входа и прилипающая шапка', () => {
     } finally {
       // Подмена прототипа не должна пережить упавший тест
       rect.mockRestore();
+    }
+  });
+});
+
+// После входа человек оказывается уже записан: вместо «Записаться» — «Отменить запись»
+let memberAfterSignIn = false;
+
+function MemberPage({ onJoin }: { onJoin(): void }) {
+  const [cancelled, setCancelled] = useState(false);
+  if (!memberAfterSignIn || cancelled) return <JoinButton onJoin={onJoin} />;
+  return (
+    <button type="button" onClick={() => setCancelled(true)}>
+      Отменить запись
+    </button>
+  );
+}
+
+// Кнопка записи появляется позже сама, без действий человека: по сигналу теста
+let reveal: () => void = () => undefined;
+
+function RevealLater({ onJoin }: { onJoin(): void }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    reveal = () => setVisible(true);
+  });
+  if (!memberAfterSignIn || visible) return <JoinButton onJoin={onJoin} />;
+  return <p>Вы участник</p>;
+}
+
+// Кнопка записи появляется сама, когда «загрузились данные»
+function JoinAfterLoad({ onJoin }: { onJoin(): void }) {
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setLoaded(true), 30);
+    return () => clearTimeout(timer);
+  }, []);
+  return loaded ? <JoinButton onJoin={onJoin} /> : <p role="status">Загрузка…</p>;
+}
+
+describe('отложенное действие — только ответ на клик гостя', () => {
+  const routes = (page: ReactNode) => (
+    <Routes>
+      <Route element={<AppLayout />}>
+        <Route path="events/:id" element={page} />
+        <Route
+          path="login"
+          element={
+            <>
+              <BackButton />
+              <LoginPage />
+            </>
+          }
+        />
+        <Route path="register" element={<RegisterPage />} />
+      </Route>
+    </Routes>
+  );
+
+  async function signIn(email = 'anna@demo') {
+    await userEvent.type(await screen.findByLabelText('Почта'), email);
+    await userEvent.type(screen.getByLabelText('Пароль'), 'demo');
+    await userEvent.click(screen.getByRole('button', { name: 'Войти' }));
+  }
+
+  beforeEach(() => {
+    memberAfterSignIn = false;
+  });
+
+  it('кнопка, которую страница показала после загрузки данных, выполняет действие', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp('/events/1', routes(<JoinAfterLoad onJoin={onJoin} />));
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    await signIn();
+    await waitFor(() => expect(onJoin).toHaveBeenCalledTimes(1));
+  });
+
+  it('кнопка, появившаяся после действия самого человека, сама не срабатывает', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp('/events/1', routes(<MemberPage onJoin={onJoin} />));
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    memberAfterSignIn = true;
+    await signIn();
+    // Уже записан — кнопки нет; он отменил запись, «Записаться» снова на экране
+    await userEvent.click(await screen.findByRole('button', { name: 'Отменить запись' }));
+    await screen.findByRole('button', { name: 'Записаться' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onJoin).not.toHaveBeenCalled();
+  });
+
+  it('вход ↔ регистрация не оставляют экран входа в истории: «Назад» — к странице события', async () => {
+    fakeApi();
+    renderApp('/events/1', routes(<JoinButton onJoin={vi.fn()} />));
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Зарегистрироваться' }));
+    await userEvent.click(
+      await within(screen.getByRole('main')).findByRole('link', { name: 'Войти' }),
+    );
+    await screen.findByLabelText('Почта');
+    await userEvent.click(screen.getByRole('button', { name: 'Назад' }));
+    await screen.findByRole('button', { name: 'Записаться' });
+    expect(screen.queryByLabelText('Почта')).toBeNull();
+  });
+
+  it('оставленное действие не переживает размонтирование каркаса', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp('/events/1', routes(<MemberPage onJoin={onJoin} />));
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    memberAfterSignIn = true;
+    await signIn();
+    await screen.findByRole('button', { name: 'Отменить запись' });
+    cleanup();
+    // Действие осталось бы в памяти и сработало бы в следующем приложении или тесте
+    expect(takePendingAction('/events/1', 'join', anna.id)).toBe(false);
+    expect(onJoin).not.toHaveBeenCalled();
+  });
+
+  it('кнопка, появившаяся сама намного позже, действие не выполняет: у него есть срок', async () => {
+    fakeApi();
+    const onJoin = vi.fn();
+    renderApp('/events/1', routes(<RevealLater onJoin={onJoin} />));
+    await userEvent.click(await screen.findByRole('button', { name: 'Записаться' }));
+    memberAfterSignIn = true;
+    await signIn();
+    await screen.findByText('Вы участник');
+
+    // Человек ничего не нажимал, а через минуту страница сама показала «Записаться»
+    // (запись отменили в другой вкладке, данные обновились)
+    const later = performance.now() + 60_000;
+    const now = vi.spyOn(performance, 'now').mockReturnValue(later);
+    try {
+      act(() => reveal());
+      await screen.findByRole('button', { name: 'Записаться' });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(onJoin).not.toHaveBeenCalled();
+    } finally {
+      now.mockRestore();
     }
   });
 });
