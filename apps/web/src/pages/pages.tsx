@@ -8,6 +8,7 @@ import {
   safeNext,
   useMe,
 } from '../features/auth';
+import { NotificationCenter } from '../features/notifications';
 
 function useReturnAfterSignIn() {
   const [params] = useSearchParams();
@@ -100,7 +101,10 @@ export const CreateEventPage = () => (
 
 export const NotificationsPage = () => (
   <RequireAuth>
-    <Section title="Уведомления" text="Здесь будут уведомления о ваших записях и мероприятиях." />
+    <div className="page">
+      <h1>Уведомления</h1>
+      <NotificationCenter />
+    </div>
   </RequireAuth>
 );
 

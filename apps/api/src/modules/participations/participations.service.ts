@@ -141,6 +141,7 @@ export class ParticipationsService {
             participationId: active.id,
             eventId: event.id,
             userId: actor.userId,
+            previousStatus: active.status,
             actorId: actor.userId,
             occurredAt: now,
           }),
@@ -148,6 +149,11 @@ export class ParticipationsService {
         return { id: active.id, eventId: event.id, status };
       }),
     );
+  }
+
+  /** Все, кто записан или подал заявку: им важны перенос, отмена и снятие (уведомления, ТЗ 3.3). */
+  signedUpUserIds(eventId: string): Promise<string[]> {
+    return this.participations.signedUpUserIds(eventId);
   }
 
   /**

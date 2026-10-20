@@ -29,7 +29,11 @@ describe('стенды stand-1…3 (stands/*.env)', () => {
   it.each(stands)(
     '$name: номер стенда доходит до приложения, демо-режим включён',
     ({ name, env }) => {
-      expect(loadStandConfig(env)).toEqual({ demoMode: true, standId: name });
+      expect(loadStandConfig(env)).toEqual({
+        demoMode: true,
+        standId: name,
+        demoResetIntervalSeconds: 10,
+      });
     },
   );
 

@@ -59,3 +59,10 @@ export {
   cleanSingleLine,
   normalizeLineBreaks,
 } from './text';
+export {
+  NOTIFICATION_ICON,
+  NOTIFICATION_TYPES,
+  isNotificationType,
+  notificationText,
+} from './notifications';
+export type { NotificationPayload, NotificationType } from './notifications';

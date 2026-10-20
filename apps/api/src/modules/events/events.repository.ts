@@ -90,6 +90,24 @@ export class EventsRepository {
     return tx.event.create({ data, select: { id: true } });
   }
 
+  /** Название и кто организатор: пользователь или организация (с её владельцем). */
+  findOrganizerOf(id: string): Promise<{
+    title: string;
+    organizerUserId: string | null;
+    organizerOrgId: string | null;
+    organizerOrg: { ownerUserId: string } | null;
+  } | null> {
+    return this.prisma.event.findUnique({
+      where: { id },
+      select: {
+        title: true,
+        organizerUserId: true,
+        organizerOrgId: true,
+        organizerOrg: { select: { ownerUserId: true } },
+      },
+    });
+  }
+
   findCard(id: string): Promise<EventWithCard | null> {
     return this.prisma.event.findUnique({ where: { id }, include: cardInclude });
   }
