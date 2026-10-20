@@ -38,6 +38,7 @@ import { SportsService } from '../sports/sports.service';
 import type { CreateEventDto, EventFeedQuery, FeedDate, UpdateEventDto } from './events.dto';
 import { EventsRepository } from './events.repository';
 import type { EditableFields, EventWithCard } from './events.repository';
+import type { Prisma } from '../../generated/prisma/client';
 
 export interface EventCard {
   id: string;
@@ -441,6 +442,16 @@ export class EventsService {
   /** Сколько мероприятий снято с публикации за последние 7 дней (обзор админки). */
   countUnpublishedLastWeek(): Promise<number> {
     return this.events.countStatusSince('unpublished', this.weekAgo());
+  }
+
+  /** Мероприятия переходят на целевое направление — в транзакции объединения дублей. */
+  moveSport(fromId: string, toId: string, tx: Prisma.TransactionClient): Promise<void> {
+    return this.events.moveSport(fromId, toId, tx);
+  }
+
+  /** Сколько мероприятий у каждого направления — для каталога в админке. */
+  countBySports(sportIds: readonly string[]): Promise<Map<string, number>> {
+    return this.events.countBySports(sportIds);
   }
 
   /** Названия мероприятий по id — для списков других модулей (сообщения в админке). */

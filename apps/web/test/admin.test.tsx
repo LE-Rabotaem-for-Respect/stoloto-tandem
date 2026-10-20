@@ -310,9 +310,17 @@ describe('админка', () => {
     expect(screen.getAllByRole('button', { name: 'Скрыть' })).toHaveLength(1);
 
     await user.click(screen.getByRole('button', { name: 'Скрыть' }));
-    screen.getByLabelText('Причина — её увидит автор');
+    // Фокус — в поле причины; «Отмена» возвращает его на кнопку
+    expect(screen.getByLabelText('Причина — её увидит автор')).toBe(document.activeElement);
+    await user.click(screen.getByRole('button', { name: 'Отмена' }));
+    expect(screen.getByRole('button', { name: 'Скрыть' })).toBe(document.activeElement);
+
+    await user.click(screen.getByRole('button', { name: 'Скрыть' }));
     await user.click(screen.getByRole('button', { name: 'Скрыть' }));
     expect((await screen.findByRole('alert')).textContent).toBe('Укажите причину');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Причина — её увидит автор')).toBe(document.activeElement),
+    );
 
     await user.type(screen.getByLabelText('Причина — её увидит автор'), 'Оскорбление');
     await user.click(screen.getByRole('button', { name: 'Скрыть' }));
@@ -322,6 +330,10 @@ describe('админка', () => {
         body: { action: 'hide', reason: 'Оскорбление' },
       }),
     );
+    // Итог — объявлен и получает фокус
+    const done = await screen.findByText('Сообщение скрыто');
+    expect(done.getAttribute('role')).toBe('status');
+    expect(done).toBe(document.activeElement);
   });
 
   it('скрытое сообщение в админке можно удалить с причиной', async () => {

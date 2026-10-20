@@ -475,6 +475,41 @@ describe('POST /events/:id/messages/:messageId/moderation', () => {
     expect(stored).toMatchObject({ status: 'deleted_by_moderator', moderationReason: 'Спам' });
   });
 
+  it('«Удалить» публикует MessageDeleted от модератора с причиной', async () => {
+    const event = await createEvent();
+    const message = (await post(anna, event.id, { text: 'Реклама' })).body;
+    const published = vi.spyOn(app.get(EventBus), 'publish');
+    await moderate(admin, event.id, message.id, { action: 'delete', reason: 'Спам' });
+    const deleted = published.mock.calls
+      .flat()
+      .filter((item) => (item as { type: string }).type === 'MessageDeleted');
+    published.mockRestore();
+    expect(deleted).toEqual([
+      expect.objectContaining({
+        messageId: message.id,
+        eventId: event.id,
+        by: 'moderator',
+        reason: 'Спам',
+        actorId: admin.id,
+      }),
+    ]);
+  });
+
+  it('одновременное скрытие одного сообщения: ровно один 200 и одно событие', async () => {
+    const event = await createEvent();
+    const message = (await post(anna, event.id, { text: 'Вопрос' })).body;
+    const published = vi.spyOn(app.get(EventBus), 'publish');
+    const responses = await Promise.all(
+      [1, 2].map(() => moderate(admin, event.id, message.id, { action: 'hide', reason: 'Спам' })),
+    );
+    const hidden = published.mock.calls
+      .flat()
+      .filter((item) => (item as { type: string }).type === 'MessageHidden');
+    published.mockRestore();
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(hidden).toHaveLength(1);
+  });
+
   it('только администратор; гостю — 401, организатору и автору — 403', async () => {
     const event = await createEvent();
     const message = (await post(anna, event.id, { text: 'Вопрос' })).body;
@@ -489,6 +524,12 @@ describe('POST /events/:id/messages/:messageId/moderation', () => {
 
   it.each([
     ['без причины', { action: 'hide', reason: '   ' }, 'reason', 'Укажите причину'],
+    [
+      'причина длиннее 500',
+      { action: 'hide', reason: 'п'.repeat(501) },
+      'reason',
+      'Причина — до 500 символов',
+    ],
     [
       'неизвестное действие',
       { action: 'restore', reason: 'Причина' },
