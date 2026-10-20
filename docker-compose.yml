@@ -1,6 +1,16 @@
+# Журналы контейнеров ограничены: журнал доступа nginx с адресами посетителей иначе растёт,
+# пока не займёт диск сервера
+x-logging: &logging
+  options:
+    max-size: 10m
+    max-file: '3'
+
 services:
   db:
     image: postgres:17-alpine
+    # Стенды поднимаются сами после перезагрузки сервера
+    restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_DB: tandem
       POSTGRES_USER: tandem
@@ -17,6 +27,8 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    logging: *logging
     environment:
       PORT: 3000
       DATABASE_URL: postgresql://tandem:${POSTGRES_PASSWORD:-tandem}@db:5432/tandem
@@ -42,9 +54,13 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    logging: *logging
     depends_on:
       api:
         condition: service_healthy
+        # Новый выпуск api — перезапуск web, чтобы nginx не держал прежний адрес
+        restart: true
     ports:
       # Адрес публикации: по умолчанию все адреса компьютера (стенд для экспертов),
       # в CI — только 127.0.0.1
