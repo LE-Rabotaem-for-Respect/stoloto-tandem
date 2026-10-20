@@ -12,5 +12,5 @@ export {
   StatusBadge,
   Stepper,
 } from './graphics';
-export type { EventLevel, Step, StepState } from './graphics';
+export type { Step, StepState } from './graphics';
 export { leafParts, relativeDay, timeRange } from './dates';

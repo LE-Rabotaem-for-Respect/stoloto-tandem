@@ -1,5 +1,14 @@
-import { PARTICIPATION_STATUS_VIEW } from '@tandem/domain';
-import type { StatusView } from '@tandem/domain';
+import {
+  EVENT_LEVEL_TITLES,
+  ORGANIZATION_STATUS_VIEW,
+  PARTICIPATION_STATUS_VIEW,
+} from '@tandem/domain';
+import type {
+  EventLevel,
+  OrganizationStatus,
+  ParticipationStatus,
+  StatusView,
+} from '@tandem/domain';
 import { useId } from 'react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -57,13 +66,12 @@ export function EventDate({ startsAt, endsAt, now, compact, children }: EventDat
   );
 }
 
-export type EventLevel = 'beginner' | 'amateur' | 'advanced' | 'any';
-
+// Названия уровней — из @tandem/domain; «Любой» в шкале — «Любой уровень» (docs/design.md)
 const LEVELS: Record<EventLevel, { name: string; bars: number }> = {
-  beginner: { name: 'Новичок', bars: 1 },
-  amateur: { name: 'Любитель', bars: 2 },
-  advanced: { name: 'Опытный', bars: 3 },
-  any: { name: 'Любой уровень', bars: 0 },
+  beginner: { name: EVENT_LEVEL_TITLES.beginner, bars: 1 },
+  amateur: { name: EVENT_LEVEL_TITLES.amateur, bars: 2 },
+  advanced: { name: EVENT_LEVEL_TITLES.advanced, bars: 3 },
+  any: { name: `${EVENT_LEVEL_TITLES.any} уровень`, bars: 0 },
 };
 
 /** Три растущих деления: выбранный уровень залит; «Любой» — залиты все. */
@@ -158,8 +166,6 @@ export function Stepper({ steps, label }: { steps: Step[]; label: string }) {
   );
 }
 
-type ParticipationStatus = keyof typeof PARTICIPATION_STATUS_VIEW;
-
 /**
  * Мини-степпер записи (ТЗ 2.5, 2.11): «Заявка → Решение → Вы участник»;
  * свободная запись — один шаг. Лист ожидания и отменённая запись степпером
@@ -199,8 +205,6 @@ export function ParticipationStepper({
   return <Stepper label={`Ход заявки: ${current}`} steps={steps} />;
 }
 
-type OrganizationStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'needs_changes';
-
 /** Путь организации (ТЗ 2.9): «Профиль → Проверка → Решение → Публикуйте события». */
 export function OrganizationStepper({
   status,
@@ -215,7 +219,7 @@ export function OrganizationStepper({
       ? { label: 'Решение', state: 'done' }
       : decided
         ? {
-            label: status === 'rejected' ? 'Решение: отклонена' : 'Решение: нужны правки',
+            label: `Решение: ${ORGANIZATION_STATUS_VIEW[status].text.toLowerCase()}`,
             state: 'error',
             note: reason,
           }
