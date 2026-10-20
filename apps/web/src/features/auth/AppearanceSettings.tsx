@@ -14,12 +14,6 @@ export function AppearanceSettings() {
   return (
     <section className="appearance" aria-labelledby="appearance-title">
       <h2 id="appearance-title">Оформление</h2>
-      {/* Над кнопками: в «Крупном тексте» под ними сообщение ушло бы под нижнюю панель */}
-      {failed && (
-        <p className="form-error appearance-error" role="alert" ref={message}>
-          {THEME_NOT_SAVED}
-        </p>
-      )}
       <div className="appearance-options">
         <button
           className="button"
@@ -38,6 +32,12 @@ export function AppearanceSettings() {
           Высокий контраст
         </button>
       </div>
+      {/* Под кнопками, чтобы не сдвигать нажатую; прокручивается над нижней панелью */}
+      {failed && (
+        <p className="form-error appearance-error" role="alert" ref={message}>
+          {THEME_NOT_SAVED}
+        </p>
+      )}
       {!failed && (
         <p className="appearance-hint">
           Выбор запоминается в аккаунте и работает на любом устройстве.

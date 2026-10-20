@@ -241,7 +241,7 @@ describe('переключатели «Крупный текст» и «Высо
     expect(alert.closest('main')).not.toBeNull();
   });
 
-  it('в профиле сообщение стоит над кнопками', async () => {
+  it('в профиле сообщение — под кнопками: нажатая кнопка не сдвигается', async () => {
     fakeApi({ signedIn: true, saveFails: true });
     const user = userEvent.setup();
     renderApp('/profile');
@@ -249,7 +249,7 @@ describe('переключатели «Крупный текст» и «Высо
     const button = section.querySelector('button') as HTMLButtonElement;
     await user.click(button);
     const alert = await screen.findByRole('alert');
-    expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 
   it('после выхода сбой прежнего аккаунта не показывается', async () => {
@@ -370,5 +370,63 @@ describe('переключатели «Крупный текст» и «Высо
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('опоздавший ответ прежнего аккаунта не возвращает его в шапку', async () => {
+    const { failures } = fakeApi({ signedIn: true });
+    const user = userEvent.setup();
+    renderApp('/');
+    await screen.findByRole('button', { name: 'Сменить аккаунт' });
+    let respond: (fail: boolean) => void = () => undefined;
+    failures.hold = (answer) => {
+      respond = answer;
+    };
+    await user.click(screen.getByRole('button', { name: /Контраст/ }));
+    await user.click(screen.getByRole('button', { name: 'Сменить аккаунт' }));
+    failures.nextLogin = 'u2';
+    await user.type(await screen.findByLabelText('Почта'), 'igor@demo');
+    await user.type(screen.getByLabelText('Пароль'), 'demo');
+    await user.click(screen.getByRole('button', { name: 'Войти' }));
+    expect(await screen.findByText('Вошедший')).toBeTruthy();
+
+    respond(false);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByText('Вошедший')).toBeTruthy();
+    expect(screen.queryByText('Анна')).toBeNull();
+  });
+
+  it('опоздавший ответ после выхода не возвращает вошедшего', async () => {
+    const { failures } = fakeApi({ signedIn: true });
+    const user = userEvent.setup();
+    renderApp('/');
+    await screen.findByRole('button', { name: 'Сменить аккаунт' });
+    let respond: (fail: boolean) => void = () => undefined;
+    failures.hold = (answer) => {
+      respond = answer;
+    };
+    await user.click(screen.getByRole('button', { name: /Контраст/ }));
+    await user.click(screen.getByRole('button', { name: 'Сменить аккаунт' }));
+    await screen.findByRole('heading', { name: 'Вход' });
+
+    respond(false);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByRole('heading', { name: 'Вход' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Сменить аккаунт' })).toBeNull();
+  });
+
+  it('после сбоя вместе с новым выбором уходит только несохранённое', async () => {
+    const { saved, failures } = fakeApi({ signedIn: true, saveFails: true });
+    const user = userEvent.setup();
+    renderApp('/');
+    await screen.findByRole('button', { name: 'Сменить аккаунт' });
+    await user.click(screen.getByRole('button', { name: /Контраст/ }));
+    await screen.findByRole('alert');
+
+    failures.saveFails = false;
+    await user.click(screen.getByRole('button', { name: /Контраст/ }));
+    await waitFor(() => expect(saved).toHaveLength(2));
+    // «Крупный текст» не сбоил — его значение из этой вкладки не отправляется
+    expect(saved[1]).toEqual({ contrast: false });
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
   });
 });

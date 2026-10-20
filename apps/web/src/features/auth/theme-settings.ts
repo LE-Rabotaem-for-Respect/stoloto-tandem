@@ -35,7 +35,11 @@ function useSaveTheme() {
     gcTime: Infinity,
     mutationFn: ({ patch }: SaveThemeVariables) =>
       apiRequest<Me>('/me/settings', { method: 'PATCH', body: patch }),
-    onSuccess: (me) => client.setQueryData(ME_KEY, me),
+    // Опоздавший ответ прежнего аккаунта (вышел или вошёл другой) не пишет его профиль
+    // в кеш: иначе шапка снова покажет того, кто уже вышел
+    onSuccess: (me, { userId }) => {
+      if (client.getQueryData<Me | null>(ME_KEY)?.id === userId) client.setQueryData(ME_KEY, me);
+    },
   });
 }
 
@@ -45,7 +49,7 @@ function useSaveTheme() {
  * настройкам, а не по последнему ответу: при двух сохранениях подряд сбой первого
  * может прийти уже после успеха второго.
  */
-function useLastSaveFailed(userId: string | undefined): boolean {
+function useUnsavedKeys(userId: string | undefined): (keyof ThemeSettings)[] {
   const saves = useMutationState({
     filters: { mutationKey: SAVE_THEME_KEY },
     select: (mutation) => ({
@@ -53,18 +57,19 @@ function useLastSaveFailed(userId: string | undefined): boolean {
       ...(mutation.state.variables as SaveThemeVariables | undefined),
     }),
   });
-  if (!userId) return false;
+  if (!userId) return [];
   const own = saves.filter((save) => save.userId === userId);
-  return own.some(
-    (save, index) =>
-      save.status === 'error' &&
-      Object.keys(save.patch ?? {}).some(
-        (key) =>
-          !own
-            .slice(index + 1)
-            .some((later) => later.status === 'success' && key in (later.patch ?? {})),
-      ),
-  );
+  const unsaved = new Set<keyof ThemeSettings>();
+  own.forEach((save, index) => {
+    if (save.status !== 'error') return;
+    for (const key of Object.keys(save.patch ?? {}) as (keyof ThemeSettings)[]) {
+      const savedLater = own
+        .slice(index + 1)
+        .some((later) => later.status === 'success' && key in (later.patch ?? {}));
+      if (!savedLater) unsaved.add(key);
+    }
+  });
+  return [...unsaved];
 }
 
 /**
@@ -74,7 +79,7 @@ function useLastSaveFailed(userId: string | undefined): boolean {
  */
 export function useThemeSaveFailed(): boolean {
   const me = useMe();
-  return useLastSaveFailed(me.data?.id);
+  return useUnsavedKeys(me.data?.id).length > 0;
 }
 
 /**
@@ -87,12 +92,14 @@ export function useThemeSettings() {
   const me = useMe();
   const save = useSaveTheme();
   const userId = me.data?.id;
-  const failed = useLastSaveFailed(userId);
+  const unsaved = useUnsavedKeys(userId);
   const change = (patch: Partial<ThemeSettings>) => {
     const next = { largeText: theme.largeText, contrast: theme.contrast, ...patch };
     theme.setSettings(next);
-    // После сбоя в аккаунте могло не сохраниться и прежнее переключение — отправляются оба
-    if (userId) save.mutate({ userId, patch: failed ? next : patch });
+    // Вместе с новым выбором — только то, что раньше не сохранилось: остальное могли
+    // поменять на другом устройстве, и прежнее значение отсюда его перезаписало бы
+    const retry = Object.fromEntries(unsaved.map((key) => [key, next[key]]));
+    if (userId) save.mutate({ userId, patch: { ...retry, ...patch } });
   };
   return {
     largeText: theme.largeText,
