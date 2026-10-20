@@ -42,7 +42,7 @@ export function LoginPage() {
       <LoginForm onSignedIn={done} />
       <p>
         Нет аккаунта?{' '}
-        <Link to={registerLink} state={carry}>
+        <Link to={registerLink} state={carry} replace>
           Зарегистрироваться
         </Link>
       </p>
@@ -62,7 +62,7 @@ export function RegisterPage() {
       <RegisterForm onSignedIn={done} />
       <p>
         Уже есть аккаунт?{' '}
-        <Link to={loginLink} state={carry}>
+        <Link to={loginLink} state={carry} replace>
           Войти
         </Link>
       </p>
