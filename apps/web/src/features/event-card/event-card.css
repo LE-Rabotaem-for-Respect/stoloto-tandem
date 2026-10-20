@@ -38,12 +38,25 @@
   filter: invert(1);
 }
 
-/* В «Высоком контрасте» запас первого экрана меньше всего (docs/design.md) — обложка
-   без внутренней рамки, как раньше */
+/* До 768 px и в «Высоком контрасте» запас первого экрана мал (docs/design.md, «Первый
+   экран») — обложка без внутренней рамки: рамка добавила бы высоты первому блоку */
 [data-theme='contrast'] .event-card-cover {
   width: 100%;
   margin: 0;
   border-radius: var(--radius-card) var(--radius-card) 0 0;
+}
+
+@media (max-width: 767px) {
+  .event-card-cover {
+    width: 100%;
+    margin: 0;
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
+  }
+
+  /* Бейдж режима в строке над названием — плотнее: строка не выше текста направления */
+  .event-card-heading .mode-badge {
+    padding-block: 2px;
+  }
 }
 
 .event-card-body {

@@ -1,5 +1,5 @@
 import '@fontsource-variable/golos-text';
-import '@fontsource-variable/rubik';
+import '@fontsource-variable/unbounded';
 import '@fontsource-variable/caveat';
 import './shared/theme/tokens.css';
 import './shared/theme/base.css';
