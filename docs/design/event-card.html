@@ -1091,9 +1091,9 @@
             <svg class="icon" aria-hidden="true"><use href="#i-cancelled" /></svg>
             <span class="status-text">Запись закрыта</span>
           </div>
-          <button class="btn-primary" type="button" disabled>Записаться</button>
+          <button class="btn-primary sample-disabled" type="button" disabled>Записаться</button>
         </div>
-        <p class="record-status record-status--off record-status--sample">
+        <p class="record-status record-status--off record-status--sample sample-reason">
           Запись закрыта: мероприятие уже началось
         </p>
         <div class="status status--wait">
@@ -1174,6 +1174,7 @@
             data-status-full="Мест нет — можно встать в лист ожидания"
             data-tone="queue"
             data-button="Встать в лист ожидания"
+            data-seats-full="Мест нет, занято 10 из 10"
           ></div>
         </section>
       </div>
@@ -1236,14 +1237,25 @@
           full.textContent = d.statusFull;
           full.hidden = false;
           status.setAttribute('aria-describedby', full.id);
+          bar.querySelector('.btn-primary').setAttribute('aria-describedby', full.id);
+          // Мест нет: все кружки заняты
+          if (d.seatsFull) {
+            copy.querySelectorAll('.seat-row li').forEach((li) => li.removeAttribute('data-free'));
+            copy.querySelector('.seats-text').textContent = d.seatsFull;
+          }
         }
         frame.append(copy);
       });
 
       const gallery = document.getElementById('gallery');
-      document
-        .querySelectorAll('.panel')
-        .forEach((panel) => panel.append(gallery.content.cloneNode(true)));
+      document.querySelectorAll('.panel').forEach((panel, i) => {
+        const copy = gallery.content.cloneNode(true);
+        // Неактивная кнопка ссылается на строку с причиной
+        const reason = copy.querySelector('.sample-reason');
+        reason.id = 'sample-reason-' + i;
+        copy.querySelector('.sample-disabled').setAttribute('aria-describedby', reason.id);
+        panel.append(copy);
+      });
     </script>
   </body>
 </html>
