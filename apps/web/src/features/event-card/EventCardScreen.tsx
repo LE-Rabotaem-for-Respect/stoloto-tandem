@@ -22,6 +22,7 @@ import { loginPath, useAuthAction } from '../auth';
 import { useEventCard, useParticipationAction } from './api';
 import type { EventCardView } from './api';
 import { actionLabel, actionTarget, findAction, primaryAction, secondaryActions } from './actions';
+import { ParticipantsPanel } from './participants';
 import { cardStatus } from './status';
 
 const LEVEL_TEXT = {
@@ -435,7 +436,7 @@ function ParticipantsTabs({ event }: { event: EventCardView }) {
         hidden={tab !== 'participants'}
         tabIndex={0}
       >
-        <p className="event-card-soon">Здесь будут участники и заявки на это мероприятие.</p>
+        <ParticipantsPanel eventId={event.id} active={tab === 'participants'} />
       </div>
     </>
   );

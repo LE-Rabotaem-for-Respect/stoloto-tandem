@@ -268,3 +268,64 @@
   display: grid;
   gap: var(--space-3);
 }
+
+/* «Участники и заявки» организатора */
+.participants {
+  display: grid;
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+.participants-group h2 {
+  margin-bottom: var(--space-2);
+}
+
+.participants-count {
+  color: var(--color-ink-muted);
+  font-weight: 600;
+}
+
+.participants-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.participant {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.participant-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.participant-answer,
+.participant-hint,
+.participants-empty {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.participant-hint {
+  color: var(--color-ink-muted);
+  font-size: var(--fs-caption);
+}
+
+.participant-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.participant-reject {
+  display: grid;
+  gap: var(--space-2);
+}
