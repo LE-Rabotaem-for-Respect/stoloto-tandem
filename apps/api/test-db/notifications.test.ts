@@ -146,6 +146,37 @@ describe('кто получает уведомления (ТЗ 3.3)', () => {
     expect(await notificationsOf(organizer.id)).toHaveLength(0);
   });
 
+  it('отмена участником — организатору «освободилось место»; отмена заявки — без уведомления', async () => {
+    const { organizer, event } = await eventByUser();
+    const [anna, ksenia] = await Promise.all([createUser(), createUser()]);
+    const left = await participation(event.id, anna.id, 'cancelled');
+    const withdrawn = await participation(event.id, ksenia.id, 'cancelled');
+
+    await handlers.cancelledByParticipant(
+      domainEvent('ParticipationCancelled', {
+        eventId: event.id,
+        ...meta(anna.id),
+        participationId: left.id,
+        userId: anna.id,
+        previousStatus: 'confirmed',
+      }),
+    );
+    await handlers.cancelledByParticipant(
+      domainEvent('ParticipationCancelled', {
+        eventId: event.id,
+        ...meta(ksenia.id),
+        participationId: withdrawn.id,
+        userId: ksenia.id,
+        previousStatus: 'pending',
+      }),
+    );
+
+    expect(await notificationsOf(organizer.id)).toMatchObject([
+      { type: 'seat_freed', link: `/events/${event.id}` },
+    ]);
+    expect(await notificationsOf(anna.id)).toHaveLength(0);
+  });
+
   it('вопрос — организатору, ответ организатора — автору вопроса', async () => {
     const { organizer, event } = await eventByUser();
     const anna = await createUser();
@@ -309,6 +340,9 @@ describe('центр уведомлений: GET /notifications, POST /notificat
 
   it('гостю — 401', async () => {
     expect((await request(app.getHttpServer()).get('/notifications')).status).toBe(401);
+    expect((await request(app.getHttpServer()).post('/notifications/read').send({})).status).toBe(
+      401,
+    );
   });
 
   it('свои уведомления, новые сверху, одной строкой с пиктограммой и счётчиком', async () => {

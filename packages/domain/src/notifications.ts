@@ -10,6 +10,8 @@ export const NOTIFICATION_TYPES = [
   'participation_requested',
   /** Организатору: новый вопрос в обсуждении. */
   'question_posted',
+  /** Организатору: участник отменил запись — освободилось место. */
+  'seat_freed',
   /** Участнику: заявка принята. */
   'participation_confirmed',
   /** Участнику: заявка отклонена. */
@@ -64,6 +66,7 @@ const TEXT: Record<NotificationType, (payload: NotificationPayload) => string> =
   participation_rejected: (p) =>
     withReason(`Заявка на ${quoted(p.eventTitle)} отклонена`, p.reason),
   participation_promoted: (p) => `Освободилось место: вы участник ${quoted(p.eventTitle)}`,
+  seat_freed: (p) => `Освободилось место в ${quoted(p.eventTitle)}: участник отменил запись`,
   answer_posted: (p) => `Организатор ответил на ваш вопрос в ${quoted(p.eventTitle)}`,
   event_rescheduled: (p) =>
     p.startsAt
@@ -91,6 +94,7 @@ export const notificationText = (type: NotificationType, payload: NotificationPa
 export const NOTIFICATION_ICON: Record<NotificationType, string> = {
   participation_requested: 'status-pending',
   question_posted: 'action-message',
+  seat_freed: 'action-leave',
   participation_confirmed: 'status-confirmed',
   participation_rejected: 'status-rejected',
   participation_promoted: 'status-confirmed',

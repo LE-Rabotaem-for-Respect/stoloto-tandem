@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { ICONS } from '../../shared/illustrations';
 import type { IconName } from '../../shared/illustrations';
 import { Icon } from '../../shared/ui/Icon';
-import { useMarkAllRead, useNotifications } from './api';
+import { useMarkRead, useNotifications } from './api';
 import type { NotificationItem } from './api';
 
 const isIcon = (name: string): name is IconName => (ICONS as readonly string[]).includes(name);
@@ -57,14 +57,17 @@ function Row({ item }: { item: NotificationItem }) {
 /** Центр уведомлений: пиктограмма типа и одна строка, переход на целевой экран. */
 export function NotificationCenter() {
   const notifications = useNotifications();
-  const markAllRead = useMarkAllRead();
-  const unread = notifications.data?.unread ?? 0;
-  const { mutate } = markAllRead;
+  const { mutate } = useMarkRead();
+  // id показанных непрочитанных — строкой: эффект срабатывает, только когда набор изменился
+  const shownUnread = (notifications.data?.items ?? [])
+    .filter((item) => !item.read)
+    .map((item) => item.id)
+    .join(',');
 
-  // Открыл центр — увидел: непрочитанные становятся прочитанными, подсветка остаётся до ухода
+  // Открыл центр — увидел: показанные непрочитанные становятся прочитанными, подсветка остаётся до ухода
   useEffect(() => {
-    if (unread > 0) mutate();
-  }, [unread, mutate]);
+    if (shownUnread) mutate(shownUnread.split(','));
+  }, [shownUnread, mutate]);
 
   if (notifications.isPending) return <p role="status">Загрузка…</p>;
   if (notifications.isError) {

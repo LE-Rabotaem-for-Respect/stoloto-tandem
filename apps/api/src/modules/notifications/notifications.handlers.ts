@@ -50,6 +50,18 @@ export class NotificationHandlers {
     });
   }
 
+  /** Отмена участником (ТЗ 3.3): организатору — только если освободилось место. */
+  @OnDomainEvent('ParticipationCancelled')
+  async cancelledByParticipant(event: DomainEvent<'ParticipationCancelled'>) {
+    if (event.previousStatus !== 'confirmed') return;
+    const target = await this.events.notificationTarget(event.eventId);
+    if (!target) return;
+    await this.notify([target.organizerUserId], event.actorId, 'seat_freed', {
+      payload: { eventTitle: target.title },
+      link: eventLink(event.eventId),
+    });
+  }
+
   @OnDomainEvent('ParticipationPromotedFromWaitlist')
   async promoted(event: DomainEvent<'ParticipationPromotedFromWaitlist'>) {
     await this.toParticipant(event, 'participation_promoted');

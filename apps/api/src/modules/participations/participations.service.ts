@@ -141,6 +141,7 @@ export class ParticipationsService {
             participationId: active.id,
             eventId: event.id,
             userId: actor.userId,
+            previousStatus: active.status,
             actorId: actor.userId,
             occurredAt: now,
           }),
@@ -150,16 +151,16 @@ export class ParticipationsService {
     );
   }
 
-  /**
-   * «Участники и заявки» (ТЗ 2.5): ждут решения, участники, лист ожидания и архив
-   * (отклонённые и отменённые). Организатору — с действиями у заявок, администратору —
-   * только просмотр.
-   */
   /** Все, кто записан или подал заявку: им важны перенос, отмена и снятие (уведомления, ТЗ 3.3). */
   signedUpUserIds(eventId: string): Promise<string[]> {
     return this.participations.signedUpUserIds(eventId);
   }
 
+  /**
+   * «Участники и заявки» (ТЗ 2.5): ждут решения, участники, лист ожидания и архив
+   * (отклонённые и отменённые). Организатору — с действиями у заявок, администратору —
+   * только просмотр.
+   */
   async participants(actor: Actor, eventId: string): Promise<ParticipantsView> {
     const event = isUUID(eventId) ? await this.participations.findEvent(eventId) : null;
     if (!event) throw new ApiError('event_not_available');

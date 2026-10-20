@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { NOTIFICATION_TYPES } from '@tandem/domain';
 import type { NotificationPayload, NotificationType } from '@tandem/domain';
 import { PrismaService } from '../../core/prisma/prisma.service';
 
@@ -34,7 +35,10 @@ export class NotificationsRepository {
   }
 
   unreadCount(userId: string): Promise<number> {
-    return this.prisma.notification.count({ where: { userId, readAt: null } });
+    // Неизвестные типы (старые записи) в список не попадают — и в счётчик тоже
+    return this.prisma.notification.count({
+      where: { userId, readAt: null, type: { in: [...NOTIFICATION_TYPES] } },
+    });
   }
 
   /** Отмечает прочитанными свои уведомления: перечисленные или все. */

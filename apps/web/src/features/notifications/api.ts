@@ -30,11 +30,15 @@ export function useNotifications() {
   });
 }
 
-export function useMarkAllRead() {
+/**
+ * Отмечает прочитанными показанные уведомления — по их id, а не «все»: пришедшее
+ * между загрузкой списка и отметкой человек ещё не видел.
+ */
+export function useMarkRead() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      apiRequest<{ unread: number }>('/notifications/read', { method: 'POST', body: {} }),
+    mutationFn: (ids: string[]) =>
+      apiRequest<{ unread: number }>('/notifications/read', { method: 'POST', body: { ids } }),
     onSuccess: ({ unread }) => {
       client.setQueryData<NotificationList>(KEY, (list) => list && { ...list, unread });
     },

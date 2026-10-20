@@ -33,11 +33,13 @@ const items = [
 function fakeApi(signedIn: boolean) {
   let unread = 1;
   const calls: string[] = [];
+  const bodies: unknown[] = [];
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
       const call = `${init?.method ?? 'GET'} ${url}`;
       calls.push(call);
+      if (init?.body) bodies.push(JSON.parse(String(init.body)));
       switch (call) {
         case 'GET /api/me':
           return signedIn
@@ -66,7 +68,7 @@ function fakeApi(signedIn: boolean) {
       }
     }),
   );
-  return { calls };
+  return { calls, bodies };
 }
 
 function renderAt(path: string) {
@@ -110,6 +112,8 @@ describe('уведомления в web', () => {
       '/events/1',
     );
     await waitFor(() => expect(api.calls).toContain('POST /api/notifications/read'));
+    // Отмечаются только показанные непрочитанные — не «все»
+    expect(api.bodies).toEqual([{ ids: [items.find((item) => !item.read)?.id] }]);
 
     const nav = screen.getByRole('navigation', { name: 'Основные разделы' });
     await waitFor(() =>

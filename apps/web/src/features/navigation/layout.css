@@ -295,6 +295,15 @@ html {
   position: relative;
 }
 
+/* В нижней панели счётчик — в углу пиктограммы, а не третьей строкой: высота панели не прыгает */
+@media (max-width: 767px) {
+  .main-nav-link .badge {
+    position: absolute;
+    top: var(--space-1);
+    left: calc(50% + 0.5rem);
+  }
+}
+
 .badge {
   min-width: 1.5em;
   padding: 0 var(--space-1);
