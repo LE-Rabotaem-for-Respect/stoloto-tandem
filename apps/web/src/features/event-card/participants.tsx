@@ -25,6 +25,13 @@ interface ParticipantsList {
   archive: Participant[];
 }
 
+// Статусы записи в domain — глазами самого участника («Вы отменили запись»); организатору
+// в архиве — о записи. У участников и листа ожидания раздел говорит сам за себя
+const ARCHIVE_VIEW = {
+  rejected: PARTICIPATION_STATUS_VIEW.rejected,
+  cancelled: { ...PARTICIPATION_STATUS_VIEW.cancelled, text: 'Запись отменена' },
+};
+
 const participantsKey = (eventId: string) => ['event', eventId, 'participants'] as const;
 
 function useParticipants(eventId: string, enabled: boolean) {
@@ -161,9 +168,9 @@ function Group({
           {people.map((person) => (
             <li key={person.id} className="participant">
               <span className="participant-name">{person.user.name}</span>
-              {person.status !== 'pending' && (
+              {(person.status === 'rejected' || person.status === 'cancelled') && (
                 <StatusBadge
-                  view={PARTICIPATION_STATUS_VIEW[person.status]}
+                  view={ARCHIVE_VIEW[person.status]}
                   reason={person.status === 'rejected' ? person.decisionReason : null}
                   compact
                 />
