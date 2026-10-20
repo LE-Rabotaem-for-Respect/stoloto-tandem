@@ -140,6 +140,13 @@ function Profile() {
           </>
         )}
       </dl>
+      {me.data.role === 'admin' && (
+        <p>
+          <Link className="button" to="/admin">
+            Админка: заявки организаций и поиск
+          </Link>
+        </p>
+      )}
     </div>
   );
 }
