@@ -13,9 +13,13 @@ test('сценарий 1: Анна создаёт событие с новым �
   await navLink(page, 'Создать').click();
   const form = page.locator('form.create-event');
   await form.getByRole('combobox', { name: 'Направление' }).fill('Кёрлинг на льду');
-  await expect(
-    page.getByRole('option', { name: 'Добавить «Кёрлинг на льду» как новое направление' }),
-  ).toBeVisible();
+  // Совпадений в каталоге нет: единственный пункт — «Добавить … как новое направление»
+  await expect(page.getByRole('option')).toHaveCount(1);
+  await page
+    .getByRole('option', { name: 'Добавить «Кёрлинг на льду» как новое направление' })
+    .click();
+  const group = form.getByLabel('Группа нового направления (необязательно)');
+  await expect(group.locator('option:checked')).toHaveText('Другое — по умолчанию');
   await form.getByRole('combobox', { name: 'Направление' }).clear();
 
   // 4. Все шаги без ошибок, на последнем — предпросмотр будущей карточки
