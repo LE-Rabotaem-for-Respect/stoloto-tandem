@@ -199,16 +199,11 @@ function useStickyTopHeight() {
 }
 
 /**
- * Смена раздела — содержимое мягко поднимается. Ключ — путь без поиска: смена фильтров
- * ленты не перерисовывает страницу и не сбрасывает фокус.
+ * Содержимое мягко поднимается при загрузке. Без `key` по пути: пересоздание страницы
+ * при каждом переходе сбрасывало её состояние и ломало возврат гостя к действию после входа.
  */
 function PageEnter({ children }: { children: ReactNode }) {
-  const { pathname } = useLocation();
-  return (
-    <div key={pathname} className="page-enter">
-      {children}
-    </div>
-  );
+  return <div className="page-enter">{children}</div>;
 }
 
 export function AppLayout() {
