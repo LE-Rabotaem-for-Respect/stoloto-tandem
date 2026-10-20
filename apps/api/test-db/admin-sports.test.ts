@@ -135,32 +135,32 @@ describe('список', () => {
 describe('переименование', () => {
   it('прежнее имя — в алиасы: подсказки по-прежнему находят направление', async () => {
     const cookie = await admin();
-    const padel = await sport('Падл', { isCustom: true });
+    const badminton = await sport('Бадминтн', { isCustom: true });
 
     const response = await http()
-      .post(`/admin/sports/${padel.id}/rename`)
+      .post(`/admin/sports/${badminton.id}/rename`)
       .set('Cookie', cookie)
-      .send({ name: `  Падел   ${tag} ` });
+      .send({ name: `  Бадминтон   ${tag} ` });
     expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ name: `Падел ${tag}`, aliases: [`падл ${tag}`] });
+    expect(response.body).toMatchObject({ name: `Бадминтон ${tag}`, aliases: [`бадминтн ${tag}`] });
 
     const suggestions = await http()
       .get('/sports')
-      .query({ q: `падл ${tag}` });
-    expect(suggestions.body.items.map((item: { id: string }) => item.id)).toEqual([padel.id]);
+      .query({ q: `бадминтн ${tag}` });
+    expect(suggestions.body.items.map((item: { id: string }) => item.id)).toEqual([badminton.id]);
   });
 
   it('имя другого направления занять нельзя; неверное имя и неизвестный адрес — ошибки', async () => {
     const cookie = await admin();
-    const [padel, tennis] = await Promise.all([sport('Падел'), sport('Теннис')]);
+    const [squash, tennis] = await Promise.all([sport('Сквош'), sport('Теннис')]);
 
     const taken = await http()
       .post(`/admin/sports/${tennis.id}/rename`)
       .set('Cookie', cookie)
-      .send({ name: `падел ${tag}` });
+      .send({ name: `сквош ${tag}` });
     expect(taken.status).toBe(400);
     expect(taken.body.fields.name).toBe(
-      `Такое направление уже есть: «Падел ${tag}». Объедините с ним`,
+      `Такое направление уже есть: «Сквош ${tag}». Объедините с ним`,
     );
 
     const invalid = await http()
@@ -178,8 +178,8 @@ describe('переименование', () => {
       expect(missing.status).toBe(404);
       expect(missing.body.message).toBe('Направление не найдено');
     }
-    expect((await prisma.sport.findUniqueOrThrow({ where: { id: padel.id } })).name).toBe(
-      `Падел ${tag}`,
+    expect((await prisma.sport.findUniqueOrThrow({ where: { id: squash.id } })).name).toBe(
+      `Сквош ${tag}`,
     );
   });
 });
@@ -188,16 +188,16 @@ describe('объединение дублей', () => {
   it('мероприятия, направления людей и организаций переходят на целевое; дубль скрыт, его имя — алиас', async () => {
     const cookie = await admin();
     const [duplicate, target] = await Promise.all([
-      sport('Падел клуб', { isCustom: true }),
-      sport('Падел'),
+      sport('Пиклбол клуб', { isCustom: true }),
+      sport('Пиклбол'),
     ]);
-    const event = await eventOn(duplicate.id, 'Падел по средам');
+    const event = await eventOn(duplicate.id, 'Пиклбол по средам');
     const [both, onlyDuplicate] = await Promise.all([createUser(), createUser()]);
     await prisma.userSport.createMany({
       data: [
-        { userId: both.id, sportId: duplicate.id },
-        { userId: both.id, sportId: target.id },
-        { userId: onlyDuplicate.id, sportId: duplicate.id },
+        { userId: both.id, sportId: duplicate.id, level: 'beginner' },
+        { userId: both.id, sportId: target.id, level: 'amateur' },
+        { userId: onlyDuplicate.id, sportId: duplicate.id, level: 'beginner' },
       ],
     });
     const [orgBoth, orgDuplicate] = await Promise.all([createOrganization(), createOrganization()]);
@@ -243,7 +243,7 @@ describe('объединение дублей', () => {
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       id: target.id,
-      aliases: [`падел клуб ${tag}`],
+      aliases: [`пиклбол клуб ${tag}`],
       eventCount: 1,
     });
 
@@ -280,16 +280,16 @@ describe('объединение дублей', () => {
     // Старое имя ведёт к целевому: в подсказках и при создании мероприятия
     const suggestions = await http()
       .get('/sports')
-      .query({ q: `падел клуб ${tag}` });
+      .query({ q: `пиклбол клуб ${tag}` });
     expect(suggestions.body.items.map((item: { id: string }) => item.id)).toEqual([target.id]);
     const organizer = await signUp();
     const created = await http()
       .post('/events')
       .set('Cookie', organizer.cookie)
       .send({
-        title: 'Падел по пятницам',
+        title: 'Пиклбол по пятницам',
         description: 'Играем пары',
-        newSport: { name: `Падел клуб ${tag}` },
+        newSport: { name: `Пиклбол клуб ${tag}` },
         startsAt: '2026-10-23T12:00:00Z',
         endsAt: '2026-10-23T13:30:00Z',
         city: 'Красноярск',

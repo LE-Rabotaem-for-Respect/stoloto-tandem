@@ -1,5 +1,11 @@
-import { EVENT_STATUSES, ORGANIZATION_STATUSES, ORGANIZATION_STATUS_VIEW } from '@tandem/domain';
-import type { EventStatus, OrganizationStatus, StatusTone } from '@tandem/domain';
+import {
+  EVENT_STATUSES,
+  ORGANIZATION_STATUSES,
+  ORGANIZATION_STATUS_VIEW,
+  SPORT_CATEGORIES,
+  SPORT_CATEGORY_TITLES,
+} from '@tandem/domain';
+import type { EventStatus, OrganizationStatus, SportCategory, StatusTone } from '@tandem/domain';
 import { useId, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -12,10 +18,21 @@ import {
   useAdminHiddenMessages,
   useAdminOrganizations,
   useAdminOverview,
+  useAdminSports,
   useDiscussion,
   useOrganizationDecision,
+  useSportChange,
+  useSportSuggestions,
 } from './api';
-import type { AdminEvent, AdminHiddenMessage, AdminOrganization, AdminSearch, Page } from './api';
+import type {
+  AdminEvent,
+  AdminHiddenMessage,
+  AdminOrganization,
+  AdminSearch,
+  AdminSport,
+  Page,
+  SportChange,
+} from './api';
 import './admin.css';
 
 interface StatusLook {
@@ -83,6 +100,7 @@ function AdminNav() {
       <Link to="/admin/organizations">Организации</Link>
       <Link to="/admin/events">Мероприятия</Link>
       <Link to="/admin/messages">Скрытые сообщения</Link>
+      <Link to="/admin/sports">Направления</Link>
     </nav>
   );
 }
@@ -596,6 +614,270 @@ function HiddenMessages() {
   );
 }
 
+const SPORT_FILTERS = [
+  { value: 'main', text: 'Основной список' },
+  { value: 'custom', text: 'Пользовательские' },
+  { value: 'hidden', text: 'Скрытые' },
+];
+
+type SportMode = SportChange['action'];
+
+/** «Объединить с…»: целевое — из подсказок, как в формах; сам дубль в них не предлагается. */
+function MergeTarget({
+  sport,
+  targetId,
+  onPick,
+}: {
+  sport: AdminSport;
+  targetId: string | null;
+  onPick: (target: { id: string; name: string }) => void;
+}) {
+  const [text, setText] = useState('');
+  const id = useId();
+  const suggestions = useSportSuggestions(text);
+  const items = (suggestions.data?.items ?? []).filter((item) => item.id !== sport.id);
+  return (
+    <>
+      <div className="field">
+        <label htmlFor={`${id}-q`}>Найти направление, в которое перенести мероприятия</label>
+        <input
+          id={`${id}-q`}
+          value={text}
+          maxLength={40}
+          onChange={(change) => setText(change.target.value)}
+        />
+      </div>
+      {items.length > 0 && (
+        <ul className="admin-choices" aria-label="Подходящие направления">
+          {items.map((item) => (
+            <li key={item.id}>
+              <button
+                className="button"
+                type="button"
+                aria-pressed={item.id === targetId}
+                onClick={() => onPick(item)}
+              >
+                {item.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+/** Действия с направлением: открыта одна форма; после успеха строка показывает итог. */
+function SportActions({ sport }: { sport: AdminSport }) {
+  const change = useSportChange();
+  const [mode, setMode] = useState<SportMode | null>(null);
+  const [name, setName] = useState(sport.name);
+  const [category, setCategory] = useState<SportCategory>(sport.category);
+  const [target, setTarget] = useState<{ id: string; name: string } | null>(null);
+  const id = useId();
+  const fields = change.error instanceof ApiRequestError ? change.error.fields : {};
+  const fieldError = fields.name ?? fields.targetId ?? fields.category;
+  const formError = change.error && !fieldError ? errorText(change.error) : undefined;
+  const invalid = fieldError
+    ? { 'aria-invalid': true, 'aria-describedby': `${id}-error` }
+    : undefined;
+
+  const open = (next: SportMode | null) => {
+    change.reset();
+    setMode(next);
+  };
+  const send = (submit: FormEvent<HTMLFormElement>, body: SportChange) => {
+    submit.preventDefault();
+    change.mutate(body, { onSuccess: () => setMode(null) });
+  };
+  const footer = (submitText: string, disabled = false) => (
+    <>
+      {fieldError && (
+        <p className="field-error" id={`${id}-error`}>
+          {fieldError}
+        </p>
+      )}
+      {formError && <p className="form-error">{formError}</p>}
+      <div className="admin-actions">
+        <button className="button" type="submit" disabled={disabled || change.isPending}>
+          {submitText}
+        </button>
+        <button className="button" type="button" onClick={() => open(null)}>
+          Отмена
+        </button>
+      </div>
+    </>
+  );
+
+  if (mode === 'rename') {
+    return (
+      <form
+        className="admin-decision"
+        onSubmit={(submit) => send(submit, { id: sport.id, action: 'rename', name })}
+      >
+        <div className="field">
+          <label htmlFor={`${id}-name`}>Новое название</label>
+          <input
+            id={`${id}-name`}
+            value={name}
+            maxLength={40}
+            required
+            {...invalid}
+            onChange={(input) => setName(input.target.value)}
+          />
+        </div>
+        {footer('Сохранить название')}
+      </form>
+    );
+  }
+  if (mode === 'merge') {
+    return (
+      <form
+        className="admin-decision"
+        onSubmit={(submit) => {
+          if (target) send(submit, { id: sport.id, action: 'merge', targetId: target.id });
+          else submit.preventDefault();
+        }}
+      >
+        <MergeTarget sport={sport} targetId={target?.id ?? null} onPick={setTarget} />
+        {target && (
+          <p>
+            Мероприятия «{sport.name}» перейдут в «{target.name}». «{sport.name}» станет его прежним
+            названием и пропадёт из подсказок.
+          </p>
+        )}
+        {footer('Объединить', !target)}
+      </form>
+    );
+  }
+  if (mode === 'promote') {
+    return (
+      <form
+        className="admin-decision"
+        onSubmit={(submit) => send(submit, { id: sport.id, action: 'promote', category })}
+      >
+        <div className="field">
+          <label htmlFor={`${id}-category`}>Группа в основном списке</label>
+          <select
+            id={`${id}-category`}
+            value={category}
+            {...invalid}
+            onChange={(select) => setCategory(select.target.value as SportCategory)}
+          >
+            {SPORT_CATEGORIES.map((value) => (
+              <option key={value} value={value}>
+                {SPORT_CATEGORY_TITLES[value]}
+              </option>
+            ))}
+          </select>
+        </div>
+        {footer('Перевести в основной список')}
+      </form>
+    );
+  }
+  if (mode === 'hide') {
+    return (
+      <form
+        className="admin-decision"
+        onSubmit={(submit) => send(submit, { id: sport.id, action: 'hide' })}
+      >
+        <p>
+          «{sport.name}» пропадёт из подсказок и фильтров. Мероприятия останутся и будут
+          показываться в группе «Другое».
+        </p>
+        {footer('Скрыть направление')}
+      </form>
+    );
+  }
+  if (sport.status === 'hidden') return null;
+  return (
+    <div className="admin-actions">
+      <button
+        className="button"
+        type="button"
+        onClick={() => {
+          setName(sport.name);
+          open('rename');
+        }}
+      >
+        Переименовать
+      </button>
+      <button
+        className="button"
+        type="button"
+        onClick={() => {
+          setTarget(null);
+          open('merge');
+        }}
+      >
+        Объединить с…
+      </button>
+      {sport.isCustom && (
+        <button className="button" type="button" onClick={() => open('promote')}>
+          В основной список
+        </button>
+      )}
+      <button className="button" type="button" onClick={() => open('hide')}>
+        Скрыть
+      </button>
+    </div>
+  );
+}
+
+const SPORT_STATUS_ADMIN: Record<'main' | 'custom' | 'hidden', StatusLook> = {
+  main: { text: 'Основной список', icon: 'status-confirmed', tone: 'ok' },
+  custom: { text: 'Пользовательское', icon: 'status-pending', tone: 'wait' },
+  hidden: { text: 'Скрыто', icon: 'action-hide', tone: 'off' },
+};
+
+function SportRow({ sport }: { sport: AdminSport }) {
+  const kind = sport.status === 'hidden' ? 'hidden' : sport.isCustom ? 'custom' : 'main';
+  return (
+    <li className="admin-row">
+      <div className="admin-row-head">
+        <h2>{sport.name}</h2>
+        <StatusTag {...SPORT_STATUS_ADMIN[kind]} />
+      </div>
+      <dl className="facts admin-facts">
+        <dt>Группа</dt>
+        <dd>{SPORT_CATEGORY_TITLES[sport.category]}</dd>
+        <dt>Мероприятий</dt>
+        <dd>{sport.eventCount}</dd>
+        {sport.aliases.length > 0 && (
+          <>
+            <dt>Прежние названия</dt>
+            <dd>{sport.aliases.join(', ')}</dd>
+          </>
+        )}
+      </dl>
+      <SportActions sport={sport} />
+    </li>
+  );
+}
+
+function Sports() {
+  const search = useSearch();
+  const list = useAdminSports(search);
+  return (
+    <div className="page">
+      <h1>Направления</h1>
+      <AdminNav />
+      <SearchForm statuses={SPORT_FILTERS} label="Поиск направлений" />
+      <Loading error={list.error} isPending={list.isPending} />
+      {list.data && (
+        <>
+          <Pager page={list.data} />
+          <ul className="admin-list">
+            {list.data.items.map((sport) => (
+              <SportRow key={sport.id} sport={sport} />
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
 export const AdminOverviewPage = () => (
   <AdminOnly>
     <Overview />
@@ -617,5 +899,11 @@ export const AdminEventsPage = () => (
 export const AdminMessagesPage = () => (
   <AdminOnly>
     <HiddenMessages />
+  </AdminOnly>
+);
+
+export const AdminSportsPage = () => (
+  <AdminOnly>
+    <Sports />
   </AdminOnly>
 );

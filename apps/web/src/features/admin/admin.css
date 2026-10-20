@@ -194,3 +194,22 @@
     margin-top: var(--space-2);
   }
 }
+
+/* Подсказки «Объединить с…»: выбранное направление — с рамкой основного цвета */
+.admin-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-choices .button {
+  overflow-wrap: anywhere;
+}
+
+.admin-choices [aria-pressed='true'] {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
