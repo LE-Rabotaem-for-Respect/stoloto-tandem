@@ -331,3 +331,54 @@ describe('PATCH /events/:id — кто меняет', () => {
     expect(other.body.code).toBe('event_not_available');
   });
 });
+
+describe('PATCH /events/:id — одновременно с записью', () => {
+  it('смена режима ждёт запись, которая идёт в это же время, и видит её', async () => {
+    const id = await event();
+    const user = await prisma.user.create({
+      data: {
+        name: 'Участник',
+        email: `p-${randomUUID()}@example.ru`,
+        passwordHash,
+        createdAt: new Date(),
+      },
+    });
+    // «Запись» держит строку мероприятия, как сервис участия, и сохраняет заявку. Без
+    // блокировки изменение насчитало бы ноль записей и сменило режим при живой заявке
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let locked: () => void = () => undefined;
+    const lockTaken = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const join = prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "events" WHERE "id" = ${id}::uuid FOR UPDATE`;
+        locked();
+        await held;
+        await tx.participation.create({
+          data: {
+            eventId: id,
+            userId: user.id,
+            status: 'pending',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
+      },
+      { timeout: 10_000 },
+    );
+    await lockTaken;
+    const editing = patch(igor, id, { mode: 'approval' }).then((response) => response);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    release();
+    await join;
+
+    const response = await editing;
+    expect(response.status).toBe(400);
+    expect(response.body.fields).toHaveProperty('mode');
+    expect((await prisma.event.findUniqueOrThrow({ where: { id } })).mode).toBe('free');
+  });
+});
